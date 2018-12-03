@@ -106,10 +106,10 @@ func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
 		if reqMethod := methodMaps[method.Name]; reqMethod != "" {
 			methodName := strings.ToLower(method.Name)
 			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
-			router.Methods([]string{reqMethod}, path, HandlerFunc(func(ctx Context) error {
+			router.Methods([]string{reqMethod}, path, func(ctx Context) error {
 				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
 				return vs[0].Interface().(error)
-			}), fmt.Sprintf("%s_%s", typeName, methodName))
+			}, fmt.Sprintf("%s_%s", typeName, methodName))
 
 			paths = append(paths, path)
 		}

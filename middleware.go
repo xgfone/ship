@@ -27,10 +27,10 @@ func NewLoggerMiddleware(now ...func() time.Time) Middleware {
 		_now = now[0]
 	}
 
-	return MiddlewareFunc(func(next Handler) Handler {
-		return HandlerFunc(func(ctx Context) (err error) {
+	return func(next Handler) Handler {
+		return func(ctx Context) (err error) {
 			start := _now()
-			err = next.Handle(ctx)
+			err = next(ctx)
 			end := _now()
 
 			logger := ctx.Logger()
@@ -41,8 +41,8 @@ func NewLoggerMiddleware(now ...func() time.Time) Middleware {
 					end.Sub(start).String(), err)
 			}
 			return
-		})
-	})
+		}
+	}
 }
 
 // NewPanicMiddleware returns a middleware to wrap the panic.
@@ -54,15 +54,15 @@ func NewPanicMiddleware(handle ...func(Context, interface{})) Middleware {
 		handlePanic = handle[0]
 	}
 
-	return MiddlewareFunc(func(next Handler) Handler {
-		return HandlerFunc(func(ctx Context) (err error) {
+	return func(next Handler) Handler {
+		return func(ctx Context) (err error) {
 			defer func() {
 				if err := recover(); err != nil {
 					handlePanic(ctx, err)
 				}
 			}()
-			err = next.Handle(ctx)
+			err = next(ctx)
 			return
-		})
-	})
+		}
+	}
 }

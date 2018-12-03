@@ -82,6 +82,7 @@ type Context interface {
 	Render(code int, name string, data interface{}) error
 	SetRenderer(renderer Renderer)
 
+	// Manage the key-value in the context.
 	Get(key string) interface{}
 	Set(key string, value interface{})
 
@@ -136,14 +137,10 @@ type Context interface {
 }
 
 // Handler is a handler of the HTTP request.
-type Handler interface {
-	Handle(Context) error
-}
+type Handler func(Context) error
 
 // Middleware stands for a middleware.
-type Middleware interface {
-	Handle(Handler) Handler
-}
+type Middleware func(Handler) Handler
 
 // Route is used to manage the route.
 type Route interface {
@@ -179,22 +176,6 @@ type Router interface {
 	ServeHTTP(resp http.ResponseWriter, req *http.Request)
 }
 
-// HandlerFunc is a Handler function.
-type HandlerFunc func(Context) error
-
-// Handle implements the interface Handler.
-func (hf HandlerFunc) Handle(ctx Context) error {
-	return hf(ctx)
-}
-
-// MiddlewareFunc is a Middleware function.
-type MiddlewareFunc func(Handler) Handler
-
-// Handle implements the interface Middleware.
-func (mf MiddlewareFunc) Handle(h Handler) Handler {
-	return mf(h)
-}
-
 // ToHTTPHandler converts the Handler to http.Handler
 //
 // Notice: Debug(), Logger(), Binder(), Render() and URLParam() can't be used
@@ -205,48 +186,48 @@ func (mf MiddlewareFunc) Handle(h Handler) Handler {
 //    ctx.SetBinder(Binder)
 //    ctx.SetRenderer(Renderer)
 //    ctx.SetURLParam(URLParam)
-func ToHTTPHandler(f func(Context) error) http.Handler {
+func ToHTTPHandler(h Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := NewContext()
 		ctx.SetReqResp(r, w)
-		f(ctx)
+		h(ctx)
 	})
 }
 
 // FromHTTPHandler converts http.Handler to Handler.
 func FromHTTPHandler(h http.HandlerFunc) Handler {
-	return HandlerFunc(func(ctx Context) error {
+	return func(ctx Context) error {
 		h.ServeHTTP(ctx.Response(), ctx.Request())
 		return nil
-	})
+	}
 }
 
 // FromHTTPHandlerFunc converts http.HandlerFunc to Handler.
 func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
-	return HandlerFunc(func(ctx Context) error {
+	return func(ctx Context) error {
 		h(ctx.Response(), ctx.Request())
 		return nil
-	})
+	}
 }
 
 // Some default handlers
 var (
-	NothingHandler = HandlerFunc(func(ctx Context) error { return nil })
+	NothingHandler = func(ctx Context) error { return nil }
 
-	NotFoundHandler = HandlerFunc(func(ctx Context) error {
+	NotFoundHandler = func(ctx Context) error {
 		http.NotFound(ctx.Response(), ctx.Request())
 		return nil
-	})
+	}
 
-	MethodNotAllowedHandler = HandlerFunc(func(ctx Context) error {
+	MethodNotAllowedHandler = func(ctx Context) error {
 		ctx.Response().WriteHeader(http.StatusMethodNotAllowed)
 		return nil
-	})
+	}
 
-	OptionsHandler = HandlerFunc(func(ctx Context) error {
+	OptionsHandler = func(ctx Context) error {
 		ctx.Response().WriteHeader(http.StatusOK)
 		return nil
-	})
+	}
 )
 
 // HandlePanic wraps and logs the panic information.

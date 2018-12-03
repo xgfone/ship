@@ -74,7 +74,7 @@ func TestDuplicateParams(t *testing.T) {
 
 func TestWildcardParam(t *testing.T) {
 	r := NewRouter()
-	r.Get("/users/*", HandlerFunc(func(ctx Context) (err error) {
+	r.Get("/users/*", func(ctx Context) (err error) {
 		resp := ctx.Response()
 		ups := GetURLParam(ctx.Request())
 		if _, err = resp.Write([]byte(ups.Get(WildcardParam))); err != nil {
@@ -82,7 +82,7 @@ func TestWildcardParam(t *testing.T) {
 			err = NewHTTPError(code).SetInnerError(err)
 		}
 		return
-	}))
+	})
 
 	code, body := sendTestRequest(http.MethodGet, "/users/testwild", r)
 	testEqual(t, code, http.StatusOK)

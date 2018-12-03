@@ -17,7 +17,6 @@ package ship
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,15 +33,15 @@ func ExampleMiddleware() {
 	}
 
 	bs := bytes.NewBuffer(nil)
-	logger := NewNoLevelLogger(bs, log.Lshortfile)
+	logger := NewNoLevelLogger(bs, 0)
 
 	router := NewRouter(Config{Logger: logger})
 	router.Use(NewLoggerMiddleware(getNow), NewPanicMiddleware())
 
-	router.Get("/test", HandlerFunc(func(ctx Context) error {
+	router.Get("/test", func(ctx Context) error {
 		ctx.Logger().Info("handler")
 		return nil
-	}))
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()
@@ -54,6 +53,6 @@ func ExampleMiddleware() {
 	fmt.Println(strings.Join(strings.Split(ss[1], ",")[:3], ","))
 
 	// Output:
-	// sea.go:187: [INFO] handler
-	// sea.go:187: [INFO] method=GET, url=/test, starttime=1543817400
+	// [INFO] handler
+	// [INFO] method=GET, url=/test, starttime=1543817400
 }

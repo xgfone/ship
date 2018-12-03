@@ -152,7 +152,7 @@ func (r *routerT) Before(ms ...Middleware) {
 
 	var handler Handler = NothingHandler
 	for i := len(r.beforeMiddlewares) - 1; i >= 0; i-- {
-		handler = r.beforeMiddlewares[i].Handle(handler)
+		handler = r.beforeMiddlewares[i](handler)
 	}
 	r.beforeRouteHandler = handler
 }
@@ -162,7 +162,7 @@ func (r *routerT) After(ms ...Middleware) {
 
 	var handler Handler = NothingHandler
 	for i := len(r.afterMiddlewares) - 1; i >= 0; i-- {
-		handler = r.afterMiddlewares[i].Handle(handler)
+		handler = r.afterMiddlewares[i](handler)
 	}
 	r.afterRouteHandler = handler
 }
@@ -257,7 +257,7 @@ func (r *routerT) addRoute(method, path string, handler Handler, name ...string)
 	}
 
 	for i := len(r.middlewares) - 1; i >= 0; i-- {
-		handler = r.middlewares[i].Handle(handler)
+		handler = r.middlewares[i](handler)
 	}
 
 	method = strings.ToUpper(method)
@@ -336,7 +336,7 @@ func (r *routerT) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Handle the pre-middlewares before routing.
-	if err = r.beforeRouteHandler.Handle(ctx); err != nil {
+	if err = r.beforeRouteHandler(ctx); err != nil {
 		goto ERROR
 	}
 
@@ -402,9 +402,9 @@ END:
 	}
 
 	// Handle the post-middlewares after routing.
-	if err = r.afterRouteHandler.Handle(ctx); err == nil {
+	if err = r.afterRouteHandler(ctx); err == nil {
 		// Handle the request
-		err = handler.Handle(ctx)
+		err = handler(ctx)
 	}
 
 ERROR:

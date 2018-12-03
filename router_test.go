@@ -80,16 +80,16 @@ func testIsType(t *testing.T, v1, v2 interface{}) {
 	}
 }
 
-var defaultHandler = HandlerFunc(func(ctx Context) (err error) {
+var defaultHandler = func(ctx Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.Request().Method)); err != nil {
 		code := http.StatusInternalServerError
 		err = NewHTTPError(code).SetInnerError(err)
 	}
 	return
-})
+}
 
-var idHandler = HandlerFunc(func(ctx Context) (err error) {
+var idHandler = func(ctx Context) (err error) {
 	resp := ctx.Response()
 	ups := GetURLParam(ctx.Request())
 	if _, err = resp.Write([]byte(ups.Get("id"))); err != nil {
@@ -97,9 +97,9 @@ var idHandler = HandlerFunc(func(ctx Context) (err error) {
 		err = NewHTTPError(code).SetInnerError(err)
 	}
 	return
-})
+}
 
-var params2Handler = HandlerFunc(func(ctx Context) (err error) {
+var params2Handler = func(ctx Context) (err error) {
 	resp := ctx.Response()
 	ups := GetURLParam(ctx.Request())
 	if _, err = resp.Write([]byte(ups.Get("p1") + "|" + ups.Get("p2"))); err != nil {
@@ -107,7 +107,7 @@ var params2Handler = HandlerFunc(func(ctx Context) (err error) {
 		err = NewHTTPError(code).SetInnerError(err)
 	}
 	return
-})
+}
 
 type closeNotifyingRecorder struct {
 	*httptest.ResponseRecorder
@@ -137,11 +137,11 @@ func sendTestRequest(method, path string, router Router) (int, string) {
 
 func TestAllMethods(t *testing.T) {
 	p := NewRouter()
-	p.Use(MiddlewareFunc(func(next Handler) Handler {
-		return HandlerFunc(func(c Context) error {
-			return next.Handle(c)
-		})
-	}))
+	p.Use(func(next Handler) Handler {
+		return func(c Context) error {
+			return next(c)
+		}
+	})
 
 	tests := []struct {
 		method  string
@@ -387,12 +387,12 @@ func TestRouterAPI(t *testing.T) {
 	p := NewRouter().(*routerT)
 
 	for _, route := range githubAPI {
-		p.addRoute(route.method, route.path, HandlerFunc(func(ctx Context) error {
+		p.addRoute(route.method, route.path, func(ctx Context) error {
 			if _, err := ctx.Response().Write([]byte(ctx.Request().URL.Path)); err != nil {
 				panic(err)
 			}
 			return nil
-		}))
+		})
 	}
 
 	for _, route := range githubAPI {
@@ -506,10 +506,10 @@ func TestAutomaticallyHandleOPTIONS(t *testing.T) {
 }
 
 func TestNotFound(t *testing.T) {
-	notFound := HandlerFunc(func(ctx Context) error {
+	notFound := func(ctx Context) error {
 		http.Error(ctx.Response(), http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return nil
-	})
+	}
 
 	p := NewRouter(Config{NotFoundHandler: notFound})
 	p.Get("/home/", defaultHandler)
@@ -525,12 +525,12 @@ func TestNotFound(t *testing.T) {
 }
 
 func TestBadAdd(t *testing.T) {
-	fn := HandlerFunc(func(ctx Context) error {
+	fn := func(ctx Context) error {
 		if _, err := ctx.Response().Write([]byte(ctx.Request().Method)); err != nil {
 			panic(err)
 		}
 		return nil
-	})
+	}
 
 	p := NewRouter()
 	testMatchPanic(t, func() { p.Get("/%%%2frs#@$/", fn) },
