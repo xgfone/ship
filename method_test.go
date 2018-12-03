@@ -38,10 +38,10 @@ func strIsInSlice(s string, ss []string) bool {
 	return false
 }
 
-func TestMapStructIntoRouter(t *testing.T) {
+func TestMapMethodIntoRouter(t *testing.T) {
 	router := ship.NewRouter()
 	ts := TestStruct{}
-	paths := ship.MapStructIntoRouter(router, ts, "/v1")
+	paths := ship.MapMethodIntoRouter(router, ts, "/v1")
 	if len(paths) != 4 {
 		t.Fail()
 	} else {

@@ -28,7 +28,7 @@ var DefaultMethodMapping = map[string]string{
 	"Get":    "GET",
 }
 
-// MapStructIntoRouter maps the struct method into the router,
+// MapMethodIntoRouter maps the struct method into the router,
 // and returns the mapped paths.
 //
 // If the return value is nil, it represents that no method is mapped.
@@ -47,7 +47,7 @@ var DefaultMethodMapping = map[string]string{
 //
 //    ts := TestStruct{}
 //    router := NewRouter()
-//    paths := MapStructIntoRouter(router, ts, "/v1")
+//    paths := MapMethodIntoRouter(router, ts, "/v1")
 //
 // It's equal to the operation as follow:
 //
@@ -62,7 +62,7 @@ var DefaultMethodMapping = map[string]string{
 // etc.
 //
 // Notice: the name of type and method will be converted to the lower.
-func MapStructIntoRouter(router Router, _struct interface{}, prefix string,
+func MapMethodIntoRouter(router Router, _struct interface{}, prefix string,
 	mapping ...map[string]string) (paths []string) {
 
 	if _struct == nil {
