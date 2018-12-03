@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ship
+package mw
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 	"time"
+
+	"github.com/xgfone/ship"
 )
 
-func ExampleMiddleware() {
+func TestLogger(t *testing.T) {
 	// We fix the timestamp.
 	startTime := time.Date(2018, time.December, 3, 14, 10, 0, 0, time.UTC)
 	addTime := time.Duration(60)
@@ -33,12 +35,12 @@ func ExampleMiddleware() {
 	}
 
 	bs := bytes.NewBuffer(nil)
-	logger := NewNoLevelLogger(bs, 0)
+	logger := ship.NewNoLevelLogger(bs, 0)
 
-	router := NewRouter(Config{Logger: logger})
-	router.Use(NewLoggerMiddleware(getNow), NewRecoverMiddleware())
+	router := ship.NewRouter(ship.Config{Logger: logger})
+	router.Use(Logger(getNow))
 
-	router.Get("/test", func(ctx Context) error {
+	router.Get("/test", func(ctx ship.Context) error {
 		ctx.Logger().Info("handler")
 		return nil
 	})
@@ -49,10 +51,11 @@ func ExampleMiddleware() {
 
 	// We removes the cost string, which is uncontrollable.
 	ss := strings.Split(strings.TrimSpace(bs.String()), "\n")
-	fmt.Println(ss[0])
-	fmt.Println(strings.Join(strings.Split(ss[1], ",")[:3], ","))
-
-	// Output:
-	// [INFO] handler
-	// [INFO] method=GET, url=/test, starttime=1543846200
+	if ss[0] != "[INFO] handler" {
+		t.Fail()
+	}
+	if strings.Join(strings.Split(ss[1], ",")[:3], ",") !=
+		"[INFO] method=GET, url=/test, starttime=1543846200" {
+		t.Fail()
+	}
 }

@@ -12,23 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ship
+package mw
 
 import (
 	"time"
+
+	"github.com/xgfone/ship"
 )
 
-// NewLoggerMiddleware returns a new logger middleware that will log the request.
+// Logger returns a new logger middleware that will log the request.
 //
 // By default getTime is time.Now().
-func NewLoggerMiddleware(now ...func() time.Time) Middleware {
+func Logger(now ...func() time.Time) ship.Middleware {
 	_now := time.Now
 	if len(now) > 0 && now[0] != nil {
 		_now = now[0]
 	}
 
-	return func(next Handler) Handler {
-		return func(ctx Context) (err error) {
+	return func(next ship.Handler) ship.Handler {
+		return func(ctx ship.Context) (err error) {
 			start := _now()
 			err = next(ctx)
 			end := _now()
@@ -40,28 +42,6 @@ func NewLoggerMiddleware(now ...func() time.Time) Middleware {
 					req.Method, req.URL.RequestURI(), start.Unix(),
 					end.Sub(start).String(), err)
 			}
-			return
-		}
-	}
-}
-
-// NewRecoverMiddleware returns a middleware to wrap the panic.
-//
-// If missing handle, it will use the default, which logs the panic.
-func NewRecoverMiddleware(handle ...func(Context, interface{})) Middleware {
-	handlePanic := HandlePanic
-	if len(handle) > 0 && handle[0] != nil {
-		handlePanic = handle[0]
-	}
-
-	return func(next Handler) Handler {
-		return func(ctx Context) (err error) {
-			defer func() {
-				if err := recover(); err != nil {
-					handlePanic(ctx, err)
-				}
-			}()
-			err = next(ctx)
 			return
 		}
 	}

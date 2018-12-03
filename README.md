@@ -212,10 +212,19 @@ ship.MapMethodIntoRouter(router, TestStruct{}, "/v1", map[string]string{
 #### Using `Middleware`
 
 ```go
+package main
+
+import (
+    "net/http"
+
+    "github.com/xgfone/ship"
+    "github.com/xgfone/ship/mw"
+)
+
 func main() {
     router := ship.NewRouter()
 
-    router.Use(ship.NewLoggerMiddleware(), ship.NewRecoverMiddleware())
+    router.Use(mw.Logger(), mw.Recover())
     router.Use(MyAuthMiddleware())
 
     router.Get("/url/path", handler)
@@ -244,9 +253,9 @@ func main() {
     router := ship.NewRouter()
 
     // Use and Before have no interference each other.
-    router.Use(ship.NewLoggerMiddleware())
+    router.Use(mw.Logger())
     router.Before(RemovePathPrefix("/static"))
-    router.Use(ship.NewRecoverMiddleware())
+    router.Use(mw.Recover())
 
     router.Get("/url/path", handler)
 
@@ -262,8 +271,8 @@ func main() {
 func main() {
     router := ship.NewRouter()
 
-    router.Use(ship.NewLoggerMiddleware())
-    router.Use(ship.NewRecoverMiddleware())
+    router.Use(mw.Logger())
+    router.Use(mw.Recover())
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
     v1 := router.SubRouter("/v1")
