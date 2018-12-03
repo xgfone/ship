@@ -192,6 +192,40 @@ func (mf MiddlewareFunc) Handle(h Handler) Handler {
 	return mf(h)
 }
 
+// ToHTTPHandler converts the Handler to http.Handler
+//
+// Notice: Debug(), Logger(), Binder(), Render() and URLParam() can't be used
+// until executing the following settings:
+//
+//    ctx.SetDebug(bool)
+//    ctx.SetLogger(Logger)
+//    ctx.SetBinder(Binder)
+//    ctx.SetRenderer(Renderer)
+//    ctx.SetURLParam(URLParam)
+func ToHTTPHandler(f func(Context) error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := NewContext(nil)
+		ctx.SetReqResp(r, w)
+		f(ctx)
+	})
+}
+
+// FromHTTPHandler converts http.Handler to Handler.
+func FromHTTPHandler(h http.HandlerFunc) Handler {
+	return HandlerFunc(func(ctx Context) error {
+		h.ServeHTTP(ctx.Response(), ctx.Request())
+		return nil
+	})
+}
+
+// FromHTTPHandlerFunc converts http.HandlerFunc to Handler.
+func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
+	return HandlerFunc(func(ctx Context) error {
+		h(ctx.Response(), ctx.Request())
+		return nil
+	})
+}
+
 // Some default handlers
 var (
 	NotFoundHandler = HandlerFunc(func(ctx Context) error {
