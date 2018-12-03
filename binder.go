@@ -65,8 +65,8 @@ func (b *defaultBinder) Bind(ctx Context, v interface{}) (err error) {
 		if err = json.NewDecoder(req.Body).Decode(v); err != nil {
 			if ute, ok := err.(*json.UnmarshalTypeError); ok {
 				return NewHTTPError(http.StatusBadRequest,
-					fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, field=%v, offset=%v",
-						ute.Type, ute.Value, ute.Field, ute.Offset)).SetInnerError(err)
+					fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, offset=%v",
+						ute.Type, ute.Value, ute.Offset)).SetInnerError(err)
 			} else if se, ok := err.(*json.SyntaxError); ok {
 				return NewHTTPError(http.StatusBadRequest,
 					fmt.Sprintf("Syntax error: offset=%v, error=%v",

@@ -357,7 +357,7 @@ func TestBindUnmarshalTypeError(t *testing.T) {
 
 	err := ctx.Bind(u)
 	he := NewHTTPError(http.StatusBadRequest,
-		"Unmarshal type error: expected=int, got=string, field=id, offset=14")
+		"Unmarshal type error: expected=int, got=string, offset=14")
 	he = he.SetInnerError(err.(HTTPError))
 
 	testEqual(t, he.Error(), err.Error())

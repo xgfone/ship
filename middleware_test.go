@@ -25,7 +25,7 @@ import (
 
 func ExampleMiddleware() {
 	// We fix the timestamp.
-	startTime := time.Date(2018, time.December, 3, 14, 10, 0, 0, time.Local)
+	startTime := time.Date(2018, time.December, 3, 14, 10, 0, 0, time.UTC)
 	addTime := time.Duration(60)
 	getNow := func() time.Time {
 		startTime = startTime.Add(addTime)
@@ -54,5 +54,5 @@ func ExampleMiddleware() {
 
 	// Output:
 	// [INFO] handler
-	// [INFO] method=GET, url=/test, starttime=1543817400
+	// [INFO] method=GET, url=/test, starttime=1543846200
 }
