@@ -192,7 +192,7 @@ func (mf MiddlewareFunc) Handle(h Handler) Handler {
 	return mf(h)
 }
 
-// Error handlers
+// Some default handlers
 var (
 	NotFoundHandler = HandlerFunc(func(ctx Context) error {
 		http.NotFound(ctx.Response(), ctx.Request())
