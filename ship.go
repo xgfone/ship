@@ -39,7 +39,7 @@ type HTTPError interface {
 	SetInnerError(error) HTTPError
 }
 
-// URLParam is the interface of request scoped variables tracked by sea.
+// URLParam is the interface of request scoped variables tracked by ship.
 type URLParam interface {
 	Reset()
 

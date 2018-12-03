@@ -1,4 +1,4 @@
-# sea [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![Coverage Status](https://coveralls.io/repos/github/xgfone/ship/badge.svg?branch=master)](https://coveralls.io/github/xgfone/ship?branch=master) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](http://godoc.org/github.com/xgfone/ship) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
+# ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![Coverage Status](https://coveralls.io/repos/github/xgfone/ship/badge.svg?branch=master)](https://coveralls.io/github/xgfone/ship?branch=master) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](http://godoc.org/github.com/xgfone/ship) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
 `ship` is a A flexible and powerful HTTP router implemented by golang, which uses the interface to define the router, so you can supply yourself implementation and combine them with the default implementation.
 
@@ -64,32 +64,32 @@ type Config struct {
 	// If ture, it will clean the request path before finding the route.
 	CleanPath bool
 
-	// You can customize the logger implementation, or use ship.NewNoLevelLogger(os.Stdout).
+	// You can customize the logger implementation, or use NewNoLevelLogger(os.Stdout).
 	Logger Logger
-	// You can customize the Binder implementation, or use ship.NewBinder.
+	// You can customize the Binder implementation, or use NewBinder().
 	Binder Binder
 	// You can customize the Renderer implementation.
 	Renderer Renderer
 
-	// You can customize the Route management, or use ship.NewRoute.
+	// You can customize the Route management, or use NewRoute().
 	// The default implementation is based on Radix tree,
 	// which refers to https://github.com/go-playground/pure.
 	NewRoute func() Route
-	// You can customize the Context implementation, or use ship.NewContext.
+	// You can customize the Context implementation, or use NewContext().
 	NewContext func() Context
-	// You can customize the URLParam implementation, or use ship.NewURLParam.
+	// You can customize the URLParam implementation, or use NewURLParam().
 	NewURLParam func(int) URLParam
 	// You can check and filter the response output before sending the peer.
 	FilterOutput func([]byte) []byte
 
-	// You can appoint the error handler, or use ship.HandleHTTPError.
+	// You can appoint the error handler, or use HandleHTTPError().
 	HandleError func(ctx Context, err error)
 	// You can appoint the panic handler.
-	 HandlePanic func(ctx Context, panicValue interface{})
+	HandlePanic func(ctx Context, panicValue interface{})
 
 	// You can appoint the OPTIONS handler.
 	OptionsHandler Handler
-	// You can appoint the NotFound handler. Or use ship.NotFoundHandler.
+	// You can appoint the NotFound handler. Or use NotFoundHandler.
 	NotFoundHandler Handler
 	// You can appoint the MethodNotAllowed handler.
 	MethodNotAllowedHandler Handler
