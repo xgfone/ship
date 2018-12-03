@@ -35,8 +35,8 @@ type Config struct {
 	Renderer Renderer
 
 	NewRoute     func() Route
+	NewContext   func() Context
 	NewURLParam  func(int) URLParam
-	NewContext   func(Router) Context
 	FilterOutput func([]byte) []byte
 
 	HandleError func(ctx Context, err error)
@@ -133,7 +133,7 @@ func NewRouter(conf ...Config) Router {
 		return NewResponse(nil)
 	}}
 	config.contextPool = &sync.Pool{New: func() interface{} {
-		return config.NewContext(nil)
+		return config.NewContext()
 	}}
 	config.urlParamsPool = &sync.Pool{New: func() interface{} {
 		return config.NewURLParam(config.urlParamMaxNum)
@@ -325,8 +325,9 @@ func (r *routerT) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	resp := r.config.writerPool.Get().(*Response).SetWriter(w).SetFilter(r.config.FilterOutput)
 	ctx = r.config.contextPool.Get().(Context)
+	ctx.Reset()
+	ctx.SetRouter(r)
 	ctx.SetReqResp(req, resp)
-	ctx.Reset(r)
 	if _, ok := ctx.(*contextT); !ok {
 		ctx.SetDebug(r.config.Debug)
 		ctx.SetLogger(r.config.Logger)
@@ -411,7 +412,7 @@ ERROR:
 		r.config.HandleError(ctx, err)
 	}
 
-	ctx.Reset(nil)
+	ctx.Reset()
 	resp.Reset(nil)
 
 	r.putURLParam(params)

@@ -55,7 +55,7 @@ type contextT struct {
 //
 // Notice: For the method,
 //
-//     Reset(router Router)
+//     SetRouter(router Router)
 //
 // if router is the default implementation returned by NewRouter(),
 // it will also call the following method：
@@ -66,19 +66,31 @@ type contextT struct {
 //     c.SetRenderer()
 //
 // the arguments of which comes from router.
-func NewContext(router Router) Context {
-	ctx := contextT{
-		router: router,
-		store:  make(map[string]interface{}),
-	}
-	ctx.Reset(router)
-	return &ctx
+func NewContext() Context {
+	return &contextT{store: make(map[string]interface{})}
 }
 
 func (c *contextT) writeContentType(value string) {
 	header := c.resp.Header()
 	if header.Get(HeaderContentType) == "" {
 		header.Set(HeaderContentType, value)
+	}
+}
+
+func (c *contextT) Router() Router {
+	return c.router
+}
+
+func (c *contextT) SetRouter(router Router) {
+	if router == nil {
+		panic(fmt.Errorf("router must not be nil"))
+	}
+
+	if r, ok := router.(*routerT); ok {
+		c.SetDebug(r.config.Debug)
+		c.SetLogger(r.config.Logger)
+		c.SetBinder(r.config.Binder)
+		c.SetRenderer(r.config.Renderer)
 	}
 }
 
@@ -453,18 +465,7 @@ func (c *contextT) URL(name string, params URLParam) string {
 	return c.router.URL(name, params)
 }
 
-func (c *contextT) Reset(router Router) {
-	if router != nil {
-		c.router = router
-		if r, ok := router.(*routerT); ok {
-			c.SetDebug(r.config.Debug)
-			c.SetLogger(r.config.Logger)
-			c.SetBinder(r.config.Binder)
-			c.SetRenderer(r.config.Renderer)
-		}
-		return
-	}
-
+func (c *contextT) Reset() {
 	c.req = nil
 	c.resp = nil
 	c.router = nil

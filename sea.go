@@ -60,10 +60,10 @@ type Renderer interface {
 
 // Context stands for a request & response context.
 type Context interface {
-	// Reset the router to router.
-	//
-	// If router is nil, it should clear itself.
-	Reset(router Router)
+	Reset()
+
+	Router() Router
+	SetRouter(router Router)
 
 	Request() *http.Request
 	Response() http.ResponseWriter
@@ -207,7 +207,7 @@ func (mf MiddlewareFunc) Handle(h Handler) Handler {
 //    ctx.SetURLParam(URLParam)
 func ToHTTPHandler(f func(Context) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := NewContext(nil)
+		ctx := NewContext()
 		ctx.SetReqResp(r, w)
 		f(ctx)
 	})
