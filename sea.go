@@ -210,25 +210,26 @@ func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
 	}
 }
 
-// Some default handlers
-var (
-	NothingHandler = func(ctx Context) error { return nil }
+// NothingHandler does nothing.
+func NothingHandler(ctx Context) error { return nil }
 
-	NotFoundHandler = func(ctx Context) error {
-		http.NotFound(ctx.Response(), ctx.Request())
-		return nil
-	}
+// NotFoundHandler is the default NotFound handler.
+func NotFoundHandler(ctx Context) error {
+	http.NotFound(ctx.Response(), ctx.Request())
+	return nil
+}
 
-	MethodNotAllowedHandler = func(ctx Context) error {
-		ctx.Response().WriteHeader(http.StatusMethodNotAllowed)
-		return nil
-	}
+// MethodNotAllowedHandler is the default MethodNotAllowed handler.
+func MethodNotAllowedHandler(ctx Context) error {
+	ctx.Response().WriteHeader(http.StatusMethodNotAllowed)
+	return nil
+}
 
-	OptionsHandler = func(ctx Context) error {
-		ctx.Response().WriteHeader(http.StatusOK)
-		return nil
-	}
-)
+// OptionsHandler is the default OPTIONS handler.
+func OptionsHandler(ctx Context) error {
+	ctx.Response().WriteHeader(http.StatusOK)
+	return nil
+}
 
 // HandlePanic wraps and logs the panic information.
 func HandlePanic(ctx Context, err interface{}) {
