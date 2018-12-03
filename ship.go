@@ -140,6 +140,8 @@ type Context interface {
 type Handler func(Context) error
 
 // Middleware stands for a middleware.
+//
+// See the sub-package mw, which is the abbreviation of middleware.
 type Middleware func(Handler) Handler
 
 // Route is used to manage the route.
