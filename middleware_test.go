@@ -36,7 +36,7 @@ func ExampleMiddleware() {
 	logger := NewNoLevelLogger(bs, 0)
 
 	router := NewRouter(Config{Logger: logger})
-	router.Use(NewLoggerMiddleware(getNow), NewPanicMiddleware())
+	router.Use(NewLoggerMiddleware(getNow), NewRecoverMiddleware())
 
 	router.Get("/test", func(ctx Context) error {
 		ctx.Logger().Info("handler")

@@ -45,10 +45,10 @@ func NewLoggerMiddleware(now ...func() time.Time) Middleware {
 	}
 }
 
-// NewPanicMiddleware returns a middleware to wrap the panic.
+// NewRecoverMiddleware returns a middleware to wrap the panic.
 //
 // If missing handle, it will use the default, which logs the panic.
-func NewPanicMiddleware(handle ...func(Context, interface{})) Middleware {
+func NewRecoverMiddleware(handle ...func(Context, interface{})) Middleware {
 	handlePanic := HandlePanic
 	if len(handle) > 0 && handle[0] != nil {
 		handlePanic = handle[0]

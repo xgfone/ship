@@ -152,7 +152,7 @@ func main() {
 func main() {
     router := ship.NewRouter()
 
-    router.Use(ship.NewLoggerMiddleware(), ship.NewPanicMiddleware())
+    router.Use(ship.NewLoggerMiddleware(), ship.NewRecoverMiddleware())
     router.Use(MyAuthMiddleware())
 
     router.Get("/url/path", handler)
@@ -183,7 +183,7 @@ func main() {
     // Use and Before have no interference each other.
     router.Use(ship.NewLoggerMiddleware())
     router.Before(RemovePathPrefix("/static"))
-    router.Use(ship.NewPanicMiddleware())
+    router.Use(ship.NewRecoverMiddleware())
 
     router.Get("/url/path", handler)
 
@@ -200,7 +200,7 @@ func main() {
     router := ship.NewRouter()
 
     router.Use(ship.NewLoggerMiddleware())
-    router.Use(ship.NewPanicMiddleware())
+    router.Use(ship.NewRecoverMiddleware())
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
     v1 := router.SubRouter("/v1")
