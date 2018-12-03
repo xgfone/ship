@@ -59,7 +59,9 @@ var DefaultMethodMapping = map[string]string{
 // If you don't like the default mapping policy, you can give the customized
 // mapping by the last argument, the key of which is the name of the method
 // of the type, and the value of that is the request method, such as GET, POST,
-// etc.
+// etc. Notice that the method type must be compatible with
+//
+//    func (Context) error
 //
 // Notice: the name of type and method will be converted to the lower.
 func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
