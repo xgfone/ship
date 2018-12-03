@@ -23,27 +23,44 @@ import (
 	"sync"
 )
 
-// Config is used to configure the default router.
+// Config is used to configure the router used by the default implementation.
 type Config struct {
+	// The route prefix.
 	Prefix string
 
-	Debug     bool
+	// If ture, it will enable the debug mode.
+	Debug bool
+	// If ture, it will clean the request path before finding the route.
 	CleanPath bool
 
-	Logger   Logger
-	Binder   Binder
+	// You can customize the logger implementation, or use NewNoLevelLogger(os.Stdout).
+	Logger Logger
+	// You can customize the Binder implementation, or use NewBinder().
+	Binder Binder
+	// You can customize the Renderer implementation.
 	Renderer Renderer
 
-	NewRoute     func() Route
-	NewContext   func() Context
-	NewURLParam  func(int) URLParam
+	// You can customize the Route management, or use NewRoute().
+	// The default implementation is based on Radix tree,
+	// which refers to https://github.com/go-playground/pure.
+	NewRoute func() Route
+	// You can customize the Context implementation, or use NewContext().
+	NewContext func() Context
+	// You can customize the URLParam implementation, or use NewURLParam().
+	NewURLParam func(int) URLParam
+	// You can check and filter the response output before sending the peer.
 	FilterOutput func([]byte) []byte
 
+	// You can appoint the error handler, or use HandleHTTPError().
 	HandleError func(ctx Context, err error)
+	// You can appoint the panic handler.
 	HandlePanic func(ctx Context, panicValue interface{})
 
-	OptionsHandler          Handler
-	NotFoundHandler         Handler
+	// You can appoint the OPTIONS handler.
+	OptionsHandler Handler
+	// You can appoint the NotFound handler. Or use NotFoundHandler.
+	NotFoundHandler Handler
+	// You can appoint the MethodNotAllowed handler.
 	MethodNotAllowedHandler Handler
 
 	writerPool    *sync.Pool
@@ -78,7 +95,7 @@ type routerT struct {
 func newRouter(config *Config, parent *routerT, prefix ...string) *routerT {
 	var pre string
 	if len(prefix) > 0 {
-		pre = prefix[0]
+		pre = strings.TrimRight(prefix[0], "/ ")
 	}
 
 	router := routerT{
