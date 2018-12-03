@@ -258,6 +258,7 @@ func (r *routerT) addRoute(method, path string, handler Handler, name ...string)
 		handler = r.middlewares[i].Handle(handler)
 	}
 
+	method = strings.ToUpper(method)
 	tree := r.trees[method]
 	if tree == nil {
 		tree = r.config.NewRoute()
