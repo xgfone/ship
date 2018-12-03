@@ -60,7 +60,10 @@ type Renderer interface {
 
 // Context stands for a request & response context.
 type Context interface {
-	Reset()
+	// Reset the router to router.
+	//
+	// If router is nil, it should clear itself.
+	Reset(router Router)
 
 	Request() *http.Request
 	Response() http.ResponseWriter

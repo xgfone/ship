@@ -52,19 +52,26 @@ type contextT struct {
 }
 
 // NewContext returns a new context.
+//
+// Notice: For the method,
+//
+//     Reset(router Router)
+//
+// if router is the default implementation returned by NewRouter(),
+// it will also call the following method：
+//
+//     c.SetDebug()
+//     c.SetLogger()
+//     c.SetBinder()
+//     c.SetRenderer()
+//
+// the arguments of which comes from router.
 func NewContext(router Router) Context {
 	ctx := contextT{
 		router: router,
 		store:  make(map[string]interface{}),
 	}
-
-	if r, ok := router.(*routerT); ok {
-		ctx.SetDebug(r.config.Debug)
-		ctx.SetLogger(r.config.Logger)
-		ctx.SetBinder(r.config.Binder)
-		ctx.SetRenderer(r.config.Renderer)
-	}
-
+	ctx.Reset(router)
 	return &ctx
 }
 
@@ -446,7 +453,18 @@ func (c *contextT) URL(name string, params URLParam) string {
 	return c.router.URL(name, params)
 }
 
-func (c *contextT) Reset() {
+func (c *contextT) Reset(router Router) {
+	if router != nil {
+		c.router = router
+		if r, ok := router.(*routerT); ok {
+			c.SetDebug(r.config.Debug)
+			c.SetLogger(r.config.Logger)
+			c.SetBinder(r.config.Binder)
+			c.SetRenderer(r.config.Renderer)
+		}
+		return
+	}
+
 	c.req = nil
 	c.resp = nil
 	c.router = nil

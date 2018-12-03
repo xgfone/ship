@@ -252,6 +252,10 @@ func (r *routerT) addRoute(method, path string, handler Handler, name ...string)
 			path, strconv.Itoa(i)))
 	}
 
+	if handler == nil {
+		panic(fmt.Errorf("Handler must not be nil"))
+	}
+
 	for i := len(r.middlewares) - 1; i >= 0; i-- {
 		handler = r.middlewares[i].Handle(handler)
 	}
@@ -322,6 +326,7 @@ func (r *routerT) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	resp := r.config.writerPool.Get().(*Response).SetWriter(w).SetFilter(r.config.FilterOutput)
 	ctx = r.config.contextPool.Get().(Context)
 	ctx.SetReqResp(req, resp)
+	ctx.Reset(r)
 	if _, ok := ctx.(*contextT); !ok {
 		ctx.SetDebug(r.config.Debug)
 		ctx.SetLogger(r.config.Logger)
@@ -406,7 +411,7 @@ ERROR:
 		r.config.HandleError(ctx, err)
 	}
 
-	ctx.Reset()
+	ctx.Reset(nil)
 	resp.Reset(nil)
 
 	r.putURLParam(params)
