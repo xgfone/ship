@@ -146,6 +146,69 @@ func main() {
 }
 ```
 
+#### Map methods into Router
+
+```go
+package main
+
+import (
+    "net/http"
+
+    "github.com/xgfone/ship"
+)
+
+type TestStruct struct{}
+
+func (t TestStruct) Create(ctx ship.Context) error { return nil }
+func (t TestStruct) Delete(ctx ship.Context) error { return nil }
+func (t TestStruct) Update(ctx ship.Context) error { return nil }
+func (t TestStruct) Get(ctx ship.Context) error    { return nil }
+func (t TestStruct) Has(ctx ship.Context) error    { return nil }
+func (t TestStruct) NotHandler()                   {}
+
+func main() {
+    router := ship.NewRouter()
+
+    ship.MapMethodIntoRouter(router, TestStruct{}, "/v1")
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+`ship.MapMethodIntoRouter(router, TestStruct{}, "/v1")` is equal to
+
+```go
+ts := TestStruct{}
+router.Get("/v1/teststruct/get", ts.Get, "teststruct_get")
+router.Put("/v1/teststruct/update", ts.Update, "teststruct_update")
+router.Post("/v1/teststruct/create", ts.Create, "teststruct_create")
+router.Delete("/v1/teststruct/delete", ts.Delete, "teststruct_delete")
+```
+
+The default mapping method is `DefaultMethodMapping`, which is defined as follow.
+```go
+var DefaultMethodMapping = map[string]string{
+    // "MethodName": "RequestMethod"
+    "Create": "POST",
+    "Delete": "DELETE",
+    "Update": "PUT",
+    "Get":    "GET",
+}
+```
+
+If the default is not what you want, you can customize it, for example,
+```go
+ship.MapMethodIntoRouter(router, TestStruct{}, "/v1", map[string]string{
+    "GetMethod": "GET",
+    "PostMethod": "POST",
+})
+```
+
+**Notice:**
+- The name of type and method will be converted to the lower.
+- The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
+- The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
+
 #### Using `Middleware`
 
 ```go
