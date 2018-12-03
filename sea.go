@@ -228,6 +228,8 @@ func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
 
 // Some default handlers
 var (
+	NothingHandler = HandlerFunc(func(ctx Context) error { return nil })
+
 	NotFoundHandler = HandlerFunc(func(ctx Context) error {
 		http.NotFound(ctx.Response(), ctx.Request())
 		return nil
@@ -246,7 +248,10 @@ var (
 
 // HandlePanic wraps and logs the panic information.
 func HandlePanic(ctx Context, err interface{}) {
-	ctx.Logger().Error("panic: %v", err)
+	logger := ctx.Logger()
+	if logger != nil {
+		logger.Error("panic: %v", err)
+	}
 }
 
 // HandleHTTPError handles the HTTP error.

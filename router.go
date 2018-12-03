@@ -23,8 +23,6 @@ import (
 	"sync"
 )
 
-var nothingHandler = HandlerFunc(func(ctx Context) error { return nil })
-
 // Config is used to configure the default router.
 type Config struct {
 	Prefix string
@@ -90,8 +88,8 @@ func newRouter(config *Config, parent *routerT, prefix ...string) *routerT {
 		names: make(map[string]Route),
 		trees: make(map[string]Route),
 
-		beforeRouteHandler: nothingHandler,
-		afterRouteHandler:  nothingHandler,
+		beforeRouteHandler: NothingHandler,
+		afterRouteHandler:  NothingHandler,
 	}
 
 	if parent != nil {
@@ -152,7 +150,7 @@ func (r *routerT) logErrorf(format string, args ...interface{}) {
 func (r *routerT) Before(ms ...Middleware) {
 	r.beforeMiddlewares = append(r.beforeMiddlewares, ms...)
 
-	var handler Handler = nothingHandler
+	var handler Handler = NothingHandler
 	for i := len(r.beforeMiddlewares) - 1; i >= 0; i-- {
 		handler = r.beforeMiddlewares[i].Handle(handler)
 	}
@@ -162,7 +160,7 @@ func (r *routerT) Before(ms ...Middleware) {
 func (r *routerT) After(ms ...Middleware) {
 	r.afterMiddlewares = append(r.afterMiddlewares, ms...)
 
-	var handler Handler = nothingHandler
+	var handler Handler = NothingHandler
 	for i := len(r.afterMiddlewares) - 1; i >= 0; i-- {
 		handler = r.afterMiddlewares[i].Handle(handler)
 	}
