@@ -28,7 +28,7 @@ var DefaultMethodMapping = map[string]string{
 	"Get":    "GET",
 }
 
-// MapMethodIntoRouter maps the struct method into the router,
+// MapMethodIntoRouter maps the method of typVal into the router,
 // and returns the mapped paths.
 //
 // If the return value is nil, it represents that no method is mapped.
@@ -62,18 +62,18 @@ var DefaultMethodMapping = map[string]string{
 // etc.
 //
 // Notice: the name of type and method will be converted to the lower.
-func MapMethodIntoRouter(router Router, _struct interface{}, prefix string,
+func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
 	mapping ...map[string]string) (paths []string) {
 
-	if _struct == nil {
-		panic(fmt.Errorf("the struct must no be nil"))
+	if typVal == nil {
+		panic(fmt.Errorf("the type value must no be nil"))
 	}
 
 	if prefix == "/" {
 		prefix = ""
 	}
 
-	value := reflect.ValueOf(_struct)
+	value := reflect.ValueOf(typVal)
 	methodMaps := DefaultMethodMapping
 	if len(mapping) > 0 {
 		methodMaps = mapping[0]
@@ -84,7 +84,7 @@ func MapMethodIntoRouter(router Router, _struct interface{}, prefix string,
 	errType := reflect.TypeOf(&err).Elem()
 	ctxType := reflect.TypeOf(&ctx).Elem()
 
-	_type := reflect.TypeOf(_struct)
+	_type := value.Type()
 	typeName := strings.ToLower(_type.Name())
 	for i := _type.NumMethod() - 1; i >= 0; i-- {
 		method := _type.Method(i)
