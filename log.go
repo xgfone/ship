@@ -22,6 +22,8 @@ import (
 
 // NewNoLevelLogger returns a new Logger, which has no level,
 // that's, its level is always DEBUG.
+//
+// Notice: the logger implementation uses the standard library, log.
 func NewNoLevelLogger(w io.Writer, flag ...int) Logger {
 	_flag := log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
 	if len(flag) > 0 {
