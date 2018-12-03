@@ -20,7 +20,8 @@ import (
 	"log"
 )
 
-// NewNoLevelLogger returns a new Logger, which has no level.
+// NewNoLevelLogger returns a new Logger, which has no level,
+// that's, its level is always DEBUG.
 func NewNoLevelLogger(w io.Writer) Logger {
 	return loggerT{logger: log.New(w, "",
 		log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile)}
