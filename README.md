@@ -96,6 +96,15 @@ type Config struct {
 }
 ```
 
+```go
+func main() {
+    config := ship.Config{}
+    router := ship.NewRouter(config)
+
+    ...
+}
+```
+
 
 ## API Example
 
