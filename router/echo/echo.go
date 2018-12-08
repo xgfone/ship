@@ -27,6 +27,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -587,4 +588,40 @@ func (r *router) Find(method, path string, pnames, pvalues []string) (handler co
 	}
 
 	return
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+var kindtypes = map[kind]string{skind: "static", pkind: "param", akind: "any"}
+
+// PrintRouterTree prints the tree structure of the router.
+func PrintRouterTree(w io.Writer, r core.Router) {
+	if _r, ok := r.(*router); ok {
+		_r.tree.printTree(w, "", true)
+		return
+	}
+	panic(errors.New("the router is not a ECHO implementation"))
+}
+
+func (n *node) printTree(w io.Writer, pfx string, tail bool) {
+	p := prefix(tail, pfx, "└── ", "├── ")
+	w.Write([]byte(fmt.Sprintf("%s%s, %p: type=%s, lable=%c, path=%s, parent=%p, pnames=%v\n",
+		p, n.prefix, n, kindtypes[n.kind], n.label, n.ppath, n.parent, n.pnames)))
+
+	children := n.children
+	l := len(children)
+	p = prefix(tail, pfx, "    ", "│   ")
+	for i := 0; i < l-1; i++ {
+		children[i].printTree(w, p, false)
+	}
+	if l > 0 {
+		children[l-1].printTree(w, p, true)
+	}
+}
+
+func prefix(tail bool, p, on, off string) string {
+	if tail {
+		return fmt.Sprintf("%s%s", p, on)
+	}
+	return fmt.Sprintf("%s%s", p, off)
 }
