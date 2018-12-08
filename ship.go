@@ -80,10 +80,10 @@ type Config struct {
 	// instead of sending the response to the peer.
 	HandleError func(Context, error)
 
-	// You can appoint the NotFound handler. Or use NotFoundHandler.
+	// You can appoint the NotFound handler. The default is NotFoundHandler().
 	NotFoundHandler Handler
 
-	// OPTIONS and MethodNotAllowed handler, which are used for the default rotuer.
+	// OPTIONS and MethodNotAllowed handler, which are used for the default router.
 	OptionsHandler          Handler
 	MethodNotAllowedHandler Handler
 }
