@@ -7,7 +7,7 @@ import (
 	"github.com/xgfone/ship/core"
 )
 
-func TestEchoRouter(t *testing.T) {
+func TestRouter(t *testing.T) {
 	router := NewRouter(nil, nil)
 	router.Add("static", "GET", "/static", func(ctx core.Context) error { return ctx.String(200, "STATIC") })
 	router.Add("param", "POST", "/test/:name", func(ctx core.Context) error {
