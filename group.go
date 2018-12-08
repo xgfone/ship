@@ -67,3 +67,8 @@ func (g *Group) GroupNone(prefix string, middlewares ...Middleware) *Group {
 func (g *Group) Route(path string, handler Handler) *Route {
 	return newRoute(g.ship, g.prefix, path, handler, g.mdwares...)
 }
+
+// R is short for Group#Route(path, handler).
+func (g *Group) R(path string, handler Handler) *Route {
+	return g.Route(path, handler)
+}
