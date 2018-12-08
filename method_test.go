@@ -39,7 +39,7 @@ func strIsInSlice(s string, ss []string) bool {
 }
 
 func TestMapMethodIntoRouter(t *testing.T) {
-	router := ship.NewRouter()
+	router := ship.New()
 	ts := TestStruct{}
 	paths := ship.MapMethodIntoRouter(router, ts, "/v1")
 	if len(paths) != 4 {
@@ -59,7 +59,7 @@ func TestMapMethodIntoRouter(t *testing.T) {
 		}
 	}
 
-	router.Each(func(name, method, path string, handler ship.Handler) {
+	router.Traverse(func(name, method, path string) {
 		switch method {
 		case "GET":
 			if name != "teststruct_get" || path != "/v1/teststruct/get" {

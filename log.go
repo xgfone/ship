@@ -18,7 +18,18 @@ import (
 	"fmt"
 	"io"
 	"log"
+
+	"github.com/xgfone/ship/core"
 )
+
+// Logger is the alias of core.Logger.
+//
+// Methods:
+//   Debug(foramt string, args ...interface{})
+//   Info(foramt string, args ...interface{})
+//   Warn(foramt string, args ...interface{})
+//   Error(foramt string, args ...interface{})
+type Logger = core.Logger
 
 // NewNoLevelLogger returns a new Logger, which has no level,
 // that's, its level is always DEBUG.

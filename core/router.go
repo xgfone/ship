@@ -1,0 +1,25 @@
+package core
+
+// Router stands for a router management.
+type Router interface {
+	// Generate a URL by the url name and parameters.
+	URL(name string, params ...interface{}) string
+
+	// Add a route with name, method , path and handler,
+	// and return the number of the paramaters if there are the paramaters
+	// in the route. Or return 0.
+	//
+	// If the router does not support the paramater, it should panic.
+	Add(name string, method string, path string, handler Handler) (paramNum int)
+
+	// Find a route handler by the method and path of the request.
+	//
+	// Return nil if the route does not exist.
+	//
+	// If the route has more than one parameter, the name and value
+	// of the parameters should be stored `pnames` and `pvalues` respectively.
+	Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
+
+	// Traverse each route.
+	Each(func(name string, method string, path string))
+}

@@ -27,24 +27,101 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/xgfone/ship/core"
+)
+
+var (
+	indexPage = "index.html"
+	emptyStrS = [256]string{}
 )
 
 // MaxMemoryLimit is the maximum memory.
 var MaxMemoryLimit int64 = 32 << 20 // 32MB
 
-var indexPage = "index.html"
+// Context is the alias of core.Context, which stands for a context.
+//
+// Methods:
+//
+//    Request() *http.Request
+//    Response() http.ResponseWriter
+//
+//    IsTLS() bool
+//    IsDebug() bool
+//    IsWebSocket() bool
+//
+//    Header(name string) (value string)
+//    SetHeader(name string, value string)
+//
+//    URLParams() map[string]string
+//    URLParamByName(name string) (value string)
+//
+//    Scheme() string
+//    RealIP() string
+//    ContentType() string
+//
+//    QueryParam(name string) (value string)
+//    QueryParams() url.Values
+//    QueryRawString() string
+//
+//    FormParams() (url.Values, error)
+//    FormValue(name string) (value string)
+//    FormFile(name string) (*multipart.FileHeader, error)
+//    MultipartForm() (*multipart.Form, error)
+//
+//    Cookies() []*http.Cookie
+//    Cookie(name string) (*http.Cookie, error)
+//    SetCookie(cookie *http.Cookie)
+//
+//    // Get and Set are used to store the key-value information about the context.
+//    Get(key string) (value interface{})
+//    Set(key string, value interface{})
+//
+//    Logger() Logger
+//    URL(name string, params ...interface{}) string
+//
+//    Bind(v interface{}) error
+//
+//    Render(name string, code int, data interface{}) error
+//
+//    NoContent(code int) error
+//    Redirect(code int, toURL string) error
+//    String(code int, data string) error
+//    Blob(code int, contentType string, b []byte) error
+//
+//    HTML(code int, html string) error
+//    HTMLBlob(code int, b []byte) error
+//
+//    JSON(code int, i interface{}) error
+//    JSONBlob(code int, b []byte) error
+//    JSONPretty(code int, i interface{}, indent string) error
+//
+//    JSONP(code int, callback string, i interface{}) error
+//    JSONPBlob(code int, callback string, b []byte) error
+//
+//    XML(code int, i interface{}) error
+//    XMLBlob(code int, b []byte) error
+//    XMLPretty(code int, i interface{}, indent string) error
+//
+//    File(file string) error
+//    Inline(file string, name string) error
+//    Attachment(file string, name string) error
+//    Stream(code int, contentType string, r io.Reader) error
+//
+type Context = core.Context
 
-type contextT struct {
-	req  *http.Request
-	resp http.ResponseWriter
+// Context stands for a request and response context.
+type context struct {
+	req   *http.Request
+	resp  http.ResponseWriter
+	query url.Values
 
-	router Router
-	params URLParam
-	query  url.Values
+	pnames  []string
+	pvalues []string
 
-	debug  bool
-	logger Logger
-
+	ship     *Ship
+	debug    bool
+	logger   Logger
 	binder   Binder
 	renderer Renderer
 
@@ -52,109 +129,142 @@ type contextT struct {
 }
 
 // NewContext returns a new context.
-//
-// Notice: For the method,
-//
-//     SetRouter(router Router)
-//
-// if router is the default implementation returned by NewRouter(),
-// it will also call the following method：
-//
-//     c.SetDebug()
-//     c.SetLogger()
-//     c.SetBinder()
-//     c.SetRenderer()
-//
-// the arguments of which comes from router.
-func NewContext() Context {
-	return &contextT{store: make(map[string]interface{})}
-}
+func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam int) *context {
+	var pnames, pvalues []string
+	if maxParam > 0 {
+		pnames = make([]string, maxParam)
+		pvalues = make([]string, maxParam)
+	}
 
-func (c *contextT) writeContentType(value string) {
-	header := c.resp.Header()
-	if header.Get(HeaderContentType) == "" {
-		header.Set(HeaderContentType, value)
+	return &context{
+		req:  req,
+		resp: resp,
+
+		// See c.setShip(s)
+		ship:     s,
+		debug:    s.config.Debug,
+		logger:   s.config.Logger,
+		binder:   s.config.Binder,
+		renderer: s.config.Renderer,
+
+		pnames:  pnames,
+		pvalues: pvalues,
+
+		store: make(map[string]interface{}),
 	}
 }
 
-func (c *contextT) Router() Router {
-	return c.router
+func (c *context) setShip(s *Ship) {
+	c.ship = s
+	c.debug = s.config.Debug
+	c.logger = s.config.Logger
+	c.binder = s.config.Binder
+	c.renderer = s.config.Renderer
 }
 
-func (c *contextT) SetRouter(router Router) {
-	if router == nil {
-		panic(fmt.Errorf("router must not be nil"))
+func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
+	c.req = r
+	c.resp = w
+}
+
+func (c *context) reset() {
+	c.req = nil
+	c.resp = nil
+	c.query = nil
+
+	copy(c.pnames, emptyStrS[:len(c.pnames)])
+	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
+
+	for key := range c.store {
+		delete(c.store, key)
 	}
+}
 
-	if r, ok := router.(*routerT); ok {
-		c.SetDebug(r.config.Debug)
-		c.SetLogger(r.config.Logger)
-		c.SetBinder(r.config.Binder)
-		c.SetRenderer(r.config.Renderer)
+// URLParamByName returns the parameter in the url path by name.
+func (c *context) URLParamByName(name string) string {
+	_len := len(c.pnames)
+	for i := 0; i < _len; i++ {
+		if len(c.pnames[i]) == 0 {
+			return ""
+		} else if c.pnames[i] == name {
+			return c.pvalues[i]
+		}
 	}
+	return ""
 }
 
-func (c *contextT) Request() *http.Request {
-	return c.req
+// URLParams returns all the parameters in the url path.
+func (c *context) URLParams() map[string]string {
+	_len := len(c.pnames)
+	ms := make(map[string]string, _len)
+	for i := 0; i < _len; i++ {
+		if len(c.pnames[i]) == 0 {
+			break
+		}
+		ms[c.pnames[i]] = c.pvalues[i]
+	}
+	return ms
 }
 
-func (c *contextT) Response() http.ResponseWriter {
-	return c.resp
+// Get retrieves data from the context.
+func (c *context) Get(key string) interface{} {
+	return c.store[key]
 }
 
-func (c *contextT) SetRequest(req *http.Request) {
-	c.req = req
+// Set saves data in the context.
+func (c *context) Set(key string, value interface{}) {
+	c.store[key] = value
 }
 
-func (c *contextT) SetReqResp(req *http.Request, resp http.ResponseWriter) {
-	c.req = req
-	c.resp = resp
-}
-
-func (c *contextT) IsDebug() bool {
-	return c.debug
-}
-
-func (c *contextT) SetDebug(debug bool) {
-	c.debug = debug
-}
-
-func (c *contextT) Logger() Logger {
+// Logger returns the logger implementation.
+func (c *context) Logger() Logger {
 	return c.logger
 }
 
-func (c *contextT) SetLogger(logger Logger) {
-	c.logger = logger
+// IsDebug reports whether to enable the debug mode.
+func (c *context) IsDebug() bool {
+	return c.debug
 }
 
 // IsTLS returns true if HTTP connection is TLS otherwise false.
-func (c *contextT) IsTLS() bool {
+func (c *context) IsTLS() bool {
 	return c.req.TLS != nil
-
 }
 
 // IsWebSocket returns true if HTTP connection is WebSocket otherwise false.
-func (c *contextT) IsWebSocket() bool {
+func (c *context) IsWebSocket() bool {
 	return strings.ToLower(c.req.Header.Get(HeaderUpgrade)) == "websocket"
 }
 
+// Request returns the inner Request.
+func (c *context) Request() *http.Request {
+	return c.req
+}
+
+// Response returns the inner http.ResponseWriter.
+func (c *context) Response() http.ResponseWriter {
+	return c.resp
+}
+
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
-func (c *contextT) Scheme() (scheme string) {
+func (c *context) Scheme() (scheme string) {
 	// Can't use `r.Request.URL.Scheme`
 	// See: https://groups.google.com/forum/#!topic/golang-nuts/pMUkBlQBDF0
 	if c.IsTLS() {
 		return "https"
 	}
-	if scheme = c.req.Header.Get(HeaderXForwardedProto); scheme != "" {
+
+	header := c.req.Header
+	if scheme = header.Get(HeaderXForwardedProto); scheme != "" {
 		return
 	}
-	if scheme = c.req.Header.Get(HeaderXForwardedProtocol); scheme != "" {
+	if scheme = header.Get(HeaderXForwardedProtocol); scheme != "" {
 		return
 	}
-	if scheme = c.req.Header.Get(HeaderXUrlScheme); scheme != "" {
+	if scheme = header.Get(HeaderXUrlScheme); scheme != "" {
 		return
 	}
-	if ssl := c.req.Header.Get(HeaderXForwardedSsl); ssl == "on" {
+	if ssl := header.Get(HeaderXForwardedSsl); ssl == "on" {
 		return "https"
 	}
 	return "http"
@@ -162,7 +272,7 @@ func (c *contextT) Scheme() (scheme string) {
 
 // RealIP returns the client's network address based on `X-Forwarded-For`
 // or `X-Real-IP` request header.
-func (c *contextT) RealIP() string {
+func (c *context) RealIP() string {
 	if ip := c.req.Header.Get(HeaderXForwardedFor); ip != "" {
 		return strings.TrimSpace(strings.Split(ip, ",")[0])
 	}
@@ -173,26 +283,24 @@ func (c *contextT) RealIP() string {
 	return ra
 }
 
-// Param returns path parameter by name.
-func (c *contextT) URLParamByName(name string) string {
-	if c.params == nil {
-		return ""
+func (c *context) ContentType() (ct string) {
+	ct = c.req.Header.Get("Content-Type")
+	if index := strings.IndexAny(ct, " ;"); index > 0 {
+		ct = ct[:index]
 	}
-	return c.params.Get(name)
+	return
 }
 
-// ParamNames returns path parameter names.
-func (c *contextT) URLParam() URLParam {
-	return c.params
+func (c *context) Header(name string) string {
+	return c.req.Header.Get(name)
 }
 
-// SetParamNames sets path parameter names.
-func (c *contextT) SetURLParam(params URLParam) {
-	c.params = params
+func (c *context) SetHeader(name, value string) {
+	c.resp.Header().Set(name, value)
 }
 
 // QueryParam returns the query param for the provided name.
-func (c *contextT) QueryParam(name string) string {
+func (c *context) QueryParam(name string) string {
 	if c.query == nil {
 		c.query = c.req.URL.Query()
 	}
@@ -200,25 +308,25 @@ func (c *contextT) QueryParam(name string) string {
 }
 
 // QueryParams returns the query parameters as `url.Values`.
-func (c *contextT) QueryParams() url.Values {
+func (c *context) QueryParams() url.Values {
 	if c.query == nil {
 		c.query = c.req.URL.Query()
 	}
 	return c.query
 }
 
-// QueryString returns the URL query string.
-func (c *contextT) QueryString() string {
+// QueryRawString returns the URL query string.
+func (c *context) QueryRawString() string {
 	return c.req.URL.RawQuery
 }
 
 // FormValue returns the form field value for the provided name.
-func (c *contextT) FormValue(name string) string {
+func (c *context) FormValue(name string) string {
 	return c.req.FormValue(name)
 }
 
 // FormParams returns the form parameters as `url.Values`.
-func (c *contextT) FormParams() (url.Values, error) {
+func (c *context) FormParams() (url.Values, error) {
 	if strings.HasPrefix(c.req.Header.Get(HeaderContentType), MIMEMultipartForm) {
 		if err := c.req.ParseMultipartForm(MaxMemoryLimit); err != nil {
 			return nil, err
@@ -232,87 +340,76 @@ func (c *contextT) FormParams() (url.Values, error) {
 }
 
 // FormFile returns the multipart form file for the provided name.
-func (c *contextT) FormFile(name string) (*multipart.FileHeader, error) {
+func (c *context) FormFile(name string) (*multipart.FileHeader, error) {
 	_, fh, err := c.req.FormFile(name)
 	return fh, err
 }
 
 // MultipartForm returns the multipart form.
-func (c *contextT) MultipartForm() (*multipart.Form, error) {
+func (c *context) MultipartForm() (*multipart.Form, error) {
 	err := c.req.ParseMultipartForm(MaxMemoryLimit)
 	return c.req.MultipartForm, err
 }
 
 // Cookie returns the named cookie provided in the request.
-func (c *contextT) Cookie(name string) (*http.Cookie, error) {
+func (c *context) Cookie(name string) (*http.Cookie, error) {
 	return c.req.Cookie(name)
 }
 
-// SetCookie adds a `Set-Cookie` header in HTTP response.
-func (c *contextT) SetCookie(cookie *http.Cookie) {
-	http.SetCookie(c.resp, cookie)
-}
-
 // Cookies returns the HTTP cookies sent with the request.
-func (c *contextT) Cookies() []*http.Cookie {
+func (c *context) Cookies() []*http.Cookie {
 	return c.req.Cookies()
 }
 
-// Get retrieves data from the context.
-func (c *contextT) Get(key string) interface{} {
-	return c.store[key]
+// SetCookie adds a `Set-Cookie` header in HTTP response.
+func (c *context) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c.resp, cookie)
 }
 
-// Set saves data in the context.
-func (c *contextT) Set(key string, value interface{}) {
-	c.store[key] = value
-}
-
-// Bind binds the request body into provided type `i`. The default binder
-// does it based on Content-Type header.
-func (c *contextT) Bind(v interface{}) error {
+// Bind binds the request information into provided type v.
+//
+// The default binder does it based on Content-Type header.
+func (c *context) Bind(v interface{}) error {
 	return c.binder.Bind(c, v)
-}
-
-func (c *contextT) SetBinder(b Binder) {
-	c.binder = b
 }
 
 // Render renders a template with data and sends a text/html response with status
 // code. Renderer must be registered using `Echo.Renderer`.
-func (c *contextT) Render(code int, name string, data interface{}) error {
+func (c *context) Render(name string, code int, data interface{}) error {
 	if c.renderer == nil {
 		return ErrRendererNotRegistered
 	}
 	buf := new(bytes.Buffer)
-	if err := c.renderer.Render(c, buf, code, name, data); err != nil {
+	if err := c.renderer.Render(c, buf, name, code, data); err != nil {
 		return err
 	}
 	return c.HTMLBlob(code, buf.Bytes())
 }
 
-// SetRenderer sets the rendered to r.
-func (c *contextT) SetRenderer(r Renderer) {
-	c.renderer = r
+func (c *context) writeContentType(value string) {
+	header := c.resp.Header()
+	if header.Get(HeaderContentType) == "" {
+		header.Set(HeaderContentType, value)
+	}
 }
 
 // HTML sends an HTTP response with status code.
-func (c *contextT) HTML(code int, html string) error {
+func (c *context) HTML(code int, html string) error {
 	return c.HTMLBlob(code, []byte(html))
 }
 
 // HTMLBlob sends an HTTP blob response with status code.
-func (c *contextT) HTMLBlob(code int, b []byte) error {
+func (c *context) HTMLBlob(code int, b []byte) error {
 	return c.Blob(code, MIMETextHTMLCharsetUTF8, b)
 }
 
 // String sends a string response with status code.
-func (c *contextT) String(code int, s string) error {
+func (c *context) String(code int, s string) error {
 	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(s))
 }
 
 // JSON sends a JSON response with status code.
-func (c *contextT) JSON(code int, i interface{}) error {
+func (c *context) JSON(code int, i interface{}) error {
 	b, err := json.Marshal(i)
 	if err != nil {
 		return err
@@ -321,7 +418,7 @@ func (c *contextT) JSON(code int, i interface{}) error {
 }
 
 // JSONPretty sends a pretty-print JSON with status code.
-func (c *contextT) JSONPretty(code int, i interface{}, indent string) error {
+func (c *context) JSONPretty(code int, i interface{}, indent string) error {
 	b, err := json.MarshalIndent(i, "", indent)
 	if err != nil {
 		return err
@@ -330,13 +427,13 @@ func (c *contextT) JSONPretty(code int, i interface{}, indent string) error {
 }
 
 // JSONBlob sends a JSON blob response with status code.
-func (c *contextT) JSONBlob(code int, b []byte) error {
+func (c *context) JSONBlob(code int, b []byte) error {
 	return c.Blob(code, MIMEApplicationJSONCharsetUTF8, b)
 }
 
 // JSONP sends a JSONP response with status code. It uses `callback` to construct
 // the JSONP payload.
-func (c *contextT) JSONP(code int, callback string, i interface{}) error {
+func (c *context) JSONP(code int, callback string, i interface{}) error {
 	b, err := json.Marshal(i)
 	if err != nil {
 		return err
@@ -346,7 +443,7 @@ func (c *contextT) JSONP(code int, callback string, i interface{}) error {
 
 // JSONPBlob sends a JSONP blob response with status code. It uses `callback`
 // to construct the JSONP payload.
-func (c *contextT) JSONPBlob(code int, callback string, b []byte) (err error) {
+func (c *context) JSONPBlob(code int, callback string, b []byte) (err error) {
 	c.writeContentType(MIMEApplicationJavaScriptCharsetUTF8)
 	c.resp.WriteHeader(code)
 	if _, err = c.resp.Write([]byte(callback + "(")); err != nil {
@@ -360,7 +457,7 @@ func (c *contextT) JSONPBlob(code int, callback string, b []byte) (err error) {
 }
 
 // XML sends an XML response with status code.
-func (c *contextT) XML(code int, i interface{}) error {
+func (c *context) XML(code int, i interface{}) error {
 	b, err := xml.Marshal(i)
 	if err != nil {
 		return err
@@ -369,7 +466,7 @@ func (c *contextT) XML(code int, i interface{}) error {
 }
 
 // XMLPretty sends a pretty-print XML with status code.
-func (c *contextT) XMLPretty(code int, i interface{}, indent string) error {
+func (c *context) XMLPretty(code int, i interface{}, indent string) error {
 	b, err := xml.MarshalIndent(i, "", indent)
 	if err != nil {
 		return err
@@ -378,7 +475,7 @@ func (c *contextT) XMLPretty(code int, i interface{}, indent string) error {
 }
 
 // XMLBlob sends an XML blob response with status code.
-func (c *contextT) XMLBlob(code int, b []byte) (err error) {
+func (c *context) XMLBlob(code int, b []byte) (err error) {
 	c.writeContentType(MIMEApplicationXMLCharsetUTF8)
 	c.resp.WriteHeader(code)
 	if _, err = c.resp.Write([]byte(xml.Header)); err != nil {
@@ -389,7 +486,7 @@ func (c *contextT) XMLBlob(code int, b []byte) (err error) {
 }
 
 // Blob sends a blob response with status code and content type.
-func (c *contextT) Blob(code int, contentType string, b []byte) (err error) {
+func (c *context) Blob(code int, contentType string, b []byte) (err error) {
 	c.writeContentType(contentType)
 	c.resp.WriteHeader(code)
 	_, err = c.resp.Write(b)
@@ -397,7 +494,7 @@ func (c *contextT) Blob(code int, contentType string, b []byte) (err error) {
 }
 
 // Stream sends a streaming response with status code and content type.
-func (c *contextT) Stream(code int, contentType string, r io.Reader) (err error) {
+func (c *context) Stream(code int, contentType string, r io.Reader) (err error) {
 	c.writeContentType(contentType)
 	c.resp.WriteHeader(code)
 	_, err = io.Copy(c.resp, r)
@@ -405,7 +502,7 @@ func (c *contextT) Stream(code int, contentType string, r io.Reader) (err error)
 }
 
 // File sends a response with the content of the file.
-func (c *contextT) File(file string) (err error) {
+func (c *context) File(file string) (err error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return ErrNotFound
@@ -429,30 +526,31 @@ func (c *contextT) File(file string) (err error) {
 	return
 }
 
-func (c *contextT) contentDisposition(file, name, dispositionType string) error {
-	c.resp.Header().Set(HeaderContentDisposition, fmt.Sprintf("%s; filename=%q", dispositionType, name))
+func (c *context) contentDisposition(file, name, dispositionType string) error {
+	c.resp.Header().Set(HeaderContentDisposition,
+		fmt.Sprintf("%s; filename=%q", dispositionType, name))
 	return c.File(file)
 }
 
 // Attachment sends a response as attachment, prompting client to save the
 // file.
-func (c *contextT) Attachment(file string, name string) error {
+func (c *context) Attachment(file string, name string) error {
 	return c.contentDisposition(file, name, "attachment")
 }
 
 // Inline sends a response as inline, opening the file in the browser.
-func (c *contextT) Inline(file string, name string) error {
+func (c *context) Inline(file string, name string) error {
 	return c.contentDisposition(file, name, "inline")
 }
 
 // NoContent sends a response with no body and a status code.
-func (c *contextT) NoContent(code int) error {
+func (c *context) NoContent(code int) error {
 	c.resp.WriteHeader(code)
 	return nil
 }
 
 // Redirect redirects the request to a provided URL with status code.
-func (c *contextT) Redirect(code int, toURL string) error {
+func (c *context) Redirect(code int, toURL string) error {
 	if code < 300 || code > 308 {
 		return ErrInvalidRedirectCode
 	}
@@ -461,18 +559,7 @@ func (c *contextT) Redirect(code int, toURL string) error {
 	return nil
 }
 
-func (c *contextT) URL(name string, params URLParam) string {
-	return c.router.URL(name, params)
-}
-
-func (c *contextT) Reset() {
-	c.req = nil
-	c.resp = nil
-	c.router = nil
-	c.params = nil
-	c.query = nil
-	c.debug = false
-	c.logger = nil
-	c.binder = nil
-	c.renderer = nil
+// URL generates an URL from route name and provided parameters.
+func (c *context) URL(name string, params ...interface{}) string {
+	return c.ship.URL(name, params...)
 }

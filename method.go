@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -64,11 +65,11 @@ var DefaultMethodMapping = map[string]string{
 //    func (Context) error
 //
 // Notice: the name of type and method will be converted to the lower.
-func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
+func MapMethodIntoRouter(s *Ship, typVal interface{}, prefix string,
 	mapping ...map[string]string) (paths []string) {
 
 	if typVal == nil {
-		panic(fmt.Errorf("the type value must no be nil"))
+		panic(errors.New("the type value must no be nil"))
 	}
 
 	if prefix == "/" {
@@ -82,9 +83,7 @@ func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
 	}
 
 	var err error
-	var ctx Context
 	errType := reflect.TypeOf(&err).Elem()
-	ctxType := reflect.TypeOf(&ctx).Elem()
 
 	_type := value.Type()
 	typeName := strings.ToLower(_type.Name())
@@ -96,7 +95,7 @@ func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
 		if mtype.NumIn() != 2 || mtype.NumOut() != 1 {
 			continue
 		}
-		if !mtype.In(1).Implements(ctxType) {
+		if _, ok := reflect.New(mtype.In(1)).Interface().(*Context); !ok {
 			continue
 		}
 		if !mtype.Out(0).Implements(errType) {
@@ -106,11 +105,10 @@ func MapMethodIntoRouter(router Router, typVal interface{}, prefix string,
 		if reqMethod := methodMaps[method.Name]; reqMethod != "" {
 			methodName := strings.ToLower(method.Name)
 			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
-			router.Methods([]string{reqMethod}, path, func(ctx Context) error {
+			s.Route(path, func(ctx Context) error {
 				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
 				return vs[0].Interface().(error)
-			}, fmt.Sprintf("%s_%s", typeName, methodName))
-
+			}).Name(fmt.Sprintf("%s_%s", typeName, methodName)).Method(reqMethod)
 			paths = append(paths, path)
 		}
 	}

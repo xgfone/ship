@@ -1,8 +1,8 @@
 # ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![Coverage Status](https://coveralls.io/repos/github/xgfone/ship/badge.svg?branch=master)](https://coveralls.io/github/xgfone/ship?branch=master) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](http://godoc.org/github.com/xgfone/ship) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
-`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework, which uses the interface to define the router, so you can supply yourself implementation and combine them with the default implementation.
+`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework.
 
-`ship` is inspired by [echo](https://github.com/labstack/echo), [pure](https://github.com/go-playground/pure) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
+`ship` is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
 
 ## Install
@@ -16,7 +16,7 @@ For the core functions, **it has no any third-party dependencies.**
 
 ## Prerequisite
 
-Now `ship` requires Go `1.7+`.
+Now `ship` requires Go `1.9+`.
 
 
 ## Quick Start
@@ -33,10 +33,10 @@ import (
 )
 
 func main() {
-	router := ship.NewRouter()
-	router.Get("/ping", func(ctx ship.Context) error {
+	router := ship.New()
+	router.Route("/ping", func(ctx ship.Context) error {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
-	})
+	}).GET()
 
 	http.ListenAndServe(":8080", router)
 }
@@ -56,50 +56,49 @@ $ curl http://127.0.0.1:8080/ping
 
 ```go
 type Config struct {
-	// The route prefix.
+	// The route prefix, which is "" by default.
 	Prefix string
 
 	// If ture, it will enable the debug mode.
 	Debug bool
-	// If ture, it will clean the request path before finding the route.
-	CleanPath bool
 
-	// You can customize the logger implementation, or use NewNoLevelLogger(os.Stdout).
+	// The router management, which uses echo implementation by default.
+	// But you can appoint yourself customized Router implementation.
+	Router Router
+
+	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
+	// But you can appoint yourself customized Logger implementation.
 	Logger Logger
-	// You can customize the Binder implementation, or use NewBinder().
+	// Binder is used to bind the request data to the given value,
+	// which is `NewBinder()` by default.
+	// But you can appoint yourself customized Binder implementation
 	Binder Binder
-	// You can customize the Renderer implementation.
+	// Rendered is used to render the response to the peer, which has no
+	// the default implementation.
 	Renderer Renderer
 
-	// You can customize the Route management, or use NewRoute().
-	// The default implementation is based on Radix tree,
-	// which refers to https://github.com/go-playground/pure.
-	NewRoute func() Route
-	// You can customize the Context implementation, or use NewContext().
-	NewContext func() Context
-	// You can customize the URLParam implementation, or use NewURLParam().
-	NewURLParam func(int) URLParam
-	// You can check and filter the response output before sending the peer.
-	FilterOutput func([]byte) []byte
+	// Handle the error at last.
+	//
+	// The default will send the response to the peer if the error is a HTTPError.
+	// Or only log it. So the handler and the middleware return a HTTPError,
+	// instead of sending the response to the peer.
+	HandleError func(Context, error)
 
-	// You can appoint the error handler, or use HandleHTTPError().
-	HandleError func(ctx Context, err error)
-	// You can appoint the panic handler.
-	HandlePanic func(ctx Context, panicValue interface{})
-
-	// You can appoint the OPTIONS handler.
-	OptionsHandler Handler
 	// You can appoint the NotFound handler. Or use NotFoundHandler.
 	NotFoundHandler Handler
-	// You can appoint the MethodNotAllowed handler.
+
+	// OPTIONS and MethodNotAllowed handler, which are used for the default rotuer.
+	OptionsHandler          Handler
 	MethodNotAllowedHandler Handler
 }
 ```
 
 ```go
 func main() {
-    config := ship.Config{}
-    router := ship.NewRouter(config)
+    config := ship.Config{
+        ...
+    }
+    router := ship.New(config)
 
     ...
 }
@@ -115,32 +114,32 @@ See [GoDOC](https://godoc.org/github.com/xgfone/ship).
 
 ```go
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Get("/path/get", getHandler)
-    router.Put("/path/put", putHandler)
-    router.Post("/path/post", postHandler)
-    router.Patch("/path/patch", patchHandler)
-    router.Delete("/path/delete", deleteHandler)
-    router.Option("/path/option", optionHandler)
-    router.Connect("/path/connect", connectHandler)
+    router.Route("/path/get", getHandler).GET()
+    router.Route("/path/put", putHandler).PUT()
+    router.Route("/path/post", postHandler).POST()
+    router.Route("/path/patch", patchHandler).PATCH()
+    router.Route("/path/delete", deleteHandler).DELETE()
+    router.Route("/path/option", optionHandler).OPTIONS()
+    router.Route("/path/connect", connectHandler).CONNECT()
 
     http.ListenAndServe(":8080", router)
 }
 ```
 
-Notice: you can regitser the customized method by `Methods(methods []string, path string, handler Handler)`.
+Notice: you can regitser the customized method by `Route(path string, handler Handler).Method(method ...string)`.
 
 #### Naming route and building URL
 You can name the route a name when registering the route, then you can build a URL by the name.
 
 ```go
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Get("/path/:id", func(ctx Context) error {
+    router.Route("/path/:id", func(ctx Context) error {
         ctx.URL("get_url", ctx.URLParam())
-    }, "get_url")
+    }).Name("get_url").GET()
 
     http.ListenAndServe(":8080", router)
 }
@@ -167,7 +166,7 @@ func (t TestStruct) Has(ctx ship.Context) error    { return nil }
 func (t TestStruct) NotHandler()                   {}
 
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
     ship.MapMethodIntoRouter(router, TestStruct{}, "/v1")
 
@@ -179,10 +178,10 @@ func main() {
 
 ```go
 ts := TestStruct{}
-router.Get("/v1/teststruct/get", ts.Get, "teststruct_get")
-router.Put("/v1/teststruct/update", ts.Update, "teststruct_update")
-router.Post("/v1/teststruct/create", ts.Create, "teststruct_create")
-router.Delete("/v1/teststruct/delete", ts.Delete, "teststruct_delete")
+router.Route("/v1/teststruct/get", ts.Get).Name("teststruct_get").GET()
+router.Route("/v1/teststruct/update", ts.Update).Name("teststruct_update").PUT()
+router.Route("/v1/teststruct/create", ts.Create).Name("teststruct_create").POST()
+router.Route("/v1/teststruct/delete", ts.Delete).Name("teststruct_delete").DELETE()
 ```
 
 The default mapping method is `DefaultMethodMapping`, which is defined as follow.
@@ -218,16 +217,16 @@ import (
     "net/http"
 
     "github.com/xgfone/ship"
-    "github.com/xgfone/ship/mw"
+    "github.com/xgfone/ship/middleware"
 )
 
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Use(mw.Logger(), mw.Recover())
+    router.Use(middleware.Logger(), middleware.Recover())
     router.Use(MyAuthMiddleware())
 
-    router.Get("/url/path", handler)
+    router.Route("/url/path", handler).GET()
 
     http.ListenAndServe(":8080", router)
 }
@@ -250,38 +249,36 @@ func RemovePathPrefix(prefix string) ship.Middleware {
 }
 
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
     // Use and Before have no interference each other.
-    router.Use(mw.Logger())
-    router.Before(RemovePathPrefix("/static"))
-    router.Use(mw.Recover())
+    router.Use(middleware.Logger())
+    router.Pre(RemovePathPrefix("/static"))
+    router.Use(middleware.Recover())
 
-    router.Get("/url/path", handler)
+    router.Route("/url/path", handler).GET()
 
     http.ListenAndServe(":8080", router)
 }
 ```
 
-**After** Middleware is the same as **Before**, except running the middlewares after routing and before executing the found handler.
-
 #### Using `SubRouter`
 
 ```go
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Use(mw.Logger())
-    router.Use(mw.Recover())
+    router.Use(middleware.Logger())
+    router.Use(middleware.Recover())
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
-    v1 := router.SubRouter("/v1")
-    v1.Get("/get/path", getHandler)
+    v1 := router.Group("/v1")
+    v1.Route("/get/path", getHandler).GET()
 
     // v2 SubRouter, which won't inherit the middlewares of the parent router.
-    v2 := router.SubRouterNone("/v2")
+    v2 := router.GroupNone("/v2")
     v2.Use(MyAuthMiddleware())
-    v2.Post("/post/path", postHandler)
+    v2.Route("/post/path", postHandler).POST()
 
     http.ListenAndServe(":8080", router)
 }
@@ -291,12 +288,12 @@ func main() {
 
 ```go
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Get("/get/path", getHandler, "get_name")
-    router.Post("/post/path", posttHandler, "post_name")
+    router.Route("/get/path", getHandler).Name("get_name").GET()
+    router.Route("/post/path", posttHandler).Name("post_name").POST()
 
-    router.Each(func(name, method, path string, handler Handler) {
+    router.Traverse(func(name, method, path string) {
         fmt.Println(name, method, path)
         // Output:
         // get_name GET /get/path
@@ -310,7 +307,7 @@ func main() {
 
 ## `Context`
 
-See [the interface doc](https://godoc.org/github.com/xgfone/ship#Context).
+See [the interface doc](https://godoc.org/github.com/xgfone/ship/core#Context).
 
 
 ## Bind JSON, XML or Form data form payload
@@ -324,15 +321,15 @@ type Login struct {
 }
 
 func main() {
-    router := ship.NewRouter()
+    router := ship.New()
 
-    router.Post("/login", func(ctx ship.Context) error {
+    router.Route("/login", func(ctx ship.Context) error {
         var login Login
         if err := ctx.Bind(&login); err != nil {
             return err
         }
         ...
-    })
+    }).POST()
 
     http.ListenAndServe(":8080", router)
 }
@@ -341,22 +338,39 @@ func main() {
 
 ## Route Management
 
-`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route, which refers to [pure](https://github.com/go-playground/pure), that's, `ship.NewRoute()`.
+`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route, which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://godoc.org/github.com/xgfone/ship/router/echo#NewRouter).
 
-You can appoint yourself implementation by implementing the interface `ship.Route`.
+You can appoint yourself implementation by implementing the interface [`ship.Router`](https://godoc.org/github.com/xgfone/ship/core#Router).
 
 ```go
-type Route interface {
-    AddRoute(name string, method string, path string, handler Handler) (paramMaxNum int)
-    FindRoute(method string, path string, newURLParam func() URLParam) (Handler, URLParam)
-    URL(name string, params URLParam) string
+type Router interface {
+	// Generate a URL by the url name and parameters.
+	URL(name string, params ...interface{}) string
+
+	// Add a route with name, method , path and handler,
+	// and return the number of the paramaters if there are the paramaters
+	// in the route. Or return 0.
+	//
+	// If the router does not support the paramater, it should panic.
+	Add(name string, method string, path string, handler Handler) (paramNum int)
+
+	// Find a route handler by the method and path of the request.
+	//
+	// Return nil if the route does not exist.
+	//
+	// If the route has more than one parameter, the name and value
+	// of the parameters should be stored `pnames` and `pvalues` respectively.
+	Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
+
+	// Traverse each route.
+	Each(func(name string, method string, path string))
 }
 ```
 
 ```go
 func main() {
-    config := ship.Config{NewRoute: MyNewRoute}
-    router := ship.NewRouter(config)
+    config := ship.Config{Router: NewMyRouter(...)}
+    router := ship.New(config)
     ...
 }
 ```

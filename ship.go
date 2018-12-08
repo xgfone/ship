@@ -15,263 +15,294 @@
 package ship
 
 import (
+	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
-	"net/url"
+	"os"
+	"strings"
+	"sync"
+
+	"github.com/xgfone/ship/binder"
+
+	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship/router/echo"
 )
 
-// Logger stands for a logger.
-type Logger interface {
-	Debug(foramt string, args ...interface{})
-	Info(foramt string, args ...interface{})
-	Warn(foramt string, args ...interface{})
-	Error(foramt string, args ...interface{})
-}
-
-// HTTPError stands for a HTTP error.
-type HTTPError interface {
-	Code() int
-	Message() string
-	Error() string
-	InnerError() error
-	SetInnerError(error) HTTPError
-}
-
-// URLParam is the interface of request scoped variables tracked by ship.
-type URLParam interface {
-	Reset()
-
-	Get(name string) (value string)
-	Set(name string, value string)
-	Each(func(name string, value string))
-}
-
-// Binder is the interface to bind the value to v from ctx.
-type Binder interface {
-	Bind(ctx Context, v interface{}) error
-}
-
-// Renderer is the interface to render the response.
-type Renderer interface {
-	Render(ctx Context, w io.Writer, code int, name string, data interface{}) error
-}
-
-// Context stands for a request & response context.
-type Context interface {
-	Reset()
-
-	Router() Router
-	SetRouter(router Router)
-
-	Request() *http.Request
-	Response() http.ResponseWriter
-	SetRequest(req *http.Request)
-	SetReqResp(req *http.Request, resp http.ResponseWriter)
-
-	IsDebug() bool
-	SetDebug(debug bool)
-
-	Logger() Logger
-	SetLogger(logger Logger)
-
-	Bind(v interface{}) error
-	SetBinder(binder Binder)
-
-	Render(code int, name string, data interface{}) error
-	SetRenderer(renderer Renderer)
-
-	// Manage the key-value in the context.
-	Get(key string) interface{}
-	Set(key string, value interface{})
-
-	IsTLS() bool
-	IsWebSocket() bool
-
-	Scheme() string
-	RealIP() string
-
-	URLParam() URLParam
-	URLParamByName(name string) string
-	SetURLParam(params URLParam)
-
-	QueryParam(name string) string
-	QueryParams() url.Values
-	QueryString() string
-
-	FormFile(name string) (*multipart.FileHeader, error)
-	FormValue(name string) string
-
-	FormParams() (url.Values, error)
-	MultipartForm() (*multipart.Form, error)
-
-	Cookie(name string) (*http.Cookie, error)
-	Cookies() []*http.Cookie
-	SetCookie(cookie *http.Cookie)
-
-	URL(name string, params URLParam) string
-	Redirect(code int, toURL string) error
-
-	HTML(code int, htmlData string) error
-	HTMLBlob(code int, htmlData []byte) error
-
-	JSON(code int, data interface{}) error
-	JSONBlob(code int, data []byte) error
-	JSONPretty(code int, data interface{}, indent string) error
-	JSONP(code int, callback string, data interface{}) error
-	JSONPBlob(code int, callback string, data []byte) error
-
-	XML(code int, data interface{}) error
-	XMLBlob(code int, data []byte) error
-	XMLPretty(code int, data interface{}, indent string) error
-
-	File(file string) error
-	Inline(file string, name string) error
-	Attachment(file string, name string) error
-	Stream(code int, contentType string, data io.Reader) error
-
-	NoContent(code int) error
-	String(code int, data string) error
-	Blob(code int, contentType string, data []byte) error
-}
-
-// Handler is a handler of the HTTP request.
-type Handler func(Context) error
-
-// Middleware stands for a middleware.
+// Router is the alias of core.Router, which is used to manage the routes.
 //
-// See the sub-package mw, which is the abbreviation of middleware.
-type Middleware func(Handler) Handler
+// Methods:
+//   URL(name string, params ...interface{}) string
+//   Add(name string, method string, path string, handler Handler) (paramNum int)
+//   Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
+//   Each(func(name string, method string, path string))
+type Router = core.Router
 
-// Route is used to manage the route.
-type Route interface {
-	AddRoute(name string, method string, path string, handler Handler) (paramMaxNum int)
-	FindRoute(method string, path string, newURLParam func() URLParam) (Handler, URLParam)
-	URL(name string, params URLParam) string
-}
-
-// Router stands for a router.
-type Router interface {
-	Before(middlewares ...Middleware)
-	After(middlewares ...Middleware)
-	Use(middlewares ...Middleware)
-
-	SubRouter(prefix ...string) Router
-	SubRouterNone(prefix ...string) Router
-
-	Any(path string, handler Handler, name ...string)
-	Get(path string, handler Handler, name ...string)
-	Put(path string, handler Handler, name ...string)
-	Post(path string, handler Handler, name ...string)
-	Head(path string, handler Handler, name ...string)
-	Patch(path string, handler Handler, name ...string)
-	Trace(path string, handler Handler, name ...string)
-	Delete(path string, handler Handler, name ...string)
-	Options(path string, handler Handler, name ...string)
-	Connect(path string, handler Handler, name ...string)
-	Methods(methods []string, path string, handler Handler, name ...string)
-	Each(func(name string, method string, path string, handler Handler))
-
-	URL(name string, params URLParam) string
-
-	ServeHTTP(resp http.ResponseWriter, req *http.Request)
-}
-
-// ToHTTPHandler converts the Handler to http.Handler
+// Binder is the alias of core.Binder, which is used to bind the request
+// to v.
 //
-// Notice: Debug(), Logger(), Binder(), Render() and URLParam() can't be used
-// until executing the following settings:
+// Methods:
+//   Bind(ctx Context, v interface{}) error
+type Binder = core.Binder
+
+// Renderer is the alias of core.Renderer, which is used to render the response.
 //
-//    ctx.SetDebug(bool)
-//    ctx.SetLogger(Logger)
-//    ctx.SetBinder(Binder)
-//    ctx.SetRenderer(Renderer)
-//    ctx.SetURLParam(URLParam)
-func ToHTTPHandler(h Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := NewContext()
-		ctx.SetReqResp(r, w)
-		h(ctx)
-	})
+// Methods:
+//    Render(ctx Context, w io.Writer, name string, code int, data interface{}) error
+type Renderer = core.Renderer
+
+// Config is used to configure the router used by the default implementation.
+type Config struct {
+	// The route prefix, which is "" by default.
+	Prefix string
+
+	// If ture, it will enable the debug mode.
+	Debug bool
+
+	// The router management, which uses echo implementation by default.
+	// But you can appoint yourself customized Router implementation.
+	Router Router
+
+	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
+	// But you can appoint yourself customized Logger implementation.
+	Logger Logger
+	// Binder is used to bind the request data to the given value,
+	// which is `NewBinder()` by default.
+	// But you can appoint yourself customized Binder implementation
+	Binder Binder
+	// Rendered is used to render the response to the peer, which has no
+	// the default implementation.
+	Renderer Renderer
+
+	// Handle the error at last.
+	//
+	// The default will send the response to the peer if the error is a HTTPError.
+	// Or only log it. So the handler and the middleware return a HTTPError,
+	// instead of sending the response to the peer.
+	HandleError func(Context, error)
+
+	// You can appoint the NotFound handler. Or use NotFoundHandler.
+	NotFoundHandler Handler
+
+	// OPTIONS and MethodNotAllowed handler, which are used for the default rotuer.
+	OptionsHandler          Handler
+	MethodNotAllowedHandler Handler
 }
 
-// FromHTTPHandler converts http.Handler to Handler.
-func FromHTTPHandler(h http.HandlerFunc) Handler {
-	return func(ctx Context) error {
-		h.ServeHTTP(ctx.Response(), ctx.Request())
-		return nil
+func (c *Config) init(s *Ship) {
+	if c.Logger == nil {
+		c.Logger = NewNoLevelLogger(os.Stdout)
+	}
+
+	if c.NotFoundHandler == nil {
+		c.NotFoundHandler = NotFoundHandler()
+	}
+
+	if c.HandleError == nil {
+		c.HandleError = s.handleError
+	}
+
+	if c.Binder == nil {
+		c.Binder = binder.NewBinder()
+	}
+
+	if c.Router == nil {
+		c.Router = echo.NewRouter(c.MethodNotAllowedHandler, c.OptionsHandler)
 	}
 }
 
-// FromHTTPHandlerFunc converts http.HandlerFunc to Handler.
-func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
-	return func(ctx Context) error {
-		h(ctx.Response(), ctx.Request())
-		return nil
+// Ship is used to manage the router.
+type Ship struct {
+	config  Config
+	ctxpool sync.Pool
+	maxNum  int
+
+	prehandler     Handler
+	premiddlewares []Middleware
+	middlewares    []Middleware
+}
+
+// New returns a new Ship.
+func New(config ...Config) *Ship {
+	s := new(Ship)
+	if len(config) > 0 {
+		s.config = config[0]
+	}
+
+	s.config.init(s)
+	s.prehandler = NothingHandler()
+	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
+	return s
+}
+
+// Logger returns the inner Logger
+func (s *Ship) Logger() Logger {
+	return s.config.Logger
+}
+
+// NewContext news and returns a Context.
+func (s *Ship) NewContext(r *http.Request, w http.ResponseWriter) Context {
+	return newContext(s, r, w, s.maxNum)
+}
+
+// AcquireContext gets a Context from the pool.
+func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) Context {
+	c := s.ctxpool.Get().(*context)
+	c.setReqResp(r, w)
+	return c
+}
+
+// ReleaseContext puts a Context into the pool.
+func (s *Ship) ReleaseContext(c Context) {
+	if c != nil {
+		c.(*context).reset()
+		s.ctxpool.Put(c)
 	}
 }
 
-// NothingHandler does nothing.
-func NothingHandler(ctx Context) error { return nil }
+// Pre registers the Pre-middlewares, which are executed before finding the route.
+func (s *Ship) Pre(middlewares ...Middleware) {
+	s.premiddlewares = append(s.premiddlewares, middlewares...)
 
-// NotFoundHandler is the default NotFound handler.
-func NotFoundHandler(ctx Context) error {
-	http.NotFound(ctx.Response(), ctx.Request())
-	return nil
+	var handler Handler = NothingHandler()
+	for i := len(s.premiddlewares) - 1; i >= 0; i-- {
+		handler = s.premiddlewares[i](handler)
+	}
+	s.prehandler = handler
 }
 
-// MethodNotAllowedHandler is the default MethodNotAllowed handler.
-func MethodNotAllowedHandler(ctx Context) error {
-	ctx.Response().WriteHeader(http.StatusMethodNotAllowed)
-	return nil
+// Use registers the global middlewares.
+func (s *Ship) Use(middlewares ...Middleware) {
+	s.middlewares = append(s.middlewares, middlewares...)
 }
 
-// OptionsHandler is the default OPTIONS handler.
-func OptionsHandler(ctx Context) error {
-	ctx.Response().WriteHeader(http.StatusOK)
-	return nil
+// Group returns a new sub-group.
+func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
+	ms := make([]Middleware, 0, len(s.middlewares)+len(middlewares))
+	ms = append(ms, s.middlewares...)
+	ms = append(ms, middlewares...)
+	return newGroup(s, prefix, ms...)
 }
 
-// HandlePanic wraps and logs the panic information.
-func HandlePanic(ctx Context, err interface{}) {
-	logger := ctx.Logger()
-	if logger != nil {
-		logger.Error("panic: %v", err)
+// GroupNone is the same as Group, but not inherit the middlewares of Ship.
+func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
+	ms := make([]Middleware, 0, len(middlewares))
+	ms = append(ms, middlewares...)
+	return newGroup(s, prefix, ms...)
+}
+
+// Route returns a new route, then you can customize and register it.
+//
+// You must call Route.Method() or its short method.
+func (s *Ship) Route(path string, handler Handler) *Route {
+	return newRoute(s, s.config.Prefix, path, handler)
+}
+
+// R is short for Ship#Route(path, handler).
+func (s *Ship) R(path string, handler Handler) *Route {
+	return s.Route(path, handler)
+}
+
+func (s *Ship) addRoute(name, prefix, path string, methods []string,
+	handler Handler, mws ...Middleware) {
+	if handler == nil {
+		panic(errors.New("handler must not be nil"))
+	}
+
+	if len(methods) == 0 {
+		panic(errors.New("method must not be empty"))
+	}
+
+	if len(path) == 0 || path[0] != '/' {
+		panic(fmt.Errorf("path '%s' must start with '/'", path))
+	}
+
+	if len(prefix) > 0 && prefix[len(prefix)-1] == '/' {
+		prefix = prefix[:len(prefix)-1]
+	}
+
+	if len(prefix) > 0 {
+		path = prefix + path
+	}
+
+	if i := strings.Index(path, "//"); i != -1 {
+		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
+	}
+
+	for i := range methods {
+		methods[i] = strings.ToUpper(methods[i])
+	}
+
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		handler = s.middlewares[i](handler)
+	}
+
+	for _, m := range methods {
+		if n := s.config.Router.Add(name, m, path, handler); n > s.maxNum {
+			s.maxNum = n
+		}
 	}
 }
 
-// HandleHTTPError handles the HTTP error.
-func HandleHTTPError(ctx Context, err error) {
-	var code = http.StatusInternalServerError
-	var msg string
+// Router returns the inner Router.
+func (s *Ship) Router() Router {
+	return s.config.Router
+}
 
+// URL generates an URL from route name and provided parameters.
+func (s *Ship) URL(name string, params ...interface{}) string {
+	return s.config.Router.URL(name, params...)
+}
+
+// Traverse traverses the registered route.
+func (s *Ship) Traverse(f func(name string, method string, path string)) {
+	s.config.Router.Each(f)
+}
+
+// ServeHTTP implements the interface http.Handler.
+func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var ctx = s.AcquireContext(r, w).(*context)
+
+	if err = s.prehandler(ctx); err == nil {
+		h := s.config.Router.Find(r.Method, r.URL.Path, ctx.pnames, ctx.pvalues)
+		if h == nil {
+			err = s.config.NotFoundHandler(ctx)
+		} else {
+			err = h(ctx)
+		}
+	}
+
+	if err != nil {
+		s.config.HandleError(ctx, err)
+	}
+	s.ReleaseContext(ctx)
+}
+
+func (s *Ship) handleError(ctx Context, err error) {
+	// Handle the HTTPError, and send the response
 	if he, ok := err.(HTTPError); ok {
-		code = he.Code()
-		msg = he.Message()
+		code := he.Code()
+		ct := he.ContentType()
+		msg := he.Message()
+		if ctx.IsDebug() {
+			msg = err.Error()
+		} else if len(msg) == 0 {
+			msg = http.StatusText(code)
+		}
+
 		if ie := he.InnerError(); ie != nil {
 			err = fmt.Errorf("%s, %s", err.Error(), ie.Error())
 		}
-	} else if ctx.IsDebug() {
-		msg = err.Error()
-	} else {
-		msg = http.StatusText(code)
+
+		ctx.Blob(code, ct, []byte(msg))
 	}
 
-	// Send response
-	if resp, ok := ctx.Response().(*Response); ok && !resp.Committed {
-		if ctx.Request().Method == http.MethodHead { // Issue #608
-			resp.WriteHeader(code)
-			err = nil
-		} else {
-			if resp.Header().Get(MIMETextPlain) == "" {
-				resp.Header().Set(MIMETextPlain, msg)
-			}
-			resp.WriteHeader(code)
-			_, err = resp.Write([]byte(msg))
-		}
-		if err != nil && ctx.Logger() != nil {
-			ctx.Logger().Error("%s", err.Error())
+	// For other errors, only log the error.
+	if err != nil {
+		if logger := ctx.Logger(); logger != nil {
+			logger.Error("%s", err.Error())
 		}
 	}
+
+	return
 }
