@@ -648,25 +648,25 @@ func shipHandler(method, path string) ship.Handler {
 	}
 }
 
-func BenchmarkShipStatic(b *testing.B) {
+func BenchmarkShipEchoStatic(b *testing.B) {
 	r := ship.New()
 	loadShipRoutes(r, static)
 	benchmarkRoutes(b, r, static)
 }
 
-func BenchmarkShipGitHubAPI(b *testing.B) {
+func BenchmarkShipEchoGitHubAPI(b *testing.B) {
 	r := ship.New()
 	loadShipRoutes(r, githubAPI)
 	benchmarkRoutes(b, r, githubAPI)
 }
 
-func BenchmarkShipGplusAPI(b *testing.B) {
+func BenchmarkShipEchoGplusAPI(b *testing.B) {
 	r := ship.New()
 	loadShipRoutes(r, gplusAPI)
 	benchmarkRoutes(b, r, gplusAPI)
 }
 
-func BenchmarkShipParseAPI(b *testing.B) {
+func BenchmarkShipEchoParseAPI(b *testing.B) {
 	r := ship.New()
 	loadShipRoutes(r, parseAPI)
 	benchmarkRoutes(b, r, parseAPI)
