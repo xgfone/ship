@@ -45,6 +45,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 //    Request() *http.Request
 //    Response() http.ResponseWriter
+//    SetResponse(http.ResponseWriter)
 //
 //    IsTLS() bool
 //    IsDebug() bool
@@ -244,6 +245,13 @@ func (c *context) Request() *http.Request {
 // Response returns the inner http.ResponseWriter.
 func (c *context) Response() http.ResponseWriter {
 	return c.resp
+}
+
+// SetResponse resets the response to resp, which will ignore nil.
+func (c *context) SetResponse(resp http.ResponseWriter) {
+	if resp != nil {
+		c.resp = resp
+	}
 }
 
 // Scheme returns the HTTP protocol scheme, `http` or `https`.

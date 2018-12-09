@@ -163,7 +163,7 @@ func (s *Ship) ReleaseContext(c Context) {
 func (s *Ship) Pre(middlewares ...Middleware) {
 	s.premiddlewares = append(s.premiddlewares, middlewares...)
 
-	var handler Handler = NothingHandler()
+	handler := NothingHandler()
 	for i := len(s.premiddlewares) - 1; i >= 0; i-- {
 		handler = s.premiddlewares[i](handler)
 	}

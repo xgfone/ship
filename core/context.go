@@ -11,6 +11,7 @@ import (
 type Context interface {
 	Request() *http.Request
 	Response() http.ResponseWriter
+	SetResponse(http.ResponseWriter)
 
 	IsTLS() bool
 	IsDebug() bool
