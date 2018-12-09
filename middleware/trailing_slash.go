@@ -14,7 +14,15 @@ func RemoveTrailingSlash() ship.Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx ship.Context) (err error) {
 			req := ctx.Request()
-			req.URL.Path = strings.TrimRight(req.URL.Path, "/")
+			path := req.URL.Path
+			if path != "" && path != "/" && path[len(path)-1] == '/' {
+				path = strings.TrimRight(path, "/")
+				if path == "" {
+					req.URL.Path = "/"
+				} else {
+					req.URL.Path = path
+				}
+			}
 			return next(ctx)
 		}
 	}
