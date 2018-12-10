@@ -15,10 +15,10 @@ import (
 // For missing key, it responds "400 Bad Request".
 //
 // If getAuthTokenFromRequest is missing, the default is
-// GetAuthTokenFromHeader(ship.HeaderAuthorization, "auth").
+// GetAuthTokenFromHeader(ship.HeaderAuthorization, "token").
 func TokenAuth(validateToken func(token string) (bool, error),
 	getAuthTokenFromRequest ...func(ctx ship.Context) (token string, err error)) ship.Middleware {
-	getAuthToken := GetAuthTokenFromHeader(ship.HeaderAuthorization, "auth")
+	getAuthToken := GetAuthTokenFromHeader(ship.HeaderAuthorization, "token")
 	if len(getAuthTokenFromRequest) > 0 && getAuthTokenFromRequest[0] != nil {
 		getAuthToken = getAuthTokenFromRequest[0]
 	}
