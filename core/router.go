@@ -1,5 +1,11 @@
 package core
 
+// WildcardParam is used to represent the name of the wildcard parameter.
+//
+// Notice: for the universality, the router implementation shoud use
+// the constant as the name of the wildcard parameter.
+const WildcardParam = "*"
+
 // Router stands for a router management.
 type Router interface {
 	// Generate a URL by the url name and parameters.
