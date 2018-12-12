@@ -276,6 +276,18 @@ func main() {
 }
 ```
 
+The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middlewares as follow:
+
+- [CSRF](https://godoc.org/github.com/xgfone/ship/middleware#CSRF)
+- [Gzip](https://godoc.org/github.com/xgfone/ship/middleware#Gzip)
+- [Logger](https://godoc.org/github.com/xgfone/ship/middleware#Logger)
+- [Recover](https://godoc.org/github.com/xgfone/ship/middleware#Recover)
+- [CleanPath](https://godoc.org/github.com/xgfone/ship/middleware#CleanPath)
+- [BodyLimit](https://godoc.org/github.com/xgfone/ship/middleware#BodyLimit)
+- [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)
+- [ResetResponse](https://godoc.org/github.com/xgfone/ship/middleware#ResetResponse)
+- [RemoveTrailingSlash](https://godoc.org/github.com/xgfone/ship/middleware#RemoveTrailingSlash)
+
 #### Using `SubRouter`
 
 ```go
@@ -399,6 +411,7 @@ func main() {
 - Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries).
 - Add JWT middleware.
 - Add OAuth 2.0 middleware.
+- Add CORS middlware.
 - Add HTML template render.
 - Add the serialization and deserialization middleware.
 - Give the more capacity to the default binder.
