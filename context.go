@@ -43,6 +43,8 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 // Methods:
 //
+//    NotFoundHandler() Handler
+//
 //    Request() *http.Request
 //    Response() http.ResponseWriter
 //    SetResponse(http.ResponseWriter)
@@ -179,6 +181,10 @@ func (c *context) reset() {
 	for key := range c.store {
 		delete(c.store, key)
 	}
+}
+
+func (c *context) NotFoundHandler() Handler {
+	return c.ship.config.NotFoundHandler
 }
 
 // URLParamByName returns the parameter in the url path by name.

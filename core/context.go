@@ -9,6 +9,8 @@ import (
 
 // Context stands for a context interface.
 type Context interface {
+	NotFoundHandler() Handler
+
 	Request() *http.Request
 	Response() http.ResponseWriter
 	SetResponse(http.ResponseWriter)
