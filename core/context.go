@@ -17,6 +17,7 @@ type Context interface {
 
 	IsTLS() bool
 	IsDebug() bool
+	IsAjax() bool
 	IsWebSocket() bool
 
 	Header(name string) (value string)

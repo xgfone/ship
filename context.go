@@ -51,6 +51,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 //    IsTLS() bool
 //    IsDebug() bool
+//    IsAjax() bool
 //    IsWebSocket() bool
 //
 //    Header(name string) (value string)
@@ -241,6 +242,10 @@ func (c *context) IsTLS() bool {
 // IsWebSocket returns true if HTTP connection is WebSocket otherwise false.
 func (c *context) IsWebSocket() bool {
 	return strings.ToLower(c.req.Header.Get(HeaderUpgrade)) == "websocket"
+}
+
+func (c *context) IsAjax() bool {
+	return c.req.Header.Get(HeaderXRequestedWith) == "XMLHttpRequest"
 }
 
 // Request returns the inner Request.
