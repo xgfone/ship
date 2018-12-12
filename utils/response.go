@@ -27,7 +27,21 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"sync"
 )
+
+// ResponsePool is used to cache the Response.
+var responsePool = sync.Pool{New: func() interface{} { return NewResponse(nil) }}
+
+// GetResponseFromPool returns a Response from the pool.
+func GetResponseFromPool(w http.ResponseWriter) *Response {
+	return responsePool.Get().(*Response).SetWriter(w)
+}
+
+// PutResponseIntoPool puts a Response into the pool.
+func PutResponseIntoPool(r *Response) {
+	responsePool.Put(r.Reset(nil))
+}
 
 // Response implements http.ResponseWriter.
 type Response struct {
