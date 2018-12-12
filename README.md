@@ -138,8 +138,22 @@ func main() {
     router := ship.New()
 
     router.Route("/path/:id", func(ctx Context) error {
-        ctx.URL("get_url", ctx.URLParam())
+        fmt.Println(ctx.URL("get_url", ctx.URLParam()))
     }).Name("get_url").GET()
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+#### Add the Header and Scheme filter
+
+```go
+func main() {
+    router := ship.New()
+
+    handler := func(ctx Context) error { return nil }
+    router.R("/path1", handler).Schemes("https", "wss").GET()
+    router.R("/path2", handler).Headers("Content-Type", "application/json").POST()
 
     http.ListenAndServe(":8080", router)
 }
