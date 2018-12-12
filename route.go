@@ -47,6 +47,41 @@ func (r *Route) Name(name string) *Route {
 	return r
 }
 
+// Headers adds some header matches.
+//
+// If the headers of a certain request don't contain these headers,
+// it will return ship.config.NotFoundHandler.
+//
+// Example
+//
+//     s := ship.New()
+//     s.R("/path/to", handler).Headers("Content-Type", "application/json").POST()
+//
+func (r *Route) Headers(headers ...string) *Route {
+	_len := len(headers)
+	if _len == 0 {
+		return r
+	} else if _len%2 != 0 {
+		panic(errors.New("the number of the headers must be even"))
+	}
+
+	for i := 0; i < _len; i += 2 {
+		headers[i] = http.CanonicalHeaderKey(headers[i])
+	}
+
+	return r.Use(func(next Handler) Handler {
+		return func(ctx Context) error {
+			header := ctx.Request().Header
+			for i := 0; i < _len; i += 2 {
+				if header.Get(headers[i]) != headers[i+1] {
+					return r.ship.config.NotFoundHandler(ctx)
+				}
+			}
+			return next(ctx)
+		}
+	})
+}
+
 // Use adds some middlwares for the route.
 func (r *Route) Use(middlewares ...Middleware) *Route {
 	r.mdwares = append(r.mdwares, middlewares...)
