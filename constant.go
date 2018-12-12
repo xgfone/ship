@@ -44,6 +44,7 @@ const (
 // Headers
 const (
 	HeaderAccept              = "Accept"
+	HeaderAcceptedLanguage    = "Accept-Language"
 	HeaderAcceptEncoding      = "Accept-Encoding"
 	HeaderAllow               = "Allow"
 	HeaderAuthorization       = "Authorization"
@@ -70,6 +71,8 @@ const (
 	HeaderXRequestedWith      = "X-Requested-With"
 	HeaderServer              = "Server"
 	HeaderOrigin              = "Origin"
+	HeaderReferer             = "Referer"
+	HeaderUserAgent           = "User-Agent"
 
 	// Access control
 	HeaderAccessControlRequestMethod    = "Access-Control-Request-Method"
