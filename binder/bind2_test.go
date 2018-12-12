@@ -6,52 +6,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
-
-func testMatchPanic(t *testing.T, f func(), err error) {
-	defer func() {
-		perr := recover()
-
-		if perr != nil && err != nil {
-			if perr.(error).Error() != err.Error() {
-				t.Logf("%s <--> %s", perr, err)
-				t.Fail()
-			}
-		} else if perr != nil || err != nil {
-			t.Logf("%s <--> %s", perr, err)
-			t.Fail()
-		}
-	}()
-
-	f()
-}
-
-func isEqual(v1, v2 interface{}) bool {
-	if v1 == nil || v2 == nil {
-		return v1 == v2
-	}
-
-	return reflect.DeepEqual(v1, v2)
-}
-
-func isType(v1, v2 interface{}) bool {
-	return isEqual(reflect.TypeOf(v1), reflect.TypeOf(v2))
-}
-
-func testEqual(t *testing.T, v1, v2 interface{}) {
-	if !isEqual(v1, v2) {
-		t.Logf("%+v != %+v", v1, v2)
-		t.Fail()
-	}
-}
-
-func testIsType(t *testing.T, v1, v2 interface{}) {
-	if !isType(v1, v2) {
-		t.Fail()
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 type (
 	bindTestStruct struct {
@@ -155,21 +112,21 @@ var values = map[string][]string{
 }
 
 func assertBindTestStruct(t *testing.T, ts *bindTestStruct) {
-	testEqual(t, 0, ts.I)
-	testEqual(t, int8(8), ts.I8)
-	testEqual(t, int16(16), ts.I16)
-	testEqual(t, int32(32), ts.I32)
-	testEqual(t, int64(64), ts.I64)
-	testEqual(t, uint(0), ts.UI)
-	testEqual(t, uint8(8), ts.UI8)
-	testEqual(t, uint16(16), ts.UI16)
-	testEqual(t, uint32(32), ts.UI32)
-	testEqual(t, uint64(64), ts.UI64)
-	testEqual(t, true, ts.B)
-	testEqual(t, float32(32.5), ts.F32)
-	testEqual(t, float64(64.5), ts.F64)
-	testEqual(t, "test", ts.S)
-	testEqual(t, "", ts.GetCantSet())
+	assert.Equal(t, 0, ts.I)
+	assert.Equal(t, int8(8), ts.I8)
+	assert.Equal(t, int16(16), ts.I16)
+	assert.Equal(t, int32(32), ts.I32)
+	assert.Equal(t, int64(64), ts.I64)
+	assert.Equal(t, uint(0), ts.UI)
+	assert.Equal(t, uint8(8), ts.UI8)
+	assert.Equal(t, uint16(16), ts.UI16)
+	assert.Equal(t, uint32(32), ts.UI32)
+	assert.Equal(t, uint64(64), ts.UI64)
+	assert.Equal(t, true, ts.B)
+	assert.Equal(t, float32(32.5), ts.F32)
+	assert.Equal(t, float64(64.5), ts.F64)
+	assert.Equal(t, "test", ts.S)
+	assert.Equal(t, "", ts.GetCantSet())
 }
 
 func TestBindbindData(t *testing.T) {
@@ -216,55 +173,55 @@ func TestBindSetFields(t *testing.T) {
 	val := reflect.ValueOf(ts).Elem()
 	// Int
 	if setIntField("5", 0, val.FieldByName("I")) == nil {
-		testEqual(t, 5, ts.I)
+		assert.Equal(t, 5, ts.I)
 	} else {
 		t.Fail()
 	}
 	if setIntField("", 0, val.FieldByName("I")) == nil {
-		testEqual(t, 0, ts.I)
+		assert.Equal(t, 0, ts.I)
 	} else {
 		t.Fail()
 	}
 
 	// Uint
 	if setUintField("10", 0, val.FieldByName("UI")) == nil {
-		testEqual(t, uint(10), ts.UI)
+		assert.Equal(t, uint(10), ts.UI)
 	} else {
 		t.Fail()
 	}
 	if setUintField("", 0, val.FieldByName("UI")) == nil {
-		testEqual(t, uint(0), ts.UI)
+		assert.Equal(t, uint(0), ts.UI)
 	} else {
 		t.Fail()
 	}
 
 	// Float
 	if setFloatField("15.5", 0, val.FieldByName("F32")) == nil {
-		testEqual(t, float32(15.5), ts.F32)
+		assert.Equal(t, float32(15.5), ts.F32)
 	} else {
 		t.Fail()
 	}
 	if setFloatField("", 0, val.FieldByName("F32")) == nil {
-		testEqual(t, float32(0.0), ts.F32)
+		assert.Equal(t, float32(0.0), ts.F32)
 	} else {
 		t.Fail()
 	}
 
 	// Bool
 	if setBoolField("true", val.FieldByName("B")) == nil {
-		testEqual(t, true, ts.B)
+		assert.Equal(t, true, ts.B)
 	} else {
 		t.Fail()
 	}
 	if setBoolField("", val.FieldByName("B")) == nil {
-		testEqual(t, false, ts.B)
+		assert.Equal(t, false, ts.B)
 	} else {
 		t.Fail()
 	}
 
 	ok, err := unmarshalFieldNonPtr("2016-12-06T19:09:05Z", val.FieldByName("T"))
 	if err == nil {
-		testEqual(t, ok, true)
-		testEqual(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), ts.T)
+		assert.Equal(t, ok, true)
+		assert.Equal(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), ts.T)
 	}
 }

@@ -415,3 +415,4 @@ func main() {
 - Add HTML template render.
 - Add the serialization and deserialization middleware.
 - Give the more capacity to the default binder.
+- Add the `httprouter` router implementation.

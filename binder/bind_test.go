@@ -32,109 +32,14 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/xgfone/ship"
 )
-
-func testMatchPanic(t *testing.T, f func(), err error) {
-	defer func() {
-		perr := recover()
-
-		if perr != nil && err != nil {
-			if perr.(error).Error() != err.Error() {
-				t.Logf("%s <--> %s", perr, err)
-				t.Fail()
-			}
-		} else if perr != nil || err != nil {
-			t.Logf("%s <--> %s", perr, err)
-			t.Fail()
-		}
-	}()
-
-	f()
-}
-
-func isEqual(v1, v2 interface{}) bool {
-	if v1 == nil || v2 == nil {
-		return v1 == v2
-	}
-
-	return reflect.DeepEqual(v1, v2)
-}
-
-func isType(v1, v2 interface{}) bool {
-	return isEqual(reflect.TypeOf(v1), reflect.TypeOf(v2))
-}
-
-func testEqual(t *testing.T, v1, v2 interface{}) {
-	if !isEqual(v1, v2) {
-		t.Logf("%+v != %+v", v1, v2)
-		t.Fail()
-	}
-}
-
-func testIsType(t *testing.T, v1, v2 interface{}) {
-	if !isType(v1, v2) {
-		t.Fail()
-	}
-}
-
-var defaultHandler = func(ctx ship.Context) (err error) {
-	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.Request().Method)); err != nil {
-		code := http.StatusInternalServerError
-		err = ship.NewHTTPError(code).SetInnerError(err)
-	}
-	return
-}
-
-var idHandler = func(ctx ship.Context) (err error) {
-	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.URLParamByName("id"))); err != nil {
-		code := http.StatusInternalServerError
-		err = ship.NewHTTPError(code).SetInnerError(err)
-	}
-	return
-}
-
-var params2Handler = func(ctx ship.Context) (err error) {
-	resp := ctx.Response()
-	get := ctx.URLParamByName
-	if _, err = resp.Write([]byte(get("p1") + "|" + get("p2"))); err != nil {
-		code := http.StatusInternalServerError
-		err = ship.NewHTTPError(code).SetInnerError(err)
-	}
-	return
-}
-
-type closeNotifyingRecorder struct {
-	*httptest.ResponseRecorder
-	closed chan bool
-}
-
-func (c *closeNotifyingRecorder) close() {
-	c.closed <- true
-}
-
-func (c *closeNotifyingRecorder) CloseNotify() <-chan bool {
-	return c.closed
-}
-
-func sendTestRequest(method, path string, s *ship.Ship) (int, string) {
-	r, _ := http.NewRequest(method, path, nil)
-	w := &closeNotifyingRecorder{
-		httptest.NewRecorder(),
-		make(chan bool, 1),
-	}
-
-	s.ServeHTTP(w, r)
-	return w.Code, w.Body.String()
-}
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -146,8 +51,8 @@ func testBindOkay(t *testing.T, r io.Reader, ctype string) {
 	u := new(user)
 	err := ctx.Bind(u)
 	if err == nil {
-		testEqual(t, 1, u.ID)
-		testEqual(t, "Jon Snow", u.Name)
+		assert.Equal(t, 1, u.ID)
+		assert.Equal(t, "Jon Snow", u.Name)
 	} else {
 		t.Fail()
 	}
@@ -167,14 +72,14 @@ func testBindError(t *testing.T, r io.Reader, ctype string, expectedInternal err
 		strings.HasPrefix(ctype, ship.MIMETextXML),
 		strings.HasPrefix(ctype, ship.MIMEApplicationForm),
 		strings.HasPrefix(ctype, ship.MIMEMultipartForm):
-		if isType(ship.NewHTTPError(200), err) {
-			testEqual(t, http.StatusBadRequest, err.(ship.HTTPError).Code())
-			testIsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
+		if assert.IsType(t, ship.NewHTTPError(200), err) {
+			assert.Equal(t, http.StatusBadRequest, err.(ship.HTTPError).Code())
+			assert.IsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
 		}
 	default:
-		if isType(ship.NewHTTPError(200), err) {
-			testEqual(t, ship.ErrUnsupportedMediaType, err)
-			testIsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
+		if assert.IsType(t, ship.NewHTTPError(200), err) {
+			assert.Equal(t, ship.ErrUnsupportedMediaType, err)
+			assert.IsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
 		}
 	}
 }
@@ -295,8 +200,8 @@ func TestBindQueryParams(t *testing.T) {
 	u := new(user)
 	err := ctx.Bind(u)
 	if err == nil {
-		testEqual(t, 1, u.ID)
-		testEqual(t, "Jon Snow", u.Name)
+		assert.Equal(t, 1, u.ID)
+		assert.Equal(t, "Jon Snow", u.Name)
 	} else {
 		t.Fail()
 	}
@@ -309,8 +214,8 @@ func TestBindQueryParamsCaseInsensitive(t *testing.T) {
 	u := new(user)
 	err := ctx.Bind(u)
 	if err == nil {
-		testEqual(t, 1, u.ID)
-		testEqual(t, "Jon Snow", u.Name)
+		assert.Equal(t, 1, u.ID)
+		assert.Equal(t, "Jon Snow", u.Name)
 	} else {
 		t.Fail()
 	}
@@ -323,8 +228,8 @@ func TestBindQueryParamsCaseSensitivePrioritized(t *testing.T) {
 	u := new(user)
 	err := ctx.Bind(u)
 	if err == nil {
-		testEqual(t, 1, u.ID)
-		testEqual(t, "Jon Doe", u.Name)
+		assert.Equal(t, 1, u.ID)
+		assert.Equal(t, "Jon Doe", u.Name)
 	} else {
 		t.Fail()
 	}
@@ -346,10 +251,10 @@ func TestBindUnmarshalBind(t *testing.T) {
 	ts := Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC))
 
 	if err == nil {
-		testEqual(t, ts, result.T)
-		testEqual(t, StringArray([]string{"one", "two", "three"}), result.SA)
-		testEqual(t, []Timestamp{ts, ts}, result.TA)
-		testEqual(t, Struct{"baz"}, result.ST)
+		assert.Equal(t, ts, result.T)
+		assert.Equal(t, StringArray([]string{"one", "two", "three"}), result.SA)
+		assert.Equal(t, []Timestamp{ts, ts}, result.TA)
+		assert.Equal(t, Struct{"baz"}, result.ST)
 	}
 }
 
@@ -362,7 +267,7 @@ func TestBindUnmarshalBindPtr(t *testing.T) {
 	}{}
 	err := ctx.Bind(&result)
 	if err == nil {
-		testEqual(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), *result.Tptr)
+		assert.Equal(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), *result.Tptr)
 	} else {
 		t.Fail()
 	}
@@ -397,5 +302,5 @@ func TestBindUnmarshalTypeError(t *testing.T) {
 		"Unmarshal type error: expected=int, got=string, offset=14")
 	he = he.SetInnerError(err.(ship.HTTPError))
 
-	testEqual(t, he.Error(), err.Error())
+	assert.Equal(t, he.Error(), err.Error())
 }
