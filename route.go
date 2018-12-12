@@ -17,6 +17,7 @@ package ship
 import (
 	"errors"
 	"net/http"
+	"strings"
 )
 
 // Route represents a route information.
@@ -78,6 +79,38 @@ func (r *Route) Headers(headers ...string) *Route {
 				}
 			}
 			return next(ctx)
+		}
+	})
+}
+
+// Schemes adds some scheme matches.
+//
+// If the scheme of a certain request is not in these schemes,
+// it will return ship.config.NotFoundHandler.
+//
+// Example
+//
+//     s := ship.New()
+//     s.R("/path/to", handler).Schemes("https", "wss").POST()
+//
+func (r *Route) Schemes(schemes ...string) *Route {
+	_len := len(schemes)
+	if _len == 0 {
+		return r
+	}
+	for i := 0; i < _len; i++ {
+		schemes[i] = strings.ToLower(schemes[i])
+	}
+
+	return r.Use(func(next Handler) Handler {
+		return func(ctx Context) error {
+			scheme := ctx.Request().URL.Scheme
+			for i := 0; i < _len; i++ {
+				if schemes[i] == scheme {
+					return next(ctx)
+				}
+			}
+			return r.ship.config.NotFoundHandler(ctx)
 		}
 	})
 }
