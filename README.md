@@ -348,10 +348,14 @@ type Router interface {
 	URL(name string, params ...interface{}) string
 
 	// Add a route with name, method , path and handler,
-	// and return the number of the paramaters if there are the paramaters
+	// and return the number of the parameters if there are the parameters
 	// in the route. Or return 0.
 	//
-	// If the router does not support the paramater, it should panic.
+	// If the router does not support the parameter, it should panic.
+	//
+	// Notice: for keeping consistent, the parameter should start with ":"
+	// or "*". ":" stands for a single parameter, and "*" stands for
+	// a wildcard parameter.
 	Add(name string, method string, path string, handler Handler) (paramNum int)
 
 	// Find a route handler by the method and path of the request.
