@@ -18,53 +18,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
-
-func testMatchPanic(t *testing.T, f func(), err error) {
-	defer func() {
-		perr := recover()
-
-		if perr != nil && err != nil {
-			if perr.(error).Error() != err.Error() {
-				t.Logf("%s <--> %s", perr, err)
-				t.Fail()
-			}
-		} else if perr != nil || err != nil {
-			t.Logf("%s <--> %s", perr, err)
-			t.Fail()
-		}
-	}()
-
-	f()
-}
-
-func isEqual(v1, v2 interface{}) bool {
-	if v1 == nil || v2 == nil {
-		return v1 == v2
-	}
-
-	return reflect.DeepEqual(v1, v2)
-}
-
-func isType(v1, v2 interface{}) bool {
-	return isEqual(reflect.TypeOf(v1), reflect.TypeOf(v2))
-}
-
-func testEqual(t *testing.T, v1, v2 interface{}) {
-	if !isEqual(v1, v2) {
-		t.Logf("%+v != %+v", v1, v2)
-		t.Fail()
-	}
-}
-
-func testIsType(t *testing.T, v1, v2 interface{}) {
-	if !isType(v1, v2) {
-		t.Fail()
-	}
-}
 
 var defaultHandler = func(ctx Context) (err error) {
 	resp := ctx.Response()
@@ -117,8 +75,6 @@ func sendTestRequest(method, path string, s *Ship) (int, string) {
 	s.ServeHTTP(w, r)
 	return w.Code, w.Body.String()
 }
-
-//////////////////////////////////////////////////////////////////////////
 
 func TestAllMethods(t *testing.T) {
 	p := New()
@@ -271,27 +227,18 @@ func TestAllMethods(t *testing.T) {
 
 	for _, tt := range tests {
 		req, err := http.NewRequest(tt.method, tt.url, nil)
-		if err != nil {
-			t.Errorf("Expected 'nil' Got '%s'", err)
-		}
+		assert.NoError(t, err)
 
 		res := httptest.NewRecorder()
 		p.ServeHTTP(res, req)
 
-		if res.Code != tt.code {
-			t.Errorf("Expected '%d' Got '%d': %s, %s", tt.code, res.Code, tt.method, tt.url)
-		}
-
+		assert.Equal(t, tt.code, res.Code)
 		if len(tt.body) > 0 {
 			b, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				t.Errorf("Expected 'nil' Got '%s'", err)
-			}
+			assert.NoError(t, err)
 
 			s := string(b)
-			if s != tt.body {
-				t.Errorf("Expected '%s' Got '%s'", tt.body, s)
-			}
+			assert.Equal(t, tt.body, s)
 		}
 	}
 
@@ -334,26 +281,18 @@ func TestAllMethods(t *testing.T) {
 
 	for _, tt := range test2 {
 		req, err := http.NewRequest(tt.method, "/test", nil)
-		if err != nil {
-			t.Errorf("Expected 'nil' Got '%s'", err)
-		}
+		assert.NoError(t, err)
 
 		res := httptest.NewRecorder()
 		p2.ServeHTTP(res, req)
 
-		if res.Code != http.StatusOK {
-			t.Errorf("Expected '%d' Got '%d'", http.StatusOK, res.Code)
-		}
+		assert.Equal(t, http.StatusOK, res.Code)
 
 		b, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Errorf("Expected 'nil' Got '%s'", err)
-		}
+		assert.NoError(t, err)
 
 		s := string(b)
-		if s != tt.method {
-			t.Errorf("Expected '%s' Got '%s'", tt.method, s)
-		}
+		assert.Equal(t, tt.method, s)
 	}
 }
 
@@ -371,8 +310,8 @@ func TestRouterAPI(t *testing.T) {
 
 	for _, route := range githubAPI {
 		code, body := sendTestRequest(route.method, route.path, p)
-		testEqual(t, body, route.path)
-		testEqual(t, code, http.StatusOK)
+		assert.Equal(t, body, route.path)
+		assert.Equal(t, code, http.StatusOK)
 	}
 }
 
@@ -390,27 +329,27 @@ func TestMethodNotAllowed(t *testing.T) {
 	p.Route("/home/", defaultHandler).Method("PROPFIND")
 
 	code, _ := sendTestRequest(http.MethodPut, "/home/", p)
-	testEqual(t, code, http.StatusOK)
+	assert.Equal(t, code, http.StatusOK)
 
 	r, _ := http.NewRequest(http.MethodGet, "/home/", nil)
 	w := httptest.NewRecorder()
 	p.ServeHTTP(w, r)
 
-	testEqual(t, w.Code, http.StatusMethodNotAllowed)
+	assert.Equal(t, w.Code, http.StatusMethodNotAllowed)
 
 	sallow, ok := w.Header()[HeaderAllow]
 	if len(sallow) == 0 {
 		t.Fail()
 	}
 	allow := strings.Split(sallow[0], ", ")
-	testEqual(t, ok, true)
-	testEqual(t, len(allow), 9)
+	assert.Equal(t, ok, true)
+	assert.Equal(t, len(allow), 9)
 
 	r, _ = http.NewRequest("PROPFIND2", "/home/1", nil)
 	w = httptest.NewRecorder()
 	p.ServeHTTP(w, r)
 
-	testEqual(t, w.Code, http.StatusNotFound)
+	assert.Equal(t, w.Code, http.StatusNotFound)
 }
 
 func TestMethodNotAllowed2(t *testing.T) {
@@ -420,13 +359,13 @@ func TestMethodNotAllowed2(t *testing.T) {
 	p.Route("/home/", defaultHandler).HEAD()
 
 	code, _ := sendTestRequest(http.MethodGet, "/home/", p)
-	testEqual(t, code, http.StatusOK)
+	assert.Equal(t, code, http.StatusOK)
 
 	r, _ := http.NewRequest(http.MethodPost, "/home/", nil)
 	w := httptest.NewRecorder()
 	p.ServeHTTP(w, r)
 
-	testEqual(t, w.Code, http.StatusMethodNotAllowed)
+	assert.Equal(t, w.Code, http.StatusMethodNotAllowed)
 
 	sallow, ok := w.Header()[HeaderAllow]
 	if len(sallow) == 0 {
@@ -436,13 +375,13 @@ func TestMethodNotAllowed2(t *testing.T) {
 
 	// Sometimes this array is out of order for whatever reason?
 	if allow[0] == http.MethodGet {
-		testEqual(t, ok, true)
-		testEqual(t, allow[0], http.MethodGet)
-		testEqual(t, allow[1], http.MethodHead)
+		assert.Equal(t, ok, true)
+		assert.Equal(t, allow[0], http.MethodGet)
+		assert.Equal(t, allow[1], http.MethodHead)
 	} else {
-		testEqual(t, ok, true)
-		testEqual(t, allow[1], http.MethodGet)
-		testEqual(t, allow[0], http.MethodHead)
+		assert.Equal(t, ok, true)
+		assert.Equal(t, allow[1], http.MethodGet)
+		assert.Equal(t, allow[0], http.MethodHead)
 	}
 }
 
@@ -463,18 +402,16 @@ func TestAutomaticallyHandleOPTIONS(t *testing.T) {
 	p.Route("/home", defaultHandler).Method("PROPFIND")
 
 	code, _ := sendTestRequest(http.MethodGet, "/home", p)
-	testEqual(t, code, http.StatusOK)
+	assert.Equal(t, code, http.StatusOK)
 
 	r, _ := http.NewRequest(http.MethodOptions, "/home", nil)
 	w := httptest.NewRecorder()
 	p.ServeHTTP(w, r)
 
-	testEqual(t, w.Code, http.StatusOK)
-
+	assert.Equal(t, w.Code, http.StatusOK)
 	allow, ok := w.Header()[HeaderAllow]
-
-	testEqual(t, ok, true)
-	testEqual(t, len(strings.Split(allow[0], ", ")), 9)
+	assert.Equal(t, ok, true)
+	assert.Equal(t, len(strings.Split(allow[0], ", ")), 9)
 }
 
 func TestNotFound(t *testing.T) {
@@ -490,10 +427,10 @@ func TestNotFound(t *testing.T) {
 	p.Route("/users/:id/:id2/:id3", defaultHandler).GET()
 
 	code, _ := sendTestRequest("BAD_METHOD", "/home/", p)
-	testEqual(t, code, http.StatusNotFound)
+	assert.Equal(t, code, http.StatusNotFound)
 
 	code, _ = sendTestRequest(http.MethodGet, "/users/14/more", p)
-	testEqual(t, code, http.StatusNotFound)
+	assert.Equal(t, code, http.StatusNotFound)
 }
 
 func TestBasePath(t *testing.T) {
@@ -501,12 +438,7 @@ func TestBasePath(t *testing.T) {
 	p.Route("/", defaultHandler).GET()
 
 	code, _ := sendTestRequest(http.MethodGet, "/", p)
-	testEqual(t, code, http.StatusOK)
-}
-
-type zombie struct {
-	ID   int    `json:"id"   xml:"id"`
-	Name string `json:"name" xml:"name"`
+	assert.Equal(t, code, http.StatusOK)
 }
 
 type route struct {
