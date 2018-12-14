@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/xgfone/ship/binder"
-
 	"github.com/xgfone/ship/core"
 	"github.com/xgfone/ship/router/echo"
 )

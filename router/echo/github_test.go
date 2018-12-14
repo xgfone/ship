@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/xgfone/ship"
-
 	"github.com/xgfone/ship/router/echo"
 )
 
