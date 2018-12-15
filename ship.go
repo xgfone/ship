@@ -231,8 +231,15 @@ func (s *Ship) addRoute(name, prefix, path string, methods []string,
 		methods[i] = strings.ToUpper(methods[i])
 	}
 
-	for i := len(s.middlewares) - 1; i >= 0; i-- {
-		handler = s.middlewares[i](handler)
+	_len := len(s.middlewares) + len(mws)
+	if _len > 0 {
+		middlewares := make([]Middleware, _len)
+		copy(middlewares, s.middlewares)
+		copy(middlewares[len(s.middlewares):], mws)
+
+		for i := _len - 1; i >= 0; i-- {
+			handler = middlewares[i](handler)
+		}
 	}
 
 	for _, m := range methods {
