@@ -190,7 +190,13 @@ func (r *router) Add(name, method, path string, h core.Handler) int {
 			r.insert(method, path[:i], nil, pkind, "", nil)
 		} else if path[i] == '*' {
 			r.insert(method, path[:i], nil, skind, "", nil)
-			pnames = append(pnames, "*")
+
+			name := strings.TrimRight(path[i+1:], "/ ")
+			if name == "" {
+				name = "*"
+			}
+			pnames = append(pnames, name)
+
 			r.insert(method, path[:i+1], h, akind, ppath, pnames)
 			return len(pnames)
 		}

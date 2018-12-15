@@ -43,4 +43,14 @@ func TestRouter(t *testing.T) {
 	if pnames[0] != "name" || pvalues[0] != "Aaron" {
 		t.Fail()
 	}
+
+	pnames[0] = ""
+	pvalues[0] = ""
+	router.Add("", "GET", "/static/*path", func(ctx core.Context) error { return nil })
+	if router.Find("GET", "/static/path/to/file", pnames, pvalues) == nil {
+		t.Fail()
+	}
+	if len(pnames) != 1 || pnames[0] != "path" || pvalues[0] != "path/to/file" {
+		t.Fail()
+	}
 }
