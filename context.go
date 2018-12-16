@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship/utils"
 )
 
 var (
@@ -42,6 +43,9 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 // Context is the alias of core.Context, which stands for a context.
 //
 // Methods:
+//
+//    // Report whether the response is sent.
+//    IsResponse() bool
 //
 //    NotFoundHandler() Handler
 //
@@ -117,7 +121,7 @@ type Context = core.Context
 // Context stands for a request and response context.
 type context struct {
 	req   *http.Request
-	resp  http.ResponseWriter
+	resp  *utils.Response
 	query url.Values
 
 	pnames  []string
@@ -142,7 +146,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 
 	return &context{
 		req:  req,
-		resp: resp,
+		resp: utils.NewResponse(resp),
 
 		// See c.setShip(s)
 		ship:     s,
@@ -168,12 +172,12 @@ func (c *context) setShip(s *Ship) {
 
 func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
-	c.resp = w
+	c.resp.SetWriter(w)
 }
 
 func (c *context) reset() {
 	c.req = nil
-	c.resp = nil
+	c.resp.Reset(nil)
 	c.query = nil
 
 	copy(c.pnames, emptyStrS[:len(c.pnames)])
@@ -186,6 +190,10 @@ func (c *context) reset() {
 
 func (c *context) NotFoundHandler() Handler {
 	return c.ship.config.NotFoundHandler
+}
+
+func (c *context) IsResponse() bool {
+	return c.resp.Committed
 }
 
 // URLParamByName returns the parameter in the url path by name.
@@ -261,7 +269,7 @@ func (c *context) Response() http.ResponseWriter {
 // SetResponse resets the response to resp, which will ignore nil.
 func (c *context) SetResponse(resp http.ResponseWriter) {
 	if resp != nil {
-		c.resp = resp
+		c.resp.SetWriter(resp)
 	}
 }
 
