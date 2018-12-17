@@ -48,6 +48,12 @@ func (r *Route) Name(name string) *Route {
 	return r
 }
 
+// Handler sets the handler of the Route.
+func (r *Route) Handler(h Handler) *Route {
+	r.handler = h
+	return r
+}
+
 // Headers adds some header matches.
 //
 // If the headers of a certain request don't contain these headers,

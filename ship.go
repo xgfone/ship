@@ -201,6 +201,11 @@ func (s *Ship) R(path string, handler Handler) *Route {
 	return s.Route(path, handler)
 }
 
+// Path is equal to s.Route(path, nil), so you must set the handler later.
+func (s *Ship) Path(path string) *Route {
+	return s.Route(path, nil)
+}
+
 func (s *Ship) addRoute(name, prefix, path string, methods []string,
 	handler Handler, mws ...Middleware) {
 	if handler == nil {

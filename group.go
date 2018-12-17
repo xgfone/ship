@@ -72,3 +72,8 @@ func (g *Group) Route(path string, handler Handler) *Route {
 func (g *Group) R(path string, handler Handler) *Route {
 	return g.Route(path, handler)
 }
+
+// Path is equal to g.Route(path, nil), so you must set the handler later.
+func (g *Group) Path(path string) *Route {
+	return g.Route(path, nil)
+}
