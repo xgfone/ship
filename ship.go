@@ -193,7 +193,7 @@ func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
 //
 // You must call Route.Method() or its short method.
 func (s *Ship) Route(path string, handler Handler) *Route {
-	return newRoute(s, s.config.Prefix, path, handler)
+	return newRoute(s, s.config.Prefix, path, handler, s.middlewares...)
 }
 
 // R is short for Ship#Route(path, handler).
