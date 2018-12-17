@@ -142,8 +142,8 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 //
 // Notice: The method must be called at last.
 func (r *Route) Method(methods ...string) {
-	if len(r.name) > 0 && len(methods) > 1 {
-		panic(errors.New("the named route only appoint one method"))
+	if len(methods) == 0 {
+		panic(errors.New("the route requires methods"))
 	}
 	r.ship.addRoute(r.name, r.path, methods, r.handler, r.mdwares...)
 }
@@ -200,7 +200,3 @@ func (r *Route) POST() {
 func (r *Route) DELETE() {
 	r.Method(http.MethodDelete)
 }
-
-// func (r *Route)Static()  {
-
-// }

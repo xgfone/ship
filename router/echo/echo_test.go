@@ -9,8 +9,8 @@ import (
 
 func TestRouter(t *testing.T) {
 	router := NewRouter(nil, nil)
-	router.Add("static", "GET", "/static", func(ctx core.Context) error { return ctx.String(200, "STATIC") })
-	router.Add("param", "POST", "/test/:name", func(ctx core.Context) error {
+	router.Add("static", "/static", []string{"GET"}, func(ctx core.Context) error { return ctx.String(200, "STATIC") })
+	router.Add("param", "/test/:name", []string{"POST"}, func(ctx core.Context) error {
 		return ctx.String(200, fmt.Sprintf("hello %s", ctx.URLParamByName("name")))
 	})
 
@@ -46,7 +46,7 @@ func TestRouter(t *testing.T) {
 
 	pnames[0] = ""
 	pvalues[0] = ""
-	router.Add("", "GET", "/static/*path", func(ctx core.Context) error { return nil })
+	router.Add("", "/static/*path", []string{"GET"}, func(ctx core.Context) error { return nil })
 	if router.Find("GET", "/static/path/to/file", pnames, pvalues) == nil {
 		t.Fail()
 	}

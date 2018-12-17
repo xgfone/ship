@@ -31,7 +31,7 @@ import (
 //
 // Methods:
 //   URL(name string, params ...interface{}) string
-//   Add(name string, method string, path string, handler Handler) (paramNum int)
+//   Add(name string, path string, methods []string, handler Handler) (paramNum int)
 //   Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
 //   Each(func(name string, method string, path string))
 type Router = core.Router
@@ -236,10 +236,8 @@ func (s *Ship) addRoute(name, path string, methods []string, handler Handler, mw
 		handler = mws[i](handler)
 	}
 
-	for _, m := range methods {
-		if n := s.config.Router.Add(name, m, path, handler); n > s.maxNum {
-			s.maxNum = n
-		}
+	if n := s.config.Router.Add(name, path, methods, handler); n > s.maxNum {
+		s.maxNum = n
 	}
 }
 

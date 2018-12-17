@@ -382,7 +382,7 @@ type Router interface {
 	// Notice: for keeping consistent, the parameter should start with ":"
 	// or "*". ":" stands for a single parameter, and "*" stands for
 	// a wildcard parameter.
-	Add(name string, method string, path string, handler Handler) (paramNum int)
+	Add(name string, path string, methods []string, handler Handler) (paramNum int)
 
 	// Find a route handler by the method and path of the request.
 	//
