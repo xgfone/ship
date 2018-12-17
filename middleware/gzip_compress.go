@@ -22,17 +22,12 @@ func Gzip(level ...int) ship.Middleware {
 
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx ship.Context) error {
-			resp := ctx.Response()
-
 			if strings.Contains(ctx.Request().Header.Get(ship.HeaderAcceptEncoding), "gzip") {
+				resp := ctx.Response()
 				resp.Header().Add(ship.HeaderVary, ship.HeaderAcceptEncoding)
 				resp.Header().Set(ship.HeaderContentEncoding, "gzip")
 
-				writer, ok := resp.(*utils.Response)
-				if !ok {
-					writer = utils.GetResponseFromPool(resp)
-				}
-
+				writer := utils.GetResponseFromPool(resp)
 				newWriter, err := gzip.NewWriterLevel(writer, glevel)
 				if err != nil {
 					return err
@@ -45,9 +40,7 @@ func Gzip(level ...int) ship.Middleware {
 						newWriter.Reset(ioutil.Discard)
 					}
 					newWriter.Close()
-					if !ok {
-						utils.PutResponseIntoPool(writer)
-					}
+					utils.PutResponseIntoPool(writer)
 				}()
 
 				gzipWriter := &gzipResponseWriter{Writer: newWriter, ResponseWriter: resp}
