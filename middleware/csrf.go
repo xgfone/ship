@@ -36,7 +36,7 @@ type CSRFConfig struct {
 //       GetTokenFromRequest: GetCSRFTokenFromHeader(ship.HeaderXCSRFToken),
 //   }
 //
-func CSRF(config ...CSRFConfig) ship.Middleware {
+func CSRF(config ...CSRFConfig) Middleware {
 	var conf CSRFConfig
 	if len(config) > 0 {
 		conf = config[0]

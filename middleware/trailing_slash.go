@@ -10,7 +10,7 @@ import (
 // in the request path if it exists.
 //
 // Notice: it should be used as the pre-middleware by ship#Pre().
-func RemoveTrailingSlash() ship.Middleware {
+func RemoveTrailingSlash() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx ship.Context) (err error) {
 			req := ctx.Request()

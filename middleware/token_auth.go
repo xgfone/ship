@@ -16,7 +16,7 @@ import (
 //
 // If getToken is missing, the default is
 // GetAuthTokenFromHeader(ship.HeaderAuthorization, "Bearer").
-func TokenAuth(validator TokenValidator, getToken ...TokenFunc) ship.Middleware {
+func TokenAuth(validator TokenValidator, getToken ...TokenFunc) Middleware {
 	getAuthToken := GetAuthTokenFromHeader(ship.HeaderAuthorization, "Bearer")
 	if len(getToken) > 0 && getToken[0] != nil {
 		getAuthToken = getToken[0]

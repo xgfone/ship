@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/core"
 )
 
 const (
@@ -17,6 +18,11 @@ const (
 )
 
 var defaultRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+// Middleware is the alias of core.Middleware.
+//
+// We add it in order to show the middlewares in together by the godoc.
+type Middleware = core.Middleware
 
 // TokenFunc stands for a function to get a token from the request context.
 type TokenFunc func(ctx ship.Context) (token string, err error)

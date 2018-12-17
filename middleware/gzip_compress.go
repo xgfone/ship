@@ -14,7 +14,7 @@ import (
 )
 
 // Gzip returns a middleware to compress the response body by GZIP.
-func Gzip(level ...int) ship.Middleware {
+func Gzip(level ...int) Middleware {
 	glevel := -1
 	if len(level) > 0 {
 		glevel = level[0]

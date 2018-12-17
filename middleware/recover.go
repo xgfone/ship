@@ -27,7 +27,7 @@ func handlePanic(ctx ship.Context, err interface{}) {
 // Recover returns a middleware to wrap the panic.
 //
 // If missing handle, it will use the default, which logs the panic.
-func Recover(handle ...func(ship.Context, interface{})) ship.Middleware {
+func Recover(handle ...func(ship.Context, interface{})) Middleware {
 	handlePanic := handlePanic
 	if len(handle) > 0 && handle[0] != nil {
 		handlePanic = handle[0]

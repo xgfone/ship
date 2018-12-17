@@ -23,7 +23,7 @@ import (
 // Logger returns a new logger middleware that will log the request.
 //
 // By default getTime is time.Now().
-func Logger(now ...func() time.Time) ship.Middleware {
+func Logger(now ...func() time.Time) Middleware {
 	_now := time.Now
 	if len(now) > 0 && now[0] != nil {
 		_now = now[0]

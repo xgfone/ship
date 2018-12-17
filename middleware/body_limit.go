@@ -8,7 +8,7 @@ import (
 )
 
 // BodyLimit is used to limit the maximum body of the request.
-func BodyLimit(maxBodySize int64) ship.Middleware {
+func BodyLimit(maxBodySize int64) Middleware {
 	var pool sync.Pool
 	if maxBodySize > 0 {
 		pool = newLimitedReaderPool(maxBodySize)

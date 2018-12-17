@@ -12,7 +12,7 @@ import (
 // CleanPath returns a new middleware to clean the request path.
 //
 // Notice: it should be used as the pre-middleware by ship#Pre().
-func CleanPath() ship.Middleware {
+func CleanPath() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx ship.Context) (err error) {
 			req := ctx.Request()
