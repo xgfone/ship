@@ -43,6 +43,13 @@ var (
 	ErrCookieNotFound        = errors.New("cookie not found")
 )
 
+// ErrSkip is the alias of core.ErrSkip, which is not an error and used to
+// suggest that the middeware should skip and return it back to the outer
+// middleware to handle.
+//
+// Notice: it is only a suggestion.
+var ErrSkip = core.ErrSkip
+
 // HTTPError is the alias of core.HTTPError, which stands for an HTTP error.
 //
 // Methods:
