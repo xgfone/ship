@@ -220,10 +220,7 @@ func (s *Ship) addRoute(name, prefix, path string, methods []string,
 		panic(fmt.Errorf("path '%s' must start with '/'", path))
 	}
 
-	if len(prefix) > 0 && prefix[len(prefix)-1] == '/' {
-		prefix = prefix[:len(prefix)-1]
-	}
-
+	prefix = strings.TrimSuffix(s.config.Prefix+prefix, "/")
 	if len(prefix) > 0 {
 		path = prefix + path
 	}
@@ -236,15 +233,8 @@ func (s *Ship) addRoute(name, prefix, path string, methods []string,
 		methods[i] = strings.ToUpper(methods[i])
 	}
 
-	_len := len(s.middlewares) + len(mws)
-	if _len > 0 {
-		middlewares := make([]Middleware, _len)
-		copy(middlewares, s.middlewares)
-		copy(middlewares[len(s.middlewares):], mws)
-
-		for i := _len - 1; i >= 0; i-- {
-			handler = middlewares[i](handler)
-		}
+	for i := len(mws) - 1; i >= 0; i-- {
+		handler = mws[i](handler)
 	}
 
 	for _, m := range methods {

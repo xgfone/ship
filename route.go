@@ -136,7 +136,7 @@ func (r *Route) Method(methods ...string) {
 	if len(r.name) > 0 && len(methods) > 1 {
 		panic(errors.New("the named route only appoint one method"))
 	}
-	r.ship.addRoute(r.name, "", r.path, methods, r.handler, r.mdwares...)
+	r.ship.addRoute(r.name, r.prefix, r.path, methods, r.handler, r.mdwares...)
 }
 
 // Any registers all the supported methods , which is short for
@@ -191,3 +191,7 @@ func (r *Route) POST() {
 func (r *Route) DELETE() {
 	r.Method(http.MethodDelete)
 }
+
+// func (r *Route)Static()  {
+
+// }

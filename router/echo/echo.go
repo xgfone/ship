@@ -49,6 +49,7 @@ type (
 	router struct {
 		tree       *node
 		routes     map[string]*route
+		allroutes  []*route
 		options    core.Handler
 		notAllowed core.Handler
 	}
@@ -103,6 +104,7 @@ func NewRouter(methodNotAllowedHandler, optionsHandler core.Handler) core.Router
 	r := &router{
 		tree:       &node{methodHandler: new(methodHandler)},
 		routes:     map[string]*route{},
+		allroutes:  []*route{},
 		options:    optionsHandler,
 		notAllowed: methodNotAllowedHandler,
 	}
@@ -112,7 +114,7 @@ func NewRouter(methodNotAllowedHandler, optionsHandler core.Handler) core.Router
 
 // Each implements github.com/xgfone/ship:Router#Each.
 func (r *router) Each(f func(name, method, path string)) {
-	for _, route := range r.routes {
+	for _, route := range r.allroutes {
 		f(route.Name, route.Method, route.Path)
 	}
 }
@@ -153,12 +155,14 @@ func (r *router) Add(name, method, path string, h core.Handler) int {
 		path = "/" + path
 	}
 
+	_route := &route{Name: name, Method: method, Path: path}
 	if len(name) > 0 {
 		if _, ok := r.routes[name]; ok {
 			panic(fmt.Errorf("the url name '%s' has been registered", name))
 		}
-		r.routes[name] = &route{Name: name, Method: method, Path: path}
+		r.routes[name] = _route
 	}
+	r.allroutes = append(r.allroutes, _route)
 
 	pnames := []string{} // Param names
 	ppath := path        // Pristine path
