@@ -3,23 +3,11 @@ package middleware
 import (
 	"crypto/subtle"
 	"errors"
-	"math/rand"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/xgfone/ship"
 )
-
-const (
-	uppercase    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	lowercase    = "abcdefghijklmnopqrstuvwxyz"
-	alphabetic   = uppercase + lowercase
-	numeric      = "0123456789"
-	alphanumeric = alphabetic + numeric
-)
-
-var defaultRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // CSRFConfig is used to configure the CSRF middleware.
 type CSRFConfig struct {
@@ -32,7 +20,7 @@ type CSRFConfig struct {
 	CookieHTTPOnly bool
 
 	GenerateToken       func() string
-	GetTokenFromRequest func(ship.Context) (string, error)
+	GetTokenFromRequest TokenFunc
 }
 
 // CSRF returns a CSRF middleware.
@@ -125,33 +113,15 @@ func validateCSRFToken(token, clientToken string) bool {
 	return subtle.ConstantTimeCompare([]byte(token), []byte(clientToken)) == 1
 }
 
-// GenerateToken returns a token generator which will generate
-// a n-length token string.
-func GenerateToken(n int, charsets ...string) func() string {
-	charset := strings.Join(charsets, "")
-	if charset == "" {
-		charset = alphanumeric
-	}
-	_len := int64(len(charset))
-
-	return func() string {
-		buf := make([]byte, n)
-		for i := range buf {
-			buf[i] = charset[rand.Int63()%_len]
-		}
-		return string(buf)
-	}
-}
-
 // GetCSRFTokenFromHeader is used to get the CSRF token from the request header.
-func GetCSRFTokenFromHeader(header string) func(ship.Context) (string, error) {
+func GetCSRFTokenFromHeader(header string) TokenFunc {
 	return func(ctx ship.Context) (string, error) {
 		return ctx.Request().Header.Get(header), nil
 	}
 }
 
 // GetCSRFTokenFromForm is used to get the CSRF token from the request body FORM.
-func GetCSRFTokenFromForm(param string) func(ship.Context) (string, error) {
+func GetCSRFTokenFromForm(param string) TokenFunc {
 	return func(ctx ship.Context) (string, error) {
 		token := ctx.FormValue(param)
 		if token != "" {
@@ -162,7 +132,7 @@ func GetCSRFTokenFromForm(param string) func(ship.Context) (string, error) {
 }
 
 // GetCSRFTokenFromQuery is used to get the CSRF token from the request URL query.
-func GetCSRFTokenFromQuery(param string) func(ship.Context) (string, error) {
+func GetCSRFTokenFromQuery(param string) TokenFunc {
 	return func(ctx ship.Context) (string, error) {
 		token := ctx.QueryParam(param)
 		if token != "" {

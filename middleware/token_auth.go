@@ -14,13 +14,12 @@ import (
 // For invalid key, it responds "401 Unauthorized".
 // For missing key, it responds "400 Bad Request".
 //
-// If getAuthTokenFromRequest is missing, the default is
+// If getToken is missing, the default is
 // GetAuthTokenFromHeader(ship.HeaderAuthorization, "Bearer").
-func TokenAuth(validateToken func(token string) (bool, error),
-	getAuthTokenFromRequest ...func(ctx ship.Context) (token string, err error)) ship.Middleware {
+func TokenAuth(validator TokenValidator, getToken ...TokenFunc) ship.Middleware {
 	getAuthToken := GetAuthTokenFromHeader(ship.HeaderAuthorization, "Bearer")
-	if len(getAuthTokenFromRequest) > 0 && getAuthTokenFromRequest[0] != nil {
-		getAuthToken = getAuthTokenFromRequest[0]
+	if len(getToken) > 0 && getToken[0] != nil {
+		getAuthToken = getToken[0]
 	}
 
 	return func(next ship.Handler) ship.Handler {
@@ -29,7 +28,7 @@ func TokenAuth(validateToken func(token string) (bool, error),
 			if err != nil {
 				return ship.NewHTTPError(http.StatusBadRequest, err.Error())
 			}
-			if valid, err := validateToken(token); err != nil {
+			if valid, err := validator(token); err != nil {
 				return err
 			} else if valid {
 				return next(ctx)
@@ -40,7 +39,7 @@ func TokenAuth(validateToken func(token string) (bool, error),
 }
 
 // GetAuthTokenFromHeader is used to get the CSRF token from the request header.
-func GetAuthTokenFromHeader(header string, authScheme ...string) func(ship.Context) (string, error) {
+func GetAuthTokenFromHeader(header string, authScheme ...string) TokenFunc {
 	var scheme string
 	if header == ship.HeaderAuthorization {
 		if len(authScheme) > 0 {
@@ -68,7 +67,7 @@ func GetAuthTokenFromHeader(header string, authScheme ...string) func(ship.Conte
 }
 
 // GetAuthTokenFromForm is used to get the CSRF token from the request body FORM.
-func GetAuthTokenFromForm(param string) func(ship.Context) (string, error) {
+func GetAuthTokenFromForm(param string) TokenFunc {
 	return func(ctx ship.Context) (string, error) {
 		token := ctx.FormValue(param)
 		if token != "" {
@@ -79,7 +78,7 @@ func GetAuthTokenFromForm(param string) func(ship.Context) (string, error) {
 }
 
 // GetAuthTokenFromQuery is used to get the CSRF token from the request URL query.
-func GetAuthTokenFromQuery(param string) func(ship.Context) (string, error) {
+func GetAuthTokenFromQuery(param string) TokenFunc {
 	return func(ctx ship.Context) (string, error) {
 		token := ctx.QueryParam(param)
 		if token != "" {
