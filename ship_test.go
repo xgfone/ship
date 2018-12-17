@@ -316,7 +316,10 @@ func TestRouterAPI(t *testing.T) {
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	p := New(Config{MethodNotAllowedHandler: MethodNotAllowedHandler()})
+	p := New(Config{
+		KeepTrailingSlashPath:   true,
+		MethodNotAllowedHandler: MethodNotAllowedHandler(),
+	})
 
 	p.Route("/home/", defaultHandler).PUT()
 	p.Route("/home/", defaultHandler).POST()
@@ -340,10 +343,11 @@ func TestMethodNotAllowed(t *testing.T) {
 	sallow, ok := w.Header()[HeaderAllow]
 	if len(sallow) == 0 {
 		t.Fail()
+	} else {
+		allow := strings.Split(sallow[0], ", ")
+		assert.Equal(t, ok, true)
+		assert.Equal(t, len(allow), 9)
 	}
-	allow := strings.Split(sallow[0], ", ")
-	assert.Equal(t, ok, true)
-	assert.Equal(t, len(allow), 9)
 
 	r, _ = http.NewRequest("PROPFIND2", "/home/1", nil)
 	w = httptest.NewRecorder()
@@ -353,7 +357,10 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestMethodNotAllowed2(t *testing.T) {
-	p := New(Config{MethodNotAllowedHandler: MethodNotAllowedHandler()})
+	p := New(Config{
+		KeepTrailingSlashPath:   true,
+		MethodNotAllowedHandler: MethodNotAllowedHandler(),
+	})
 
 	p.Route("/home/", defaultHandler).GET()
 	p.Route("/home/", defaultHandler).HEAD()

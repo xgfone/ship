@@ -57,6 +57,9 @@ type Config struct {
 	// If ture, it will enable the debug mode.
 	Debug bool
 
+	// If true, it won't remove the trailing slash from the registered url path.
+	KeepTrailingSlashPath bool
+
 	// The router management, which uses echo implementation by default.
 	// But you can appoint yourself customized Router implementation.
 	Router Router
@@ -88,6 +91,8 @@ type Config struct {
 }
 
 func (c *Config) init(s *Ship) {
+	c.Prefix = strings.TrimSuffix(c.Prefix, "/")
+
 	if c.Logger == nil {
 		c.Logger = NewNoLevelLogger(os.Stdout)
 	}
@@ -179,14 +184,14 @@ func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(s.middlewares)+len(middlewares))
 	ms = append(ms, s.middlewares...)
 	ms = append(ms, middlewares...)
-	return newGroup(s, prefix, ms...)
+	return newGroup(s, s.config.Prefix, prefix, ms...)
 }
 
 // GroupNone is the same as Group, but not inherit the middlewares of Ship.
 func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(middlewares))
 	ms = append(ms, middlewares...)
-	return newGroup(s, prefix, ms...)
+	return newGroup(s, s.config.Prefix, prefix, ms...)
 }
 
 // Route returns a new route, then you can customize and register it.
@@ -206,8 +211,7 @@ func (s *Ship) Path(path string) *Route {
 	return s.Route(path, nil)
 }
 
-func (s *Ship) addRoute(name, prefix, path string, methods []string,
-	handler Handler, mws ...Middleware) {
+func (s *Ship) addRoute(name, path string, methods []string, handler Handler, mws ...Middleware) {
 	if handler == nil {
 		panic(errors.New("handler must not be nil"))
 	}
@@ -218,11 +222,6 @@ func (s *Ship) addRoute(name, prefix, path string, methods []string,
 
 	if len(path) == 0 || path[0] != '/' {
 		panic(fmt.Errorf("path '%s' must start with '/'", path))
-	}
-
-	prefix = strings.TrimSuffix(s.config.Prefix+prefix, "/")
-	if len(prefix) > 0 {
-		path = prefix + path
 	}
 
 	if i := strings.Index(path, "//"); i != -1 {

@@ -10,6 +10,8 @@ import (
 	"github.com/xgfone/ship"
 )
 
+func TestEmpty(t *testing.T) {}
+
 type Route struct {
 	Method string
 	Path   string

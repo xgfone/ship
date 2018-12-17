@@ -16,6 +16,7 @@ package ship
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -25,17 +26,25 @@ type Route struct {
 	ship    *Ship
 	path    string
 	name    string
-	prefix  string
 	handler Handler
 	mdwares []Middleware
 }
 
 func newRoute(s *Ship, prefix, path string, handler Handler, m ...Middleware) *Route {
+	if !s.config.KeepTrailingSlashPath {
+		path = strings.TrimSuffix(path, "/")
+	}
+
+	if len(path) == 0 {
+		path = "/"
+	} else if path[0] != '/' {
+		panic(fmt.Errorf("path '%s' must start with '/'", path))
+	}
+
 	ms := make([]Middleware, 0, len(m))
 	return &Route{
-		ship:   s,
-		path:   path,
-		prefix: prefix,
+		ship: s,
+		path: prefix + path,
 
 		handler: handler,
 		mdwares: append(ms, m...),
@@ -136,7 +145,7 @@ func (r *Route) Method(methods ...string) {
 	if len(r.name) > 0 && len(methods) > 1 {
 		panic(errors.New("the named route only appoint one method"))
 	}
-	r.ship.addRoute(r.name, r.prefix, r.path, methods, r.handler, r.mdwares...)
+	r.ship.addRoute(r.name, r.path, methods, r.handler, r.mdwares...)
 }
 
 // Any registers all the supported methods , which is short for

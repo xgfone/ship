@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -26,24 +27,21 @@ type Group struct {
 	mdwares []Middleware
 }
 
-func newGroup(s *Ship, prefix string, middlewares ...Middleware) *Group {
-	ms := make([]Middleware, 0, len(middlewares))
-	return &Group{
-		ship:    s,
-		prefix:  strings.TrimRight(prefix, "/"),
-		mdwares: append(ms, middlewares...),
+func newGroup(s *Ship, pprefix, prefix string, middlewares ...Middleware) *Group {
+	prefix = strings.TrimSuffix(prefix, "/")
+	if len(prefix) == 0 {
+		panic(errors.New("the prefix must not be empty"))
 	}
-}
-
-func (g *Group) newGroup(inherit bool, prefix string, ms ...Middleware) *Group {
-	if len(prefix) == 0 || prefix[0] != '/' {
+	if prefix[0] != '/' {
 		panic(fmt.Errorf("prefix '%s' must start with '/'", prefix))
 	}
 
-	if inherit {
-		ms = append(ms, g.mdwares...)
+	ms := make([]Middleware, 0, len(middlewares))
+	return &Group{
+		ship:    s,
+		prefix:  pprefix + prefix,
+		mdwares: append(ms, middlewares...),
 	}
-	return newGroup(g.ship, g.prefix+prefix, ms...)
 }
 
 // Use adds some middlwares for the group.
@@ -53,12 +51,12 @@ func (g *Group) Use(middlewares ...Middleware) {
 
 // Group returns a new sub-group.
 func (g *Group) Group(prefix string, middlewares ...Middleware) *Group {
-	return g.newGroup(true, prefix, middlewares...)
+	return newGroup(g.ship, g.prefix, prefix, append(g.mdwares, middlewares...)...)
 }
 
 // GroupNone is the same as Group, but not inherit the middlewares of the parent.
 func (g *Group) GroupNone(prefix string, middlewares ...Middleware) *Group {
-	return g.newGroup(false, prefix, middlewares...)
+	return newGroup(g.ship, g.prefix, prefix, middlewares...)
 }
 
 // Route returns a new route, then you can customize and register it.
