@@ -9,7 +9,7 @@ import (
 
 // Context stands for a context interface.
 type Context interface {
-	// Report whether the response is sent.
+	// Report whether the response has been sent.
 	IsResponse() bool
 
 	NotFoundHandler() Handler

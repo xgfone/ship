@@ -29,7 +29,6 @@ import (
 	"strings"
 
 	"github.com/xgfone/ship/core"
-	"github.com/xgfone/ship/utils"
 )
 
 var (
@@ -44,7 +43,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 // Methods:
 //
-//    // Report whether the response is sent.
+//    // Report whether the response has been sent.
 //    IsResponse() bool
 //
 //    NotFoundHandler() Handler
@@ -118,10 +117,23 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 type Context = core.Context
 
+type responder struct {
+	http.ResponseWriter
+	ctx *context
+}
+
+// WriteHeader implements http.ResponseWriter#WriteHeader().
+func (r responder) WriteHeader(code int) {
+	r.ResponseWriter.WriteHeader(code)
+	r.ctx.wrote = true
+}
+
 // Context stands for a request and response context.
 type context struct {
+	wrote bool
+
 	req   *http.Request
-	resp  *utils.Response
+	resp  responder
 	query url.Values
 
 	pnames  []string
@@ -144,21 +156,30 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 		pvalues = make([]string, maxParam)
 	}
 
-	return &context{
-		req:  req,
-		resp: utils.NewResponse(resp),
-
-		// See c.setShip(s)
-		ship:     s,
-		debug:    s.config.Debug,
-		logger:   s.config.Logger,
-		binder:   s.config.Binder,
-		renderer: s.config.Renderer,
-
+	ctx := &context{
 		pnames:  pnames,
 		pvalues: pvalues,
 
 		store: make(map[string]interface{}),
+	}
+	ctx.setShip(s)
+	ctx.setReqResp(req, resp)
+
+	return ctx
+}
+
+func (c *context) reset() {
+	c.req = nil
+	c.resp.ResponseWriter = nil
+	c.resp.ctx = nil
+	c.query = nil
+	c.wrote = false
+
+	copy(c.pnames, emptyStrS[:len(c.pnames)])
+	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
+
+	for key := range c.store {
+		delete(c.store, key)
 	}
 }
 
@@ -172,20 +193,8 @@ func (c *context) setShip(s *Ship) {
 
 func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
-	c.resp.SetWriter(w)
-}
-
-func (c *context) reset() {
-	c.req = nil
-	c.resp.Reset(nil)
-	c.query = nil
-
-	copy(c.pnames, emptyStrS[:len(c.pnames)])
-	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
-
-	for key := range c.store {
-		delete(c.store, key)
-	}
+	c.resp.ResponseWriter = w
+	c.resp.ctx = c
 }
 
 func (c *context) NotFoundHandler() Handler {
@@ -193,7 +202,7 @@ func (c *context) NotFoundHandler() Handler {
 }
 
 func (c *context) IsResponse() bool {
-	return c.resp.Committed
+	return c.wrote
 }
 
 // URLParamByName returns the parameter in the url path by name.
@@ -263,13 +272,13 @@ func (c *context) Request() *http.Request {
 
 // Response returns the inner http.ResponseWriter.
 func (c *context) Response() http.ResponseWriter {
-	return c.resp
+	return responder{ResponseWriter: c.resp.ResponseWriter, ctx: c}
 }
 
 // SetResponse resets the response to resp, which will ignore nil.
 func (c *context) SetResponse(resp http.ResponseWriter) {
 	if resp != nil {
-		c.resp.SetWriter(resp)
+		c.resp.ResponseWriter = resp
 	}
 }
 
