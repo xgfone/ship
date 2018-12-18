@@ -141,9 +141,9 @@ func main() {
 }
 ```
 
-Notice: you can regitser the customized method by `Route(path string).Method(handler Handler, method ...string)`.
+Notice: you can regitser the same handler with more than one method by `Route(path string).Method(handler Handler, method ...string)`.
 
-`R` is the alias of `Route`, so you can register a route by `R(path string).Method(handler Handler, method ...string)`.
+`R` is the alias of `Route`, so you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
 #### Cascade the registered routes
 
