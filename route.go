@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -35,7 +36,9 @@ func newRoute(s *Ship, prefix, path string, m ...Middleware) *Route {
 	}
 
 	if len(path) == 0 {
-		path = "/"
+		if len(prefix) == 0 {
+			path = "/"
+		}
 	} else if path[0] != '/' {
 		panic(fmt.Errorf("path '%s' must start with '/'", path))
 	}
@@ -128,16 +131,21 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 	return r
 }
 
+func (r *Route) addRoute(name, path string, handler Handler, methods ...string) *Route {
+	if len(methods) == 0 {
+		panic(errors.New("the route requires methods"))
+	}
+	r.ship.addRoute(name, path, methods, handler, r.mdwares...)
+	return r
+}
+
 // Method sets the methods and registers the route.
 //
 // If methods is nil, it will register all the supported methods for the route.
 //
 // Notice: The method must be called at last.
 func (r *Route) Method(handler Handler, methods ...string) *Route {
-	if len(methods) == 0 {
-		panic(errors.New("the route requires methods"))
-	}
-	r.ship.addRoute(r.name, r.path, methods, handler, r.mdwares...)
+	r.addRoute(r.name, r.path, handler, methods...)
 	return r
 }
 
@@ -203,5 +211,88 @@ func (r *Route) Map(method2handlers map[string]Handler) *Route {
 	for method, handler := range method2handlers {
 		r.Method(handler, method)
 	}
+	return r
+}
+
+// MapType registers the methods of a type as the routes.
+//
+// By default, mapping is Ship.Config.DefaultMethodMapping if not given.
+//
+// Example
+//
+//    type TestType struct{}
+//    func (t TestType) Create(ctx ship.Context) error { return nil }
+//    func (t TestType) Delete(ctx ship.Context) error { return nil }
+//    func (t TestType) Update(ctx ship.Context) error { return nil }
+//    func (t TestType) Get(ctx ship.Context) error    { return nil }
+//    func (t TestType) Has(ctx ship.Context) error    { return nil }
+//    func (t TestType) NotHandler()                   {}
+//
+//    router := ship.New()
+//    router.Route("/path/to").MapType(TestType{})
+//
+// It's equal to the operation as follow:
+//
+//    router.Route("/v1/testtype/get").Name("testtype_get").GET(ts.Get)
+//    router.Route("/v1/testtype/update").Name("testtype_update").PUT(ts.Update)
+//    router.Route("/v1/testtype/create").Name("testtype_create").POST(ts.Create)
+//    router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(ts.Delete)
+//
+// If you don't like the default mapping policy, you can give the customized
+// mapping by the last argument, the key of which is the name of the method
+// of the type, and the value of that is the request method, such as GET, POST,
+// etc. Notice that the method type must be compatible with
+//
+//    func (Context) error
+//
+// Notice: the name of type and method will be converted to the lower.
+func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
+	if tv == nil {
+		panic(errors.New("the type value must no be nil"))
+	}
+
+	value := reflect.ValueOf(tv)
+	methodMaps := r.ship.config.DefaultMethodMapping
+	if len(mapping) > 0 {
+		methodMaps = mapping[0]
+	}
+
+	var err error
+	errType := reflect.TypeOf(&err).Elem()
+	prefix := r.path
+	if prefix == "/" {
+		prefix = ""
+	}
+
+	_type := value.Type()
+	typeName := strings.ToLower(_type.Name())
+	for i := _type.NumMethod() - 1; i >= 0; i-- {
+		method := _type.Method(i)
+		mtype := method.Type
+
+		// func (s StructType) Handler(ctx Context) error
+		if mtype.NumIn() != 2 || mtype.NumOut() != 1 {
+			continue
+		}
+		if _, ok := reflect.New(mtype.In(1)).Interface().(*Context); !ok {
+			continue
+		}
+		if !mtype.Out(0).Implements(errType) {
+			continue
+		}
+
+		// r.addRoute(r.name, r.path, handler, methods...)
+		if reqMethod := methodMaps[method.Name]; reqMethod != "" {
+			methodName := strings.ToLower(method.Name)
+			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
+
+			name := fmt.Sprintf("%s_%s", typeName, methodName)
+			r.addRoute(name, path, func(ctx Context) error {
+				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
+				return vs[0].Interface().(error)
+			}, reqMethod)
+		}
+	}
+
 	return r
 }

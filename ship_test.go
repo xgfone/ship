@@ -732,3 +732,73 @@ var githubAPI = []route{
 	//{"PATCH", "/user/keys/:id"},
 	{"DELETE", "/user/keys/:id"},
 }
+
+type TestType struct{}
+
+func (t TestType) Create(ctx Context) error { return nil }
+func (t TestType) Delete(ctx Context) error { return nil }
+func (t TestType) Update(ctx Context) error { return nil }
+func (t TestType) Get(ctx Context) error    { return nil }
+func (t TestType) Has(ctx Context) error    { return nil }
+func (t TestType) NotHandler()              {}
+
+func strIsInSlice(s string, ss []string) bool {
+	for _, _s := range ss {
+		if _s == s {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRouteMapType(t *testing.T) {
+	router1 := New()
+	router1.Route("/v1").MapType(TestType{})
+	router1.Traverse(func(name, method, path string) {
+		switch method {
+		case "GET":
+			if name != "testtype_get" || path != "/v1/testtype/get" {
+				t.Fail()
+			}
+		case "POST":
+			if name != "testtype_create" || path != "/v1/testtype/create" {
+				t.Fail()
+			}
+		case "PUT":
+			if name != "testtype_update" || path != "/v1/testtype/update" {
+				t.Fail()
+			}
+		case "DELETE":
+			if name != "testtype_delete" || path != "/v1/testtype/delete" {
+				t.Fail()
+			}
+		default:
+			t.Fail()
+		}
+	})
+
+	router2 := New()
+	router2.Route("").MapType(TestType{})
+	router2.Traverse(func(name, method, path string) {
+		switch method {
+		case "GET":
+			if name != "testtype_get" || path != "/testtype/get" {
+				t.Fail()
+			}
+		case "POST":
+			if name != "testtype_create" || path != "/testtype/create" {
+				t.Fail()
+			}
+		case "PUT":
+			if name != "testtype_update" || path != "/testtype/update" {
+				t.Fail()
+			}
+		case "DELETE":
+			if name != "testtype_delete" || path != "/testtype/delete" {
+				t.Fail()
+			}
+		default:
+			t.Fail()
+		}
+	})
+}

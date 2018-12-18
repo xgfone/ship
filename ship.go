@@ -60,6 +60,16 @@ type Config struct {
 	// If true, it won't remove the trailing slash from the registered url path.
 	KeepTrailingSlashPath bool
 
+	// It is the default mapping to map the method into router. The default is
+	//
+	//     map[string]string{
+	//         "Create": "POST",
+	//         "Delete": "DELETE",
+	//         "Update": "PUT",
+	//         "Get":    "GET",
+	//     }
+	DefaultMethodMapping map[string]string
+
 	// The router management, which uses echo implementation by default.
 	// But you can appoint yourself customized Router implementation.
 	Router Router
@@ -92,6 +102,15 @@ type Config struct {
 
 func (c *Config) init(s *Ship) {
 	c.Prefix = strings.TrimSuffix(c.Prefix, "/")
+
+	if c.DefaultMethodMapping == nil {
+		c.DefaultMethodMapping = map[string]string{
+			"Create": "POST",
+			"Delete": "DELETE",
+			"Update": "PUT",
+			"Get":    "GET",
+		}
+	}
 
 	if c.Logger == nil {
 		c.Logger = NewNoLevelLogger(os.Stdout)

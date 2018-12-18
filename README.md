@@ -198,37 +198,37 @@ import (
     "github.com/xgfone/ship"
 )
 
-type TestStruct struct{}
+type TestType struct{}
 
-func (t TestStruct) Create(ctx ship.Context) error { return nil }
-func (t TestStruct) Delete(ctx ship.Context) error { return nil }
-func (t TestStruct) Update(ctx ship.Context) error { return nil }
-func (t TestStruct) Get(ctx ship.Context) error    { return nil }
-func (t TestStruct) Has(ctx ship.Context) error    { return nil }
-func (t TestStruct) NotHandler()                   {}
+func (t TestType) Create(ctx Context) error { return nil }
+func (t TestType) Delete(ctx Context) error { return nil }
+func (t TestType) Update(ctx Context) error { return nil }
+func (t TestType) Get(ctx Context) error    { return nil }
+func (t TestType) Has(ctx Context) error    { return nil }
+func (t TestType) NotHandler()              {}
 
 func main() {
     router := ship.New()
 
-    ship.MapMethodIntoRouter(router, TestStruct{}, "/v1")
+    router.Route("/v1").MapType(TestType{})
 
     http.ListenAndServe(":8080", router)
 }
 ```
 
-`ship.MapMethodIntoRouter(router, TestStruct{}, "/v1")` is equal to
+`router.Route("/v1").MapType(TestType{})` is equal to
 
 ```go
-ts := TestStruct{}
-router.Route("/v1/teststruct/get").Name("teststruct_get").GET(ts.Get)
-router.Route("/v1/teststruct/update").Name("teststruct_update").PUT(ts.Update)
-router.Route("/v1/teststruct/create").Name("teststruct_create").POST(ts.Create)
-router.Route("/v1/teststruct/delete").Name("teststruct_delete").DELETE(ts.Delete)
+tv := TestType{}
+router.Route("/v1/testtype/get").Name("testtype_get").GET(ts.Get)
+router.Route("/v1/testtype/update").Name("testtype_update").PUT(ts.Update)
+router.Route("/v1/testtype/create").Name("testtype_create").POST(ts.Create)
+router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(ts.Delete)
 ```
 
-The default mapping method is `DefaultMethodMapping`, which is defined as follow.
+The default mapping method is `Ship.Config.DefaultMethodMapping`, which is initialized as follow if not given when creating a new router `Ship`.
 ```go
-var DefaultMethodMapping = map[string]string{
+Ship.Config.DefaultMethodMapping = map[string]string{
     // "MethodName": "RequestMethod"
     "Create": "POST",
     "Delete": "DELETE",
@@ -239,9 +239,11 @@ var DefaultMethodMapping = map[string]string{
 
 If the default is not what you want, you can customize it, for example,
 ```go
-ship.MapMethodIntoRouter(router, TestStruct{}, "/v1", map[string]string{
-    "GetMethod": "GET",
-    "PostMethod": "POST",
+router := ship.New(ship.Config{
+    DefaultMethodMapping: map[string]string{
+        "GetMethod": "GET",
+        "PostMethod": "POST",
+    },
 })
 ```
 
