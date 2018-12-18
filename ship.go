@@ -307,12 +307,12 @@ func (s *Ship) handleError(ctx Context, err error) {
 		ctx.Blob(code, ct, []byte(msg))
 	}
 
-	// For other errors, only log the error.
-	if err != nil {
-		if logger := ctx.Logger(); logger != nil {
-			logger.Error("%s", err.Error())
-		}
+	if err == nil || err == ErrSkip {
+		return
 	}
 
-	return
+	// For other errors, only log the error.
+	if logger := ctx.Logger(); logger != nil {
+		logger.Error("%s", err.Error())
+	}
 }
