@@ -147,6 +147,12 @@ func (r *router) URL(name string, params ...interface{}) string {
 // Add implements github.com/xgfone/ship:Router#Add, which will register
 // a new route for method and path with matching handler.
 func (r *router) Add(name, path string, method string, handler core.Handler) int {
+	for _, _r := range r.allroutes {
+		if _r.Method == method && _r.Path == path {
+			panic(fmt.Errorf("the route('%s', '%s') has been registered", method, path))
+		}
+	}
+
 	_route := &route{Name: name, Method: method, Path: path}
 	if len(name) > 0 {
 		if _r, ok := r.routes[name]; ok && _r.Path != path {
