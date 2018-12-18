@@ -12,6 +12,9 @@ type Context interface {
 	// Report whether the response has been sent.
 	IsResponse() bool
 
+	// Find the corresponding handler by the method and path of the request.
+	FindHandler(method string, path string) Handler
+
 	NotFoundHandler() Handler
 
 	Request() *http.Request

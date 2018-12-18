@@ -46,6 +46,9 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    // Report whether the response has been sent.
 //    IsResponse() bool
 //
+//    // Find the corresponding handler by the method and path of the request.
+//    FindHandler(method string, path string) Handler
+//
 //    NotFoundHandler() Handler
 //
 //    Request() *http.Request
@@ -196,6 +199,10 @@ func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.resp.ResponseWriter = w
 	c.resp.ctx = c
+}
+
+func (c *context) FindHandler(method string, path string) Handler {
+	return c.ship.config.Router.Find(method, path, c.pnames, c.pvalues)
 }
 
 func (c *context) NotFoundHandler() Handler {
