@@ -34,9 +34,9 @@ import (
 
 func main() {
 	router := ship.New()
-	router.Route("/ping", func(ctx ship.Context) error {
+	router.Route("/ping").GET(func(ctx ship.Context) error {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
-	}).GET()
+	})
 
 	http.ListenAndServe(":8080", router)
 }
@@ -116,21 +116,47 @@ See [GoDOC](https://godoc.org/github.com/xgfone/ship).
 func main() {
     router := ship.New()
 
-    router.Route("/path/get", getHandler).GET()
-    router.Route("/path/put", putHandler).PUT()
-    router.Route("/path/post", postHandler).POST()
-    router.Route("/path/patch", patchHandler).PATCH()
-    router.Route("/path/delete", deleteHandler).DELETE()
-    router.Route("/path/option", optionHandler).OPTIONS()
-    router.Route("/path/connect", connectHandler).CONNECT()
+    router.Route("/path/get").GET(getHandler)
+    router.Route("/path/put").PUT(putHandler)
+    router.Route("/path/post").POST(postHandler)
+    router.Route("/path/patch").PATCH(patchHandler)
+    router.Route("/path/delete").DELETE(deleteHandler)
+    router.Route("/path/option").OPTIONS(optionHandler)
+    router.Route("/path/connect").CONNECT(connectHandler)
 
     http.ListenAndServe(":8080", router)
 }
 ```
 
-Notice: you can regitser the customized method by `Route(path string, handler Handler).Method(method ...string)`.
+Notice: you can regitser the customized method by `Route(path string).Method(handler Handler, method ...string)`.
 
-`R` is the alias of `Route`, so you can register a route by `R(path string, handler Handler).Method(method ...string)`.
+`R` is the alias of `Route`, so you can register a route by `R(path string).Method(handler Handler, method ...string)`.
+
+#### Cascade the registered routes
+
+```go
+func main() {
+    router := ship.New()
+    router.R("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+or use the mapping from method to handler:
+
+```go
+func main() {
+    router := ship.New()
+    router.R("/path/to").Map(map[string]ship.Handler{
+        "GET": getHandler,
+        "POST": postHandler,
+        "DELETE": deleteHandler,
+    })
+
+    http.ListenAndServe(":8080", router)
+}
+```
 
 #### Naming route and building URL
 You can name the route a name when registering the route, then you can build a URL by the name.
@@ -139,9 +165,9 @@ You can name the route a name when registering the route, then you can build a U
 func main() {
     router := ship.New()
 
-    router.Route("/path/:id", func(ctx Context) error {
+    router.Route("/path/:id").Name("get_url").GET(func(ctx Context) error {
         fmt.Println(ctx.URL("get_url", ctx.URLParamValues()))
-    }).Name("get_url").GET()
+    })
 
     http.ListenAndServe(":8080", router)
 }
@@ -154,8 +180,8 @@ func main() {
     router := ship.New()
 
     handler := func(ctx Context) error { return nil }
-    router.R("/path1", handler).Schemes("https", "wss").GET()
-    router.R("/path2", handler).Headers("Content-Type", "application/json").POST()
+    router.R("/path1").Schemes("https", "wss").GET(handler)
+    router.R("/path2").Headers("Content-Type", "application/json").POST(handler)
 
     http.ListenAndServe(":8080", router)
 }
@@ -194,10 +220,10 @@ func main() {
 
 ```go
 ts := TestStruct{}
-router.Route("/v1/teststruct/get", ts.Get).Name("teststruct_get").GET()
-router.Route("/v1/teststruct/update", ts.Update).Name("teststruct_update").PUT()
-router.Route("/v1/teststruct/create", ts.Create).Name("teststruct_create").POST()
-router.Route("/v1/teststruct/delete", ts.Delete).Name("teststruct_delete").DELETE()
+router.Route("/v1/teststruct/get").Name("teststruct_get").GET(ts.Get)
+router.Route("/v1/teststruct/update").Name("teststruct_update").PUT(ts.Update)
+router.Route("/v1/teststruct/create").Name("teststruct_create").POST(ts.Create)
+router.Route("/v1/teststruct/delete").Name("teststruct_delete").DELETE(ts.Delete)
 ```
 
 The default mapping method is `DefaultMethodMapping`, which is defined as follow.
@@ -243,7 +269,7 @@ func main() {
     router.Use(middleware.Logger(), middleware.Recover())
     router.Use(MyAuthMiddleware())
 
-    router.Route("/url/path", handler).GET()
+    router.Route("/url/path").GET(handler)
 
     http.ListenAndServe(":8080", router)
 }
@@ -273,7 +299,7 @@ func main() {
     router.Pre(RemovePathPrefix("/static"))
     router.Use(middleware.Recover())
 
-    router.Route("/url/path", handler).GET()
+    router.Route("/url/path").GET(handler)
 
     http.ListenAndServe(":8080", router)
 }
@@ -302,12 +328,12 @@ func main() {
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
     v1 := router.Group("/v1")
-    v1.Route("/get/path", getHandler).GET()
+    v1.Route("/get/path").GET(getHandler)
 
     // v2 SubRouter, which won't inherit the middlewares of the parent router.
     v2 := router.GroupNone("/v2")
     v2.Use(MyAuthMiddleware())
-    v2.Route("/post/path", postHandler).POST()
+    v2.Route("/post/path").POST(postHandler)
 
     http.ListenAndServe(":8080", router)
 }
@@ -319,8 +345,8 @@ func main() {
 func main() {
     router := ship.New()
 
-    router.Route("/get/path", getHandler).Name("get_name").GET()
-    router.Route("/post/path", posttHandler).Name("post_name").POST()
+    router.Route("/get/path").Name("get_name").GET(getHandler)
+    router.Route("/post/path").Name("post_name").POST(posttHandler)
 
     router.Traverse(func(name, method, path string) {
         fmt.Println(name, method, path)
@@ -352,13 +378,13 @@ type Login struct {
 func main() {
     router := ship.New()
 
-    router.Route("/login", func(ctx ship.Context) error {
+    router.Route("/login").POST(func(ctx ship.Context) error {
         var login Login
         if err := ctx.Bind(&login); err != nil {
             return err
         }
         ...
-    }).POST()
+    })
 
     http.ListenAndServe(":8080", router)
 }
@@ -376,16 +402,19 @@ type Router interface {
 	// Generate a URL by the url name and parameters.
 	URL(name string, params ...interface{}) string
 
-	// Add a route with name, method , path and handler,
+	// Add a route with name, path, method and handler,
 	// and return the number of the parameters if there are the parameters
 	// in the route. Or return 0.
+	//
+	// If the name has been added for the same path, it should be allowed.
+	// Or it should panic.
 	//
 	// If the router does not support the parameter, it should panic.
 	//
 	// Notice: for keeping consistent, the parameter should start with ":"
 	// or "*". ":" stands for a single parameter, and "*" stands for
 	// a wildcard parameter.
-	Add(name string, path string, methods []string, handler Handler) (paramNum int)
+	Add(name string, path string, method string, handler Handler) (paramNum int)
 
 	// Find a route handler by the method and path of the request.
 	//

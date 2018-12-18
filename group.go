@@ -62,16 +62,11 @@ func (g *Group) GroupNone(prefix string, middlewares ...Middleware) *Group {
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
-func (g *Group) Route(path string, handler Handler) *Route {
-	return newRoute(g.ship, g.prefix, path, handler, g.mdwares...)
+func (g *Group) Route(path string) *Route {
+	return newRoute(g.ship, g.prefix, path, g.mdwares...)
 }
 
-// R is short for Group#Route(path, handler).
-func (g *Group) R(path string, handler Handler) *Route {
-	return g.Route(path, handler)
-}
-
-// Path is equal to g.Route(path, nil), so you must set the handler later.
-func (g *Group) Path(path string) *Route {
-	return g.Route(path, nil)
+// R is short for Group#Route(path).
+func (g *Group) R(path string) *Route {
+	return g.Route(path)
 }

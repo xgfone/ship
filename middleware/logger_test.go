@@ -40,10 +40,10 @@ func TestLogger(t *testing.T) {
 	router := ship.New(ship.Config{Logger: logger})
 	router.Use(Logger(getNow))
 
-	router.Route("/test", func(ctx ship.Context) error {
+	router.Route("/test").GET(func(ctx ship.Context) error {
 		ctx.Logger().Info("handler")
 		return nil
-	}).GET()
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	rec := httptest.NewRecorder()

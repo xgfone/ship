@@ -76,6 +76,23 @@ func sendTestRequest(method, path string, s *Ship) (int, string) {
 	return w.Code, w.Body.String()
 }
 
+func TestRouteMap(t *testing.T) {
+	m2h := map[string]Handler{"GET": defaultHandler, "POST": defaultHandler}
+
+	s := New()
+	s.Route("/path/to").Map(m2h)
+
+	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, rec.Code, http.StatusOK)
+
+	req = httptest.NewRequest(http.MethodPost, "/path/to", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, rec.Code, http.StatusOK)
+}
+
 func TestAllMethods(t *testing.T) {
 	p := New()
 	p.Use(func(next Handler) Handler {
@@ -203,25 +220,25 @@ func TestAllMethods(t *testing.T) {
 	for _, tt := range tests {
 		switch tt.method {
 		case http.MethodGet:
-			p.Route(tt.path, tt.handler).GET()
+			p.Route(tt.path).GET(tt.handler)
 		case http.MethodPost:
-			p.Route(tt.path, tt.handler).POST()
+			p.Route(tt.path).POST(tt.handler)
 		case http.MethodHead:
-			p.Route(tt.path, tt.handler).HEAD()
+			p.Route(tt.path).HEAD(tt.handler)
 		case http.MethodPut:
-			p.Route(tt.path, tt.handler).PUT()
+			p.Route(tt.path).PUT(tt.handler)
 		case http.MethodDelete:
-			p.Route(tt.path, tt.handler).DELETE()
+			p.Route(tt.path).DELETE(tt.handler)
 		case http.MethodConnect:
-			p.Route(tt.path, tt.handler).CONNECT()
+			p.Route(tt.path).CONNECT(tt.handler)
 		case http.MethodOptions:
-			p.Route(tt.path, tt.handler).OPTIONS()
+			p.Route(tt.path).OPTIONS(tt.handler)
 		case http.MethodPatch:
-			p.Route(tt.path, tt.handler).PATCH()
+			p.Route(tt.path).PATCH(tt.handler)
 		case http.MethodTrace:
-			p.Route(tt.path, tt.handler).TRACE()
+			p.Route(tt.path).TRACE(tt.handler)
 		default:
-			p.Route(tt.path, tt.handler).Method(tt.method)
+			p.Route(tt.path).Method(tt.handler, tt.method)
 		}
 	}
 
@@ -245,7 +262,7 @@ func TestAllMethods(t *testing.T) {
 	// test any
 
 	p2 := New()
-	p2.Route("/test", defaultHandler).Any()
+	p2.Route("/test").Any(defaultHandler)
 
 	test2 := []struct {
 		method string
@@ -300,12 +317,12 @@ func TestRouterAPI(t *testing.T) {
 	p := New()
 
 	for _, route := range githubAPI {
-		p.Route(route.path, func(ctx Context) error {
+		p.Route(route.path).Method(func(ctx Context) error {
 			if _, err := ctx.Response().Write([]byte(ctx.Request().URL.Path)); err != nil {
 				panic(err)
 			}
 			return nil
-		}).Method(route.method)
+		}, route.method)
 	}
 
 	for _, route := range githubAPI {
@@ -321,15 +338,15 @@ func TestMethodNotAllowed(t *testing.T) {
 		MethodNotAllowedHandler: MethodNotAllowedHandler(),
 	})
 
-	p.Route("/home/", defaultHandler).PUT()
-	p.Route("/home/", defaultHandler).POST()
-	p.Route("/home/", defaultHandler).HEAD()
-	p.Route("/home/", defaultHandler).DELETE()
-	p.Route("/home/", defaultHandler).CONNECT()
-	p.Route("/home/", defaultHandler).OPTIONS()
-	p.Route("/home/", defaultHandler).PATCH()
-	p.Route("/home/", defaultHandler).TRACE()
-	p.Route("/home/", defaultHandler).Method("PROPFIND")
+	p.Route("/home/").PUT(defaultHandler)
+	p.Route("/home/").POST(defaultHandler)
+	p.Route("/home/").HEAD(defaultHandler)
+	p.Route("/home/").DELETE(defaultHandler)
+	p.Route("/home/").CONNECT(defaultHandler)
+	p.Route("/home/").OPTIONS(defaultHandler)
+	p.Route("/home/").PATCH(defaultHandler)
+	p.Route("/home/").TRACE(defaultHandler)
+	p.Route("/home/").Method(defaultHandler, "PROPFIND")
 
 	code, _ := sendTestRequest(http.MethodPut, "/home/", p)
 	assert.Equal(t, code, http.StatusOK)
@@ -362,8 +379,8 @@ func TestMethodNotAllowed2(t *testing.T) {
 		MethodNotAllowedHandler: MethodNotAllowedHandler(),
 	})
 
-	p.Route("/home/", defaultHandler).GET()
-	p.Route("/home/", defaultHandler).HEAD()
+	p.Route("/home/").GET(defaultHandler)
+	p.Route("/home/").HEAD(defaultHandler)
 
 	code, _ := sendTestRequest(http.MethodGet, "/home/", p)
 	assert.Equal(t, code, http.StatusOK)
@@ -398,15 +415,15 @@ func TestAutomaticallyHandleOPTIONS(t *testing.T) {
 		MethodNotAllowedHandler: MethodNotAllowedHandler(),
 	})
 
-	p.Route("/home", defaultHandler).GET()
-	p.Route("/home", defaultHandler).POST()
-	p.Route("/home", defaultHandler).DELETE()
-	p.Route("/home", defaultHandler).HEAD()
-	p.Route("/home", defaultHandler).PUT()
-	p.Route("/home", defaultHandler).CONNECT()
-	p.Route("/home", defaultHandler).PATCH()
-	p.Route("/home", defaultHandler).TRACE()
-	p.Route("/home", defaultHandler).Method("PROPFIND")
+	p.Route("/home").GET(defaultHandler)
+	p.Route("/home").POST(defaultHandler)
+	p.Route("/home").DELETE(defaultHandler)
+	p.Route("/home").HEAD(defaultHandler)
+	p.Route("/home").PUT(defaultHandler)
+	p.Route("/home").CONNECT(defaultHandler)
+	p.Route("/home").PATCH(defaultHandler)
+	p.Route("/home").TRACE(defaultHandler)
+	p.Route("/home").Method(defaultHandler, "PROPFIND")
 
 	code, _ := sendTestRequest(http.MethodGet, "/home", p)
 	assert.Equal(t, code, http.StatusOK)
@@ -428,10 +445,10 @@ func TestNotFound(t *testing.T) {
 	}
 
 	p := New(Config{NotFoundHandler: notFound})
-	p.Route("/home/", defaultHandler).GET()
-	p.Route("/home/", defaultHandler).POST()
-	p.Route("/users/:id", defaultHandler).GET()
-	p.Route("/users/:id/:id2/:id3", defaultHandler).GET()
+	p.Route("/home/").GET(defaultHandler)
+	p.Route("/home/").POST(defaultHandler)
+	p.Route("/users/:id").GET(defaultHandler)
+	p.Route("/users/:id/:id2/:id3").GET(defaultHandler)
 
 	code, _ := sendTestRequest("BAD_METHOD", "/home/", p)
 	assert.Equal(t, code, http.StatusNotFound)
@@ -442,7 +459,7 @@ func TestNotFound(t *testing.T) {
 
 func TestBasePath(t *testing.T) {
 	p := New()
-	p.Route("/", defaultHandler).GET()
+	p.Route("/").GET(defaultHandler)
 
 	code, _ := sendTestRequest(http.MethodGet, "/", p)
 	assert.Equal(t, code, http.StatusOK)

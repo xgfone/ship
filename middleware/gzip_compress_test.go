@@ -62,9 +62,10 @@ func TestGzipNoContent(t *testing.T) {
 }
 
 func TestGzipErrorReturned(t *testing.T) {
-	s := ship.New()
+	buf := bytes.NewBuffer(nil)
+	s := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
 	s.Use(Gzip())
-	s.R("/", func(ctx ship.Context) error { return ship.ErrNotFound })
+	s.R("/").GET(func(ctx ship.Context) error { return ship.ErrNotFound })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")

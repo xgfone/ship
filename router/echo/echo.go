@@ -40,9 +40,9 @@ var PROPFIND = "PROPFIND"
 type (
 	// Route contains a handler and information for matching against requests.
 	route struct {
-		Methods []string `json:"method"`
-		Path    string   `json:"path"`
-		Name    string   `json:"name"`
+		Method string `json:"method"`
+		Path   string `json:"path"`
+		Name   string `json:"name"`
 	}
 	// router is the registry of all registered routes for an `Echo` instance
 	// for request matching and URL path parameter parsing.
@@ -115,9 +115,7 @@ func NewRouter(methodNotAllowedHandler, optionsHandler core.Handler) core.Router
 // Each implements github.com/xgfone/ship:Router#Each.
 func (r *router) Each(f func(name, method, path string)) {
 	for _, route := range r.allroutes {
-		for _, m := range route.Methods {
-			f(route.Name, m, route.Path)
-		}
+		f(route.Name, route.Method, route.Path)
 	}
 }
 
@@ -148,27 +146,21 @@ func (r *router) URL(name string, params ...interface{}) string {
 
 // Add implements github.com/xgfone/ship:Router#Add, which will register
 // a new route for method and path with matching handler.
-func (r *router) Add(name, path string, methods []string, h core.Handler) int {
-	_route := &route{Name: name, Methods: methods, Path: path}
+func (r *router) Add(name, path string, method string, handler core.Handler) int {
+	_route := &route{Name: name, Method: method, Path: path}
 	if len(name) > 0 {
-		if _, ok := r.routes[name]; ok {
-			panic(fmt.Errorf("the url name '%s' has been registered", name))
+		if _r, ok := r.routes[name]; ok && _r.Path != path {
+			panic(fmt.Errorf("the url name '%s' has been registered for the path '%s'",
+				name, _r.Path))
 		}
 		r.routes[name] = _route
 	}
 	r.allroutes = append(r.allroutes, _route)
 
-	var maxNum int
-	for _, m := range methods {
-		if n := r.add(path, m, h); n > maxNum {
-			maxNum = n
-		}
-	}
-	return maxNum
+	return r.add(path, method, handler)
 }
 
 func (r *router) add(path string, method string, h core.Handler) int {
-
 	// Validate path
 	if path == "" {
 		panic(errors.New("echo: path cannot be empty"))

@@ -26,11 +26,10 @@ type Route struct {
 	ship    *Ship
 	path    string
 	name    string
-	handler Handler
 	mdwares []Middleware
 }
 
-func newRoute(s *Ship, prefix, path string, handler Handler, m ...Middleware) *Route {
+func newRoute(s *Ship, prefix, path string, m ...Middleware) *Route {
 	if !s.config.KeepTrailingSlashPath {
 		path = strings.TrimSuffix(path, "/")
 	}
@@ -46,7 +45,6 @@ func newRoute(s *Ship, prefix, path string, handler Handler, m ...Middleware) *R
 		ship: s,
 		path: prefix + path,
 
-		handler: handler,
 		mdwares: append(ms, m...),
 	}
 }
@@ -54,12 +52,6 @@ func newRoute(s *Ship, prefix, path string, handler Handler, m ...Middleware) *R
 // Name sets the route name.
 func (r *Route) Name(name string) *Route {
 	r.name = name
-	return r
-}
-
-// Handler sets the handler of the Route.
-func (r *Route) Handler(h Handler) *Route {
-	r.handler = h
 	return r
 }
 
@@ -141,62 +133,75 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 // If methods is nil, it will register all the supported methods for the route.
 //
 // Notice: The method must be called at last.
-func (r *Route) Method(methods ...string) {
+func (r *Route) Method(handler Handler, methods ...string) *Route {
 	if len(methods) == 0 {
 		panic(errors.New("the route requires methods"))
 	}
-	r.ship.addRoute(r.name, r.path, methods, r.handler, r.mdwares...)
+	r.ship.addRoute(r.name, r.path, methods, handler, r.mdwares...)
+	return r
 }
 
 // Any registers all the supported methods , which is short for
-// r.Method("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE" )
-func (r *Route) Any() {
-	r.Method(http.MethodConnect, http.MethodGet, http.MethodHead,
-		http.MethodPost, http.MethodPut, http.MethodPatch,
+// r.Method(handler, "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE" )
+func (r *Route) Any(handler Handler) *Route {
+	return r.Method(handler, http.MethodConnect, http.MethodGet,
+		http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch,
 		http.MethodDelete, http.MethodOptions, http.MethodTrace)
 }
 
 // CONNECT is the short for r.Method("CONNECT").
-func (r *Route) CONNECT() {
-	r.Method(http.MethodConnect)
+func (r *Route) CONNECT(handler Handler) *Route {
+	return r.Method(handler, http.MethodConnect)
 }
 
 // OPTIONS is the short for r.Method("OPTIONS").
-func (r *Route) OPTIONS() {
-	r.Method(http.MethodOptions)
+func (r *Route) OPTIONS(handler Handler) *Route {
+	return r.Method(handler, http.MethodOptions)
 }
 
 // HEAD is the short for r.Method("HEAD").
-func (r *Route) HEAD() {
-	r.Method(http.MethodHead)
+func (r *Route) HEAD(handler Handler) *Route {
+	return r.Method(handler, http.MethodHead)
 }
 
 // PATCH is the short for r.Method("PATCH").
-func (r *Route) PATCH() {
-	r.Method(http.MethodPatch)
+func (r *Route) PATCH(handler Handler) *Route {
+	return r.Method(handler, http.MethodPatch)
 }
 
 // TRACE is the short for r.Method("TRACE").
-func (r *Route) TRACE() {
-	r.Method(http.MethodTrace)
+func (r *Route) TRACE(handler Handler) *Route {
+	return r.Method(handler, http.MethodTrace)
 }
 
 // GET is the short for r.Method("GET").
-func (r *Route) GET() {
-	r.Method(http.MethodGet)
+func (r *Route) GET(handler Handler) *Route {
+	return r.Method(handler, http.MethodGet)
 }
 
 // PUT is the short for r.Method("PUT").
-func (r *Route) PUT() {
-	r.Method(http.MethodPut)
+func (r *Route) PUT(handler Handler) *Route {
+	return r.Method(handler, http.MethodPut)
 }
 
 // POST is the short for r.Method("POST").
-func (r *Route) POST() {
-	r.Method(http.MethodPost)
+func (r *Route) POST(handler Handler) *Route {
+	return r.Method(handler, http.MethodPost)
 }
 
 // DELETE is the short for r.Method("DELETE").
-func (r *Route) DELETE() {
-	r.Method(http.MethodDelete)
+func (r *Route) DELETE(handler Handler) *Route {
+	return r.Method(handler, http.MethodDelete)
+}
+
+// Map registers a group of methods with handlers, which is equal to
+//
+//     for method, handler := range method2handlers {
+//         r.Method(handler, method)
+//     }
+func (r *Route) Map(method2handlers map[string]Handler) *Route {
+	for method, handler := range method2handlers {
+		r.Method(handler, method)
+	}
+	return r
 }

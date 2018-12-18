@@ -631,15 +631,15 @@ func loadShipRoutes(s *ship.Ship, routes []*Route) {
 	for _, r := range routes {
 		switch r.Method {
 		case "GET":
-			s.Route(r.Path, shipHandler(r.Method, r.Path)).GET()
+			s.Route(r.Path).GET(shipHandler(r.Method, r.Path))
 		case "POST":
-			s.Route(r.Path, shipHandler(r.Method, r.Path)).POST()
+			s.Route(r.Path).POST(shipHandler(r.Method, r.Path))
 		case "PATCH":
-			s.Route(r.Path, shipHandler(r.Method, r.Path)).PATCH()
+			s.Route(r.Path).PATCH(shipHandler(r.Method, r.Path))
 		case "PUT":
-			s.Route(r.Path, shipHandler(r.Method, r.Path)).PUT()
+			s.Route(r.Path).PUT(shipHandler(r.Method, r.Path))
 		case "DELETE":
-			s.Route(r.Path, shipHandler(r.Method, r.Path)).DELETE()
+			s.Route(r.Path).DELETE(shipHandler(r.Method, r.Path))
 		}
 	}
 }

@@ -13,7 +13,7 @@ func TestGithubAPI(t *testing.T) {
 	handler := ship.OkHandler()
 	router := echo.NewRouter(nil, nil)
 	for _, r := range githubAPI {
-		if n := router.Add("", r.Path, []string{r.Method}, handler); n > maxParamNum {
+		if n := router.Add("", r.Path, r.Method, handler); n > maxParamNum {
 			maxParamNum = n
 		}
 	}

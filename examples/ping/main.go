@@ -8,9 +8,9 @@ import (
 
 func setupRouter() *ship.Ship {
 	router := ship.New()
-	router.Route("/ping", func(ctx ship.Context) error {
+	router.Route("/ping").GET(func(ctx ship.Context) error {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
-	}).GET()
+	})
 
 	return router
 }

@@ -7,8 +7,8 @@ import (
 func TestGroup(t *testing.T) {
 	s := New(Config{Prefix: "/v1"})
 	group := s.Group("/group")
-	group.Route("/route1", NothingHandler()).GET()
-	group.Route("/route2", NothingHandler()).POST()
+	group.Route("/route1").GET(NothingHandler())
+	group.Route("/route2").POST(NothingHandler())
 
 	i := 0
 	s.Traverse(func(name, method, path string) {

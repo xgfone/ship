@@ -31,7 +31,7 @@ import (
 //
 // Methods:
 //   URL(name string, params ...interface{}) string
-//   Add(name string, path string, methods []string, handler Handler) (paramNum int)
+//   Add(name string, path string, method string, handler Handler) (paramNum int)
 //   Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
 //   Each(func(name string, method string, path string))
 type Router = core.Router
@@ -197,18 +197,13 @@ func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
-func (s *Ship) Route(path string, handler Handler) *Route {
-	return newRoute(s, s.config.Prefix, path, handler, s.middlewares...)
+func (s *Ship) Route(path string) *Route {
+	return newRoute(s, s.config.Prefix, path, s.middlewares...)
 }
 
-// R is short for Ship#Route(path, handler).
-func (s *Ship) R(path string, handler Handler) *Route {
-	return s.Route(path, handler)
-}
-
-// Path is equal to s.Route(path, nil), so you must set the handler later.
-func (s *Ship) Path(path string) *Route {
-	return s.Route(path, nil)
+// R is short for Ship#Route(path).
+func (s *Ship) R(path string) *Route {
+	return s.Route(path)
 }
 
 func (s *Ship) addRoute(name, path string, methods []string, handler Handler, mws ...Middleware) {
@@ -228,16 +223,14 @@ func (s *Ship) addRoute(name, path string, methods []string, handler Handler, mw
 		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
 	}
 
-	for i := range methods {
-		methods[i] = strings.ToUpper(methods[i])
-	}
-
 	for i := len(mws) - 1; i >= 0; i-- {
 		handler = mws[i](handler)
 	}
 
-	if n := s.config.Router.Add(name, path, methods, handler); n > s.maxNum {
-		s.maxNum = n
+	for i := range methods {
+		if n := s.config.Router.Add(name, path, strings.ToUpper(methods[i]), handler); n > s.maxNum {
+			s.maxNum = n
+		}
 	}
 }
 

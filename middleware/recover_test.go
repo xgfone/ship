@@ -30,9 +30,9 @@ func TestRecover(t *testing.T) {
 		bs.WriteString(err.(string))
 	}))
 
-	router.Route("/panic", func(ctx ship.Context) error {
+	router.Route("/panic").GET(func(ctx ship.Context) error {
 		panic("test panic")
-	}).GET()
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
 	rec := httptest.NewRecorder()

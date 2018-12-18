@@ -78,7 +78,7 @@ func TestMiddleware(t *testing.T) {
 		}
 	})
 
-	group.R("/route", OkHandler()).Use(func(next Handler) Handler {
+	group.R("/route").Use(func(next Handler) Handler {
 		return func(ctx Context) error {
 			bs.WriteString("route m1 start\n")
 			err := next(ctx)
@@ -92,7 +92,7 @@ func TestMiddleware(t *testing.T) {
 			bs.WriteString("route m2 end\n")
 			return err
 		}
-	}).GET()
+	}).GET(OkHandler())
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/route", nil)
 	rec := httptest.NewRecorder()
