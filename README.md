@@ -62,6 +62,19 @@ type Config struct {
 	// If ture, it will enable the debug mode.
 	Debug bool
 
+	// If true, it won't remove the trailing slash from the registered url path.
+	KeepTrailingSlashPath bool
+
+	// It is the default mapping to map the method into router. The default is
+	//
+	//     map[string]string{
+	//         "Create": "POST",
+	//         "Delete": "DELETE",
+	//         "Update": "PUT",
+	//         "Get":    "GET",
+	//     }
+	DefaultMethodMapping map[string]string
+
 	// The router management, which uses echo implementation by default.
 	// But you can appoint yourself customized Router implementation.
 	Router Router
@@ -220,10 +233,10 @@ func main() {
 
 ```go
 tv := TestType{}
-router.Route("/v1/testtype/get").Name("testtype_get").GET(ts.Get)
-router.Route("/v1/testtype/update").Name("testtype_update").PUT(ts.Update)
-router.Route("/v1/testtype/create").Name("testtype_create").POST(ts.Create)
-router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(ts.Delete)
+router.Route("/v1/testtype/get").Name("testtype_get").GET(tv.Get)
+router.Route("/v1/testtype/update").Name("testtype_update").PUT(tv.Update)
+router.Route("/v1/testtype/create").Name("testtype_create").POST(tv.Create)
+router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(tv.Delete)
 ```
 
 The default mapping method is `Ship.Config.DefaultMethodMapping`, which is initialized as follow if not given when creating a new router `Ship`.
