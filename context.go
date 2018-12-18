@@ -179,12 +179,15 @@ func (c *context) reset() {
 	c.query = nil
 	c.wrote = false
 
-	copy(c.pnames, emptyStrS[:len(c.pnames)])
-	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
-
+	c.resetURLParam()
 	for key := range c.store {
 		delete(c.store, key)
 	}
+}
+
+func (c *context) resetURLParam() {
+	copy(c.pnames, emptyStrS[:len(c.pnames)])
+	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
 }
 
 func (c *context) setShip(s *Ship) {
@@ -202,6 +205,7 @@ func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 }
 
 func (c *context) FindHandler(method string, path string) Handler {
+	c.resetURLParam()
 	return c.ship.config.Router.Find(method, path, c.pnames, c.pvalues)
 }
 
