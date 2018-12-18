@@ -27,6 +27,7 @@ type Context interface {
 	SetHeader(name string, value string)
 
 	URLParams() map[string]string
+	URLParamValues() []string
 	URLParamByName(name string) (value string)
 
 	Scheme() string

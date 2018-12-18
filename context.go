@@ -61,6 +61,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    SetHeader(name string, value string)
 //
 //    URLParams() map[string]string
+//    URLParamValues() []string
 //    URLParamByName(name string) (value string)
 //
 //    Scheme() string
@@ -229,6 +230,17 @@ func (c *context) URLParams() map[string]string {
 		ms[c.pnames[i]] = c.pvalues[i]
 	}
 	return ms
+}
+
+func (c *context) URLParamValues() []string {
+	_len := len(c.pnames)
+	for i := 0; i < _len; i++ {
+		if c.pnames[i] == "" {
+			return c.pvalues[:i]
+		}
+	}
+
+	return nil
 }
 
 // Get retrieves data from the context.

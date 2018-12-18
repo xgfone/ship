@@ -130,6 +130,8 @@ func main() {
 
 Notice: you can regitser the customized method by `Route(path string, handler Handler).Method(method ...string)`.
 
+`R` is the alias of `Route`, so you can register a route by `R(path string, handler Handler).Method(method ...string)`.
+
 #### Naming route and building URL
 You can name the route a name when registering the route, then you can build a URL by the name.
 
@@ -138,7 +140,7 @@ func main() {
     router := ship.New()
 
     router.Route("/path/:id", func(ctx Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.URLParam()))
+        fmt.Println(ctx.URL("get_url", ctx.URLParamValues()))
     }).Name("get_url").GET()
 
     http.ListenAndServe(":8080", router)
@@ -221,6 +223,7 @@ ship.MapMethodIntoRouter(router, TestStruct{}, "/v1", map[string]string{
 - The name of type and method will be converted to the lower.
 - The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
 - The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
+- The type of the method must be `func(ship.Context) error`, or it will be ignored.
 
 #### Using `Middleware`
 
