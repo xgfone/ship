@@ -482,7 +482,7 @@ func main() {
 
 ## TODO
 
-- Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host).
+- [x] Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host). We use the **Virtual Host** instead.
 - Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries).
 - Add JWT middleware.
 - Add OAuth 2.0 middleware.
