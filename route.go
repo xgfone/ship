@@ -68,7 +68,7 @@ func (r *Route) Name(name string) *Route {
 // Example
 //
 //     s := ship.New()
-//     s.R("/path/to", handler).Headers("Content-Type", "application/json").POST()
+//     s.R("/path/to").Headers("Content-Type", "application/json").POST(handler)
 //
 func (r *Route) Headers(headers ...string) *Route {
 	_len := len(headers)
@@ -103,7 +103,7 @@ func (r *Route) Headers(headers ...string) *Route {
 // Example
 //
 //     s := ship.New()
-//     s.R("/path/to", handler).Schemes("https", "wss").POST()
+//     s.R("/path/to").Schemes("https", "wss").POST(handler)
 //
 func (r *Route) Schemes(schemes ...string) *Route {
 	_len := len(schemes)
@@ -180,47 +180,47 @@ func (r *Route) Any(handler Handler) *Route {
 		http.MethodDelete, http.MethodOptions, http.MethodTrace)
 }
 
-// CONNECT is the short for r.Method("CONNECT").
+// CONNECT is the short for r.Method(handler, "CONNECT").
 func (r *Route) CONNECT(handler Handler) *Route {
 	return r.Method(handler, http.MethodConnect)
 }
 
-// OPTIONS is the short for r.Method("OPTIONS").
+// OPTIONS is the short for r.Method(handler, "OPTIONS").
 func (r *Route) OPTIONS(handler Handler) *Route {
 	return r.Method(handler, http.MethodOptions)
 }
 
-// HEAD is the short for r.Method("HEAD").
+// HEAD is the short for r.Method(handler, "HEAD").
 func (r *Route) HEAD(handler Handler) *Route {
 	return r.Method(handler, http.MethodHead)
 }
 
-// PATCH is the short for r.Method("PATCH").
+// PATCH is the short for r.Method(handler, "PATCH").
 func (r *Route) PATCH(handler Handler) *Route {
 	return r.Method(handler, http.MethodPatch)
 }
 
-// TRACE is the short for r.Method("TRACE").
+// TRACE is the short for r.Method(handler, "TRACE").
 func (r *Route) TRACE(handler Handler) *Route {
 	return r.Method(handler, http.MethodTrace)
 }
 
-// GET is the short for r.Method("GET").
+// GET is the short for r.Method(handler, "GET").
 func (r *Route) GET(handler Handler) *Route {
 	return r.Method(handler, http.MethodGet)
 }
 
-// PUT is the short for r.Method("PUT").
+// PUT is the short for r.Method(handler, "PUT").
 func (r *Route) PUT(handler Handler) *Route {
 	return r.Method(handler, http.MethodPut)
 }
 
-// POST is the short for r.Method("POST").
+// POST is the short for r.Method(handler, "POST").
 func (r *Route) POST(handler Handler) *Route {
 	return r.Method(handler, http.MethodPost)
 }
 
-// DELETE is the short for r.Method("DELETE").
+// DELETE is the short for r.Method(handler, "DELETE").
 func (r *Route) DELETE(handler Handler) *Route {
 	return r.Method(handler, http.MethodDelete)
 }
