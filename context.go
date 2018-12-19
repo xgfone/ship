@@ -46,6 +46,11 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    // Report whether the response has been sent.
 //    IsResponse() bool
 //
+//    // Find the registered router handler by the method and path of the request.
+//    //
+//    // Return nil if not found.
+//    FindHandler(method string, path string) Handler
+//
 //    NotFoundHandler() Handler
 //
 //    Request() *http.Request
@@ -176,12 +181,15 @@ func (c *context) reset() {
 	c.query = nil
 	c.wrote = false
 
-	copy(c.pnames, emptyStrS[:len(c.pnames)])
-	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
-
+	c.resetURLParam()
 	for key := range c.store {
 		delete(c.store, key)
 	}
+}
+
+func (c *context) resetURLParam() {
+	copy(c.pnames, emptyStrS[:len(c.pnames)])
+	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
 }
 
 func (c *context) setShip(s *Ship) {
@@ -196,6 +204,16 @@ func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.resp.ResponseWriter = w
 	c.resp.ctx = c
+}
+
+// URL generates an URL from route name and provided parameters.
+func (c *context) URL(name string, params ...interface{}) string {
+	return c.ship.URL(name, params...)
+}
+
+func (c *context) FindHandler(method, path string) Handler {
+	c.resetURLParam()
+	return c.ship.config.Router.Find(method, path, c.pnames, c.pvalues)
 }
 
 func (c *context) NotFoundHandler() Handler {
@@ -605,9 +623,4 @@ func (c *context) Redirect(code int, toURL string) error {
 	c.resp.Header().Set(HeaderLocation, toURL)
 	c.resp.WriteHeader(code)
 	return nil
-}
-
-// URL generates an URL from route name and provided parameters.
-func (c *context) URL(name string, params ...interface{}) string {
-	return c.ship.URL(name, params...)
 }

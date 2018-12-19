@@ -12,6 +12,11 @@ type Context interface {
 	// Report whether the response has been sent.
 	IsResponse() bool
 
+	// Find the registered router handler by the method and path of the request.
+	//
+	// Return nil if not found.
+	FindHandler(method string, path string) Handler
+
 	NotFoundHandler() Handler
 
 	Request() *http.Request

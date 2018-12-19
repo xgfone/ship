@@ -23,11 +23,12 @@ import (
 // Group is a router group, that's, it manages a set of routes.
 type Group struct {
 	ship    *Ship
+	router  Router
 	prefix  string
 	mdwares []Middleware
 }
 
-func newGroup(s *Ship, pprefix, prefix string, middlewares ...Middleware) *Group {
+func newGroup(s *Ship, router Router, pprefix, prefix string, middlewares ...Middleware) *Group {
 	prefix = strings.TrimSuffix(prefix, "/")
 	if len(prefix) == 0 {
 		panic(errors.New("the prefix must not be empty"))
@@ -39,6 +40,7 @@ func newGroup(s *Ship, pprefix, prefix string, middlewares ...Middleware) *Group
 	ms := make([]Middleware, 0, len(middlewares))
 	return &Group{
 		ship:    s,
+		router:  router,
 		prefix:  pprefix + prefix,
 		mdwares: append(ms, middlewares...),
 	}
@@ -51,19 +53,19 @@ func (g *Group) Use(middlewares ...Middleware) {
 
 // Group returns a new sub-group.
 func (g *Group) Group(prefix string, middlewares ...Middleware) *Group {
-	return newGroup(g.ship, g.prefix, prefix, append(g.mdwares, middlewares...)...)
+	return newGroup(g.ship, g.router, g.prefix, prefix, append(g.mdwares, middlewares...)...)
 }
 
 // GroupNone is the same as Group, but not inherit the middlewares of the parent.
 func (g *Group) GroupNone(prefix string, middlewares ...Middleware) *Group {
-	return newGroup(g.ship, g.prefix, prefix, middlewares...)
+	return newGroup(g.ship, g.router, g.prefix, prefix, middlewares...)
 }
 
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (g *Group) Route(path string) *Route {
-	return newRoute(g.ship, g.prefix, path, g.mdwares...)
+	return newRoute(g.ship, g.router, g.prefix, path, g.mdwares...)
 }
 
 // R is short for Group#Route(path).

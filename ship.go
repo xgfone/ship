@@ -15,7 +15,6 @@
 package ship
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -157,6 +156,12 @@ func New(config ...Config) *Ship {
 	return s
 }
 
+func (s *Ship) setURLParamNum(num int) {
+	if num > s.maxNum {
+		s.maxNum = num
+	}
+}
+
 // Logger returns the inner Logger
 func (s *Ship) Logger() Logger {
 	return s.config.Logger
@@ -203,54 +208,26 @@ func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(s.middlewares)+len(middlewares))
 	ms = append(ms, s.middlewares...)
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.config.Router, s.config.Prefix, prefix, ms...)
 }
 
 // GroupNone is the same as Group, but not inherit the middlewares of Ship.
 func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(middlewares))
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.config.Router, s.config.Prefix, prefix, ms...)
 }
 
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (s *Ship) Route(path string) *Route {
-	return newRoute(s, s.config.Prefix, path, s.middlewares...)
+	return newRoute(s, s.config.Router, s.config.Prefix, path, s.middlewares...)
 }
 
 // R is short for Ship#Route(path).
 func (s *Ship) R(path string) *Route {
 	return s.Route(path)
-}
-
-func (s *Ship) addRoute(name, path string, methods []string, handler Handler, mws ...Middleware) {
-	if handler == nil {
-		panic(errors.New("handler must not be nil"))
-	}
-
-	if len(methods) == 0 {
-		panic(errors.New("method must not be empty"))
-	}
-
-	if len(path) == 0 || path[0] != '/' {
-		panic(fmt.Errorf("path '%s' must start with '/'", path))
-	}
-
-	if i := strings.Index(path, "//"); i != -1 {
-		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
-	}
-
-	for i := len(mws) - 1; i >= 0; i-- {
-		handler = mws[i](handler)
-	}
-
-	for i := range methods {
-		if n := s.config.Router.Add(name, path, strings.ToUpper(methods[i]), handler); n > s.maxNum {
-			s.maxNum = n
-		}
-	}
 }
 
 // Router returns the inner Router.
@@ -270,11 +247,15 @@ func (s *Ship) Traverse(f func(name string, method string, path string)) {
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.handleRequest(s.config.Router, w, r)
+}
+
+func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
 	var err error
 	var ctx = s.AcquireContext(r, w).(*context)
 
 	if err = s.prehandler(ctx); err == nil {
-		h := s.config.Router.Find(r.Method, r.URL.Path, ctx.pnames, ctx.pvalues)
+		h := router.Find(r.Method, r.URL.Path, ctx.pnames, ctx.pvalues)
 		if h == nil {
 			err = s.config.NotFoundHandler(ctx)
 		} else {
@@ -308,11 +289,9 @@ func (s *Ship) handleError(ctx Context, err error) {
 	}
 
 	// For other errors, only log the error.
-	if err != nil {
+	if err != ErrSkip {
 		if logger := ctx.Logger(); logger != nil {
 			logger.Error("%s", err.Error())
 		}
 	}
-
-	return
 }

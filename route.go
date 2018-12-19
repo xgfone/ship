@@ -27,10 +27,11 @@ type Route struct {
 	ship    *Ship
 	path    string
 	name    string
+	router  Router
 	mdwares []Middleware
 }
 
-func newRoute(s *Ship, prefix, path string, m ...Middleware) *Route {
+func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
 	if !s.config.KeepTrailingSlashPath {
 		path = strings.TrimSuffix(path, "/")
 	}
@@ -48,6 +49,7 @@ func newRoute(s *Ship, prefix, path string, m ...Middleware) *Route {
 		ship: s,
 		path: prefix + path,
 
+		router:  router,
 		mdwares: append(ms, m...),
 	}
 }
@@ -132,10 +134,31 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 }
 
 func (r *Route) addRoute(name, path string, handler Handler, methods ...string) *Route {
+	if handler == nil {
+		panic(errors.New("handler must not be nil"))
+	}
+
 	if len(methods) == 0 {
 		panic(errors.New("the route requires methods"))
 	}
-	r.ship.addRoute(name, path, methods, handler, r.mdwares...)
+
+	if len(path) == 0 || path[0] != '/' {
+		panic(fmt.Errorf("path '%s' must start with '/'", path))
+	}
+
+	if i := strings.Index(path, "//"); i != -1 {
+		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
+	}
+
+	for i := len(r.mdwares) - 1; i >= 0; i-- {
+		handler = r.mdwares[i](handler)
+	}
+
+	for i := range methods {
+		n := r.router.Add(name, path, strings.ToUpper(methods[i]), handler)
+		r.ship.setURLParamNum(n)
+	}
+
 	return r
 }
 
