@@ -75,10 +75,6 @@ type Config struct {
 	//     }
 	DefaultMethodMapping map[string]string
 
-	// The router management, which uses echo implementation by default.
-	// But you can appoint yourself customized Router implementation.
-	Router Router
-
 	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
 	// But you can appoint yourself customized Logger implementation.
 	Logger Logger
@@ -89,6 +85,10 @@ type Config struct {
 	// Rendered is used to render the response to the peer, which has no
 	// the default implementation.
 	Renderer Renderer
+
+	// Create a new router, which uses echo implementation by default.
+	// But you can appoint yourself customized Router implementation.
+	NewRouter func() Router
 
 	// Handle the error at last.
 	//
@@ -372,6 +372,34 @@ func main() {
 
     http.ListenAndServe(":8080", router)
 }
+```
+
+#### Add the Virtual Host
+
+```go
+func main() {
+    router := ship.New()
+    router.Route("/router").GET(func(c ship.Context) error { return c.String(200, "default") })
+
+    vhost1 := router.VHost("host1.example.com")
+    vhost1.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost1") })
+
+    vhost2 := router.VHost("host2.example.com")
+    vhost2.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost2") })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+```shell
+$ curl http://127.0.0.1:8080/router
+default
+
+$ curl http://127.0.0.1:8080/router -H 'Host: host1.example.com'
+vhost1
+
+$ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
+vhost2
 ```
 
 
