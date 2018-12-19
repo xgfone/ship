@@ -55,6 +55,7 @@ type Context interface {
 	// Get and Set are used to store the key-value information about the context.
 	Get(key string) (value interface{})
 	Set(key string, value interface{})
+	Del(key string)
 
 	Logger() Logger
 	URL(name string, params ...interface{}) string

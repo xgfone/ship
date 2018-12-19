@@ -89,6 +89,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    // Get and Set are used to store the key-value information about the context.
 //    Get(key string) (value interface{})
 //    Set(key string, value interface{})
+//    Del(key string)
 //
 //    Logger() Logger
 //    URL(name string, params ...interface{}) string
@@ -269,6 +270,10 @@ func (c *context) Get(key string) interface{} {
 // Set saves data in the context.
 func (c *context) Set(key string, value interface{}) {
 	c.store[key] = value
+}
+
+func (c *context) Del(key string) {
+	delete(c.store, key)
 }
 
 // Logger returns the logger implementation.
