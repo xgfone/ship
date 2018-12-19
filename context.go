@@ -213,7 +213,7 @@ func (c *context) URL(name string, params ...interface{}) string {
 
 func (c *context) FindHandler(method, path string) Handler {
 	c.resetURLParam()
-	return c.ship.config.Router.Find(method, path, c.pnames, c.pvalues)
+	return c.ship.router.Find(method, path, c.pnames, c.pvalues)
 }
 
 func (c *context) NotFoundHandler() Handler {

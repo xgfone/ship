@@ -69,10 +69,6 @@ type Config struct {
 	//     }
 	DefaultMethodMapping map[string]string
 
-	// The router management, which uses echo implementation by default.
-	// But you can appoint yourself customized Router implementation.
-	Router Router
-
 	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
 	// But you can appoint yourself customized Logger implementation.
 	Logger Logger
@@ -83,6 +79,10 @@ type Config struct {
 	// Rendered is used to render the response to the peer, which has no
 	// the default implementation.
 	Renderer Renderer
+
+	// Create a new router, which uses echo implementation by default.
+	// But you can appoint yourself customized Router implementation.
+	NewRouter func() Router
 
 	// Handle the error at last.
 	//
@@ -127,8 +127,8 @@ func (c *Config) init(s *Ship) {
 		c.Binder = binder.NewBinder()
 	}
 
-	if c.Router == nil {
-		c.Router = echo.NewRouter(c.MethodNotAllowedHandler, c.OptionsHandler)
+	if c.NewRouter == nil {
+		c.NewRouter = func() Router { return echo.NewRouter(c.MethodNotAllowedHandler, c.OptionsHandler) }
 	}
 }
 
@@ -141,6 +141,9 @@ type Ship struct {
 	prehandler     Handler
 	premiddlewares []Middleware
 	middlewares    []Middleware
+
+	router Router
+	vhosts map[string]*Ship
 }
 
 // New returns a new Ship.
@@ -153,6 +156,8 @@ func New(config ...Config) *Ship {
 	s.config.init(s)
 	s.prehandler = NothingHandler()
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
+	s.router = s.config.NewRouter()
+	s.vhosts = make(map[string]*Ship)
 	return s
 }
 
@@ -160,6 +165,24 @@ func (s *Ship) setURLParamNum(num int) {
 	if num > s.maxNum {
 		s.maxNum = num
 	}
+}
+
+// VHost returns a new ship used to manage the virtual host.
+//
+// For the different virtual host, you can register the same route.
+//
+// Notice: the new virtual host won't inherit anything except the configuration.
+func (s *Ship) VHost(host string) *Ship {
+	if s.vhosts == nil {
+		panic(fmt.Errorf("the virtual host cannot create the virtual host"))
+	}
+	if s.vhosts[host] != nil {
+		panic(fmt.Errorf("the virtual host '%s' has been added", host))
+	}
+	vhost := New(s.config)
+	vhost.vhosts = nil
+	s.vhosts[host] = vhost
+	return vhost
 }
 
 // Logger returns the inner Logger
@@ -208,21 +231,21 @@ func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(s.middlewares)+len(middlewares))
 	ms = append(ms, s.middlewares...)
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.config.Router, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
 }
 
 // GroupNone is the same as Group, but not inherit the middlewares of Ship.
 func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(middlewares))
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.config.Router, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
 }
 
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (s *Ship) Route(path string) *Route {
-	return newRoute(s, s.config.Router, s.config.Prefix, path, s.middlewares...)
+	return newRoute(s, s.router, s.config.Prefix, path, s.middlewares...)
 }
 
 // R is short for Ship#Route(path).
@@ -232,22 +255,29 @@ func (s *Ship) R(path string) *Route {
 
 // Router returns the inner Router.
 func (s *Ship) Router() Router {
-	return s.config.Router
+	return s.router
 }
 
 // URL generates an URL from route name and provided parameters.
 func (s *Ship) URL(name string, params ...interface{}) string {
-	return s.config.Router.URL(name, params...)
+	return s.router.URL(name, params...)
 }
 
 // Traverse traverses the registered route.
 func (s *Ship) Traverse(f func(name string, method string, path string)) {
-	s.config.Router.Each(f)
+	s.router.Each(f)
 }
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.handleRequest(s.config.Router, w, r)
+	if s.vhosts != nil {
+		if vhost := s.vhosts[r.Host]; vhost != nil {
+			vhost.handleRequest(vhost.router, w, r)
+			return
+		}
+	}
+
+	s.handleRequest(s.router, w, r)
 }
 
 func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {

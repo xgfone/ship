@@ -802,3 +802,34 @@ func TestRouteMapType(t *testing.T) {
 		}
 	})
 }
+
+func TestShipVHost(t *testing.T) {
+	s := New()
+	s.Route("/router").GET(func(c Context) error { return c.String(200, "default") })
+
+	vhost1 := s.VHost("host1.example.com")
+	vhost1.Route("/router").GET(func(c Context) error { return c.String(200, "vhost1") })
+
+	vhost2 := s.VHost("host2.example.com")
+	vhost2.Route("/router").GET(func(c Context) error { return c.String(200, "vhost2") })
+
+	req := httptest.NewRequest(http.MethodGet, "/router", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "default", rec.Body.String())
+
+	req = httptest.NewRequest(http.MethodGet, "/router", nil)
+	req.Host = "host1.example.com"
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "vhost1", rec.Body.String())
+
+	req = httptest.NewRequest(http.MethodGet, "/router", nil)
+	req.Host = "host2.example.com"
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "vhost2", rec.Body.String())
+}
