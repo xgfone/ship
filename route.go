@@ -58,6 +58,14 @@ func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Rou
 	}
 }
 
+// New clones a new Route based on the current route.
+func (r *Route) New() *Route {
+	_r := *r
+	_r.mdwares = make([]Middleware, len(r.mdwares))
+	copy(_r.mdwares, r.mdwares)
+	return &_r
+}
+
 // Name sets the route name.
 func (r *Route) Name(name string) *Route {
 	r.name = name
