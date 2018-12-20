@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"reflect"
 	"strings"
 )
@@ -349,11 +350,62 @@ func (r *Route) serveFileMetadata(ctx Context, filename string) error {
 
 // StaticFile registers a route for a static file, which supports the HEAD method
 // to get the its length and the GET method to download it.
-func (r *Route) StaticFile(filePath string) {
+func (r *Route) StaticFile(filePath string) *Route {
 	if strings.Contains(r.path, ":") || strings.Contains(r.path, "*") {
 		panic(errors.New("URL parameters cannot be used when serving a static file"))
 	}
 
 	r.addRoute("", r.path, func(ctx Context) error { return ctx.File(filePath) }, http.MethodGet)
 	r.addRoute("", r.path, func(ctx Context) error { return r.serveFileMetadata(ctx, filePath) }, http.MethodHead)
+	return r
+}
+
+// StaticFS registers a route to serve a static filesystem.
+func (r *Route) StaticFS(fs http.FileSystem) *Route {
+	if strings.Contains(r.path, ":") || strings.Contains(r.path, "*") {
+		panic(errors.New("URL parameters cannot be used when serving a static file"))
+	}
+
+	fileServer := http.StripPrefix(r.path, http.FileServer(fs))
+	rpath := path.Join(r.path, "/*filepath")
+
+	r.addRoute("", rpath, func(ctx Context) error {
+		filepath := ctx.URLParamByName("filepath")
+		if _, err := fs.Open(filepath); err != nil {
+			return ctx.NotFoundHandler()(ctx)
+		}
+		fileServer.ServeHTTP(ctx.Response(), ctx.Request())
+		return nil
+	}, http.MethodHead, http.MethodGet)
+
+	return r
+}
+
+// Static is the same as StaticFS, but listing the files for a directory.
+func (r *Route) Static(dirpath string) *Route {
+	return r.StaticFS(newOnlyFileFS(dirpath))
+}
+
+func newOnlyFileFS(root string) http.FileSystem {
+	return onlyFileFS{fs: http.Dir(root)}
+}
+
+type onlyFileFS struct {
+	fs http.FileSystem
+}
+
+func (fs onlyFileFS) Open(name string) (http.File, error) {
+	f, err := fs.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return notDirFile{f}, nil
+}
+
+type notDirFile struct {
+	http.File
+}
+
+func (f notDirFile) Readdir(count int) ([]os.FileInfo, error) {
+	return nil, nil
 }

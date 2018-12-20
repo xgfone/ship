@@ -855,3 +855,73 @@ func TestRouteStaticFile(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/markdown; charset=utf-8", rec.Header().Get(HeaderContentType))
 }
+
+func TestRouteStaticFS(t *testing.T) {
+	s := New()
+	s.Route("/ship").StaticFS(http.Dir("."))
+
+	req := httptest.NewRequest(http.MethodHead, "/ship/", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.NotZero(t, rec.Body.Len())
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
+	assert.Contains(t, rec.Body.String(), `"README.md"`)
+
+	req = httptest.NewRequest(http.MethodGet, "/ship/README.md", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NotZero(t, rec.Body.Len())
+	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
+
+	req = httptest.NewRequest(http.MethodHead, "/ship/core/", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.NotZero(t, rec.Body.Len())
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
+	assert.Contains(t, rec.Body.String(), `"router.go"`)
+
+	req = httptest.NewRequest(http.MethodGet, "/ship/core/router.go", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NotZero(t, rec.Body.Len())
+	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
+}
+
+func TestRouteStatic(t *testing.T) {
+	s := New()
+	s.Route("/ship").Static(".")
+
+	req := httptest.NewRequest(http.MethodHead, "/ship/", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.NotZero(t, rec.Body.Len())
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
+	assert.NotContains(t, rec.Body.String(), `"README.md"`)
+
+	req = httptest.NewRequest(http.MethodGet, "/ship/README.md", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NotZero(t, rec.Body.Len())
+	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
+
+	req = httptest.NewRequest(http.MethodHead, "/ship/core/", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.NotZero(t, rec.Body.Len())
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
+	assert.NotContains(t, rec.Body.String(), `"router.go"`)
+
+	req = httptest.NewRequest(http.MethodGet, "/ship/core/router.go", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NotZero(t, rec.Body.Len())
+	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
+}
