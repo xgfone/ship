@@ -333,6 +333,8 @@ func (r *Route) serveFileMetadata(ctx Context, filename string) error {
 	fi, err := f.Stat()
 	if err != nil {
 		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+	} else if fi.IsDir() {
+		return ctx.NotFoundHandler()(ctx)
 	}
 
 	h := md5.New()
