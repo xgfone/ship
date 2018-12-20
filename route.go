@@ -15,9 +15,12 @@
 package ship
 
 import (
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -318,4 +321,37 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 	}
 
 	return r
+}
+
+func (r *Route) serveFileMetadata(ctx Context, filename string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+	}
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+	}
+
+	ctx.SetHeader(HeaderEtag, fmt.Sprintf("%x", h.Sum(nil)))
+	ctx.SetHeader(HeaderContentLength, fmt.Sprintf("%d", fi.Size()))
+	return ctx.NoContent(http.StatusOK)
+}
+
+// StaticFile registers a route for a static file, which supports the HEAD method
+// to get the its length and the GET method to download it.
+func (r *Route) StaticFile(filePath string) {
+	if strings.Contains(r.path, ":") || strings.Contains(r.path, "*") {
+		panic(errors.New("URL parameters cannot be used when serving a static file"))
+	}
+
+	r.addRoute("", r.path, func(ctx Context) error { return ctx.File(filePath) }, http.MethodGet)
+	r.addRoute("", r.path, func(ctx Context) error { return r.serveFileMetadata(ctx, filePath) }, http.MethodHead)
 }

@@ -833,3 +833,25 @@ func TestShipVHost(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "vhost2", rec.Body.String())
 }
+
+func TestRouteStaticFile(t *testing.T) {
+	s := New()
+	s.Route("/README.md").StaticFile("./README.md")
+
+	req := httptest.NewRequest(http.MethodHead, "/README.md", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 0, rec.Body.Len())
+	assert.NotZero(t, rec.Header().Get(HeaderEtag))
+	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
+
+	req = httptest.NewRequest(http.MethodGet, "/README.md", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.NotZero(t, rec.Body.Len())
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "text/markdown; charset=utf-8", rec.Header().Get(HeaderContentType))
+}
