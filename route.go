@@ -33,6 +33,7 @@ type Route struct {
 	name    string
 	router  Router
 	mdwares []Middleware
+	matches []Matcher
 }
 
 func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
@@ -63,6 +64,10 @@ func (r *Route) New() *Route {
 	_r := *r
 	_r.mdwares = make([]Middleware, len(r.mdwares))
 	copy(_r.mdwares, r.mdwares)
+	if len(r.matches) > 0 {
+		_r.matches = make([]Matcher, len(r.mdwares))
+		copy(_r.matches, r.matches)
+	}
 	return &_r
 }
 
@@ -72,52 +77,66 @@ func (r *Route) Name(name string) *Route {
 	return r
 }
 
-// Headers adds some header matches.
+// Match adds the matchers of the request to check whether the request matches
+// these conditions.
 //
-// If the headers of a certain request don't contain these headers,
-// it will return ship.config.NotFoundHandler.
-//
-// Example
-//
-//     s := ship.New()
-//     s.R("/path/to").Headers("Content-Type", "application/json").POST(handler)
-//
-func (r *Route) Headers(headers ...string) *Route {
-	_len := len(headers)
-	if _len == 0 {
-		return r
-	} else if _len%2 != 0 {
-		panic(errors.New("the number of the headers must be even"))
-	}
-
-	for i := 0; i < _len; i += 2 {
-		headers[i] = http.CanonicalHeaderKey(headers[i])
-	}
-
-	return r.Use(func(next Handler) Handler {
-		return func(ctx Context) error {
-			header := ctx.Request().Header
-			for i := 0; i < _len; i += 2 {
-				if header.Get(headers[i]) != headers[i+1] {
-					return r.ship.config.NotFoundHandler(ctx)
-				}
-			}
-			return next(ctx)
-		}
-	})
+// These matchers will be executes as the middlewares. And if the matcher fails,
+// the middleware will return a HTTPError with 404.
+func (r *Route) Match(matchers ...Matcher) *Route {
+	r.matches = append(r.matches, matchers...)
+	return r
 }
 
-// Schemes adds some scheme matches.
-//
-// If the scheme of a certain request is not in these schemes,
-// it will return ship.config.NotFoundHandler.
+// HasHeader checks whether the request contains the request header.
+// If no, the request will be rejected.
 //
 // Example
 //
 //     s := ship.New()
-//     s.R("/path/to").Schemes("https", "wss").POST(handler)
+//     // The request must contains the header "Content-Type: application/json".
+//     s.R("/path/to").HasHeader("Content-Type", "application/json").POST(handler)
 //
-func (r *Route) Schemes(schemes ...string) *Route {
+func (r *Route) HasHeader(headerK, headerV string) *Route {
+	headerK = http.CanonicalHeaderKey(headerK)
+	r.Match(func(req *http.Request) error {
+		if req.Header.Get(headerK) == headerV {
+			return nil
+		}
+		return fmt.Errorf("missing the header '%s'", headerK)
+	})
+	return r
+}
+
+// NotHeader checks whether the request doesn't contains the request header.
+// If no, the request will be rejected.
+//
+// Example
+//
+//     s := ship.New()
+//     // The request must not contains the header "Content-Type: application/json".
+//     s.R("/path/to").NotHeader("Content-Type", "application/json").POST(handler)
+//
+func (r *Route) NotHeader(headerK, headerV string) *Route {
+	headerK = http.CanonicalHeaderKey(headerK)
+	r.Match(func(req *http.Request) error {
+		if req.Header.Get(headerK) == headerV {
+			return fmt.Errorf("not support the header '%s: %s'", headerK, headerV)
+		}
+		return nil
+	})
+	return r
+}
+
+// HasSchemes checks whether the request is one of the schemes.
+// If no, the request will be rejected.
+//
+// Example
+//
+//     s := ship.New()
+//     // We only handle https and wss, others will be rejected.
+//     s.R("/path/to").HasSchemes("https", "wss").POST(handler)
+//
+func (r *Route) HasSchemes(schemes ...string) *Route {
 	_len := len(schemes)
 	if _len == 0 {
 		return r
@@ -126,17 +145,48 @@ func (r *Route) Schemes(schemes ...string) *Route {
 		schemes[i] = strings.ToLower(schemes[i])
 	}
 
-	return r.Use(func(next Handler) Handler {
-		return func(ctx Context) error {
-			scheme := ctx.Request().URL.Scheme
-			for i := 0; i < _len; i++ {
-				if schemes[i] == scheme {
-					return next(ctx)
-				}
+	r.Match(func(req *http.Request) error {
+		scheme := req.URL.Scheme
+		for _, s := range schemes {
+			if s == scheme {
+				return nil
 			}
-			return r.ship.config.NotFoundHandler(ctx)
 		}
+		return fmt.Errorf("not support the scheme '%s'", scheme)
 	})
+
+	return r
+}
+
+// NotSchemes checks whether the request is not one of the schemes before routing.
+// If no, the request will be rejected.
+//
+// Example
+//
+//     s := ship.New()
+//     // We will reject the http and ws request.
+//     s.R("/path/to").NotSchemes("http", "ws").POST(handler)
+//
+func (r *Route) NotSchemes(schemes ...string) *Route {
+	_len := len(schemes)
+	if _len == 0 {
+		return r
+	}
+	for i := 0; i < _len; i++ {
+		schemes[i] = strings.ToLower(schemes[i])
+	}
+
+	r.Match(func(req *http.Request) error {
+		scheme := req.URL.Scheme
+		for _, s := range schemes {
+			if s == scheme {
+				return fmt.Errorf("the scheme '%s' is not allowed", scheme)
+			}
+		}
+		return nil
+	})
+
+	return r
 }
 
 // Use adds some middlwares for the route.
@@ -162,8 +212,28 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
 	}
 
-	for i := len(r.mdwares) - 1; i >= 0; i-- {
-		handler = r.mdwares[i](handler)
+	middlewares := make([]Middleware, 0, len(r.mdwares)+1)
+	middlewares = append(middlewares, r.mdwares...)
+
+	// Add a middleware for the matchers.
+	if len(r.matches) > 0 {
+		matchers := make([]Matcher, len(r.matches))
+		copy(matchers, r.matches)
+		middlewares = append(middlewares, func(next Handler) Handler {
+			return func(ctx Context) (err error) {
+				req := ctx.Request()
+				for _, matcher := range matchers {
+					if err = matcher(req); err != nil {
+						return ErrNotFound.SetInnerError(err)
+					}
+				}
+				return next(ctx)
+			}
+		})
+	}
+
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
 	}
 
 	for i := range methods {

@@ -48,6 +48,9 @@ type Binder = core.Binder
 //    Render(ctx Context, w io.Writer, name string, code int, data interface{}) error
 type Renderer = core.Renderer
 
+// Matcher is used to check whether the request match some conditions.
+type Matcher func(*http.Request) error
+
 // Config is used to configure the router used by the default implementation.
 type Config struct {
 	// The route prefix, which is "" by default.

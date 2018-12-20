@@ -925,3 +925,25 @@ func TestRouteStatic(t *testing.T) {
 	assert.NotZero(t, rec.Body.Len())
 	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
 }
+
+func TestRouteMatch(t *testing.T) {
+	s := New()
+
+	s.Route("/path1").HasHeader("Content-Type", "application/json").GET(
+		func(ctx Context) error { return ctx.String(200, "OK") })
+	req := httptest.NewRequest(http.MethodGet, "/path1", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "OK", rec.Body.String())
+
+	s.Route("/path2").NotHeader("Content-Type", "application/json").GET(
+		func(ctx Context) error { return ctx.String(200, "OK") })
+	req = httptest.NewRequest(http.MethodGet, "/path2", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "Not Found", rec.Body.String())
+}
