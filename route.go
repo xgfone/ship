@@ -33,7 +33,12 @@ type Route struct {
 	name    string
 	router  Router
 	mdwares []Middleware
-	matches []Matcher
+
+	matchers   []Matcher
+	hasHeaders []string
+	notHeaders []string
+	hasSchemes []string
+	notSchemes []string
 }
 
 func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
@@ -61,14 +66,19 @@ func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Rou
 
 // New clones a new Route based on the current route.
 func (r *Route) New() *Route {
-	_r := *r
-	_r.mdwares = make([]Middleware, len(r.mdwares))
-	copy(_r.mdwares, r.mdwares)
-	if len(r.matches) > 0 {
-		_r.matches = make([]Matcher, len(r.mdwares))
-		copy(_r.matches, r.matches)
+	return &Route{
+		ship:    r.ship,
+		path:    r.path,
+		name:    r.name,
+		router:  r.router,
+		mdwares: append([]Middleware{}, r.mdwares...),
+
+		matchers:   append([]Matcher{}, r.matchers...),
+		hasHeaders: append([]string{}, r.hasHeaders...),
+		notHeaders: append([]string{}, r.notHeaders...),
+		hasSchemes: append([]string{}, r.hasSchemes...),
+		notSchemes: append([]string{}, r.notSchemes...),
 	}
-	return &_r
 }
 
 // Name sets the route name.
@@ -83,7 +93,7 @@ func (r *Route) Name(name string) *Route {
 // These matchers will be executes as the middlewares. And if the matcher fails,
 // the middleware will return a HTTPError with 404.
 func (r *Route) Match(matchers ...Matcher) *Route {
-	r.matches = append(r.matches, matchers...)
+	r.matchers = append(r.matchers, matchers...)
 	return r
 }
 
@@ -97,14 +107,24 @@ func (r *Route) Match(matchers ...Matcher) *Route {
 //     s.R("/path/to").HasHeader("Content-Type", "application/json").POST(handler)
 //
 func (r *Route) HasHeader(headerK, headerV string) *Route {
-	headerK = http.CanonicalHeaderKey(headerK)
-	r.Match(func(req *http.Request) error {
-		if req.Header.Get(headerK) == headerV {
-			return nil
-		}
-		return fmt.Errorf("missing the header '%s'", headerK)
-	})
+	r.hasHeaders = append(r.hasHeaders, http.CanonicalHeaderKey(headerK), headerV)
 	return r
+}
+
+func (r *Route) buildHasHeadersMatcher() Matcher {
+	if len(r.hasHeaders) == 0 {
+		return nil
+	}
+
+	return func(req *http.Request) error {
+		for i, _len := 0, len(r.hasHeaders); i < _len; i += 2 {
+			key, value := r.hasHeaders[i], r.hasHeaders[i+1]
+			if req.Header.Get(key) != value {
+				return fmt.Errorf("missing the header '%s: %s'", key, value)
+			}
+		}
+		return nil
+	}
 }
 
 // NotHeader checks whether the request doesn't contains the request header.
@@ -117,14 +137,24 @@ func (r *Route) HasHeader(headerK, headerV string) *Route {
 //     s.R("/path/to").NotHeader("Content-Type", "application/json").POST(handler)
 //
 func (r *Route) NotHeader(headerK, headerV string) *Route {
-	headerK = http.CanonicalHeaderKey(headerK)
-	r.Match(func(req *http.Request) error {
-		if req.Header.Get(headerK) == headerV {
-			return fmt.Errorf("not support the header '%s: %s'", headerK, headerV)
+	r.notHeaders = append(r.notHeaders, http.CanonicalHeaderKey(headerK), headerV)
+	return r
+}
+
+func (r *Route) buildNotHeadersMatcher() Matcher {
+	if len(r.notHeaders) == 0 {
+		return nil
+	}
+
+	return func(req *http.Request) error {
+		for i, _len := 0, len(r.notHeaders); i < _len; i += 2 {
+			key, value := r.notHeaders[i], r.notHeaders[i+1]
+			if req.Header.Get(key) == value {
+				return fmt.Errorf("not support the header '%s: %s'", key, value)
+			}
 		}
 		return nil
-	})
-	return r
+	}
 }
 
 // HasSchemes checks whether the request is one of the schemes.
@@ -144,18 +174,24 @@ func (r *Route) HasSchemes(schemes ...string) *Route {
 	for i := 0; i < _len; i++ {
 		schemes[i] = strings.ToLower(schemes[i])
 	}
+	r.hasSchemes = append(r.hasSchemes, schemes...)
+	return r
+}
 
-	r.Match(func(req *http.Request) error {
+func (r *Route) buildHasSchemesMatcher() Matcher {
+	if len(r.hasSchemes) == 0 {
+		return nil
+	}
+
+	return func(req *http.Request) error {
 		scheme := req.URL.Scheme
-		for _, s := range schemes {
+		for _, s := range r.hasSchemes {
 			if s == scheme {
 				return nil
 			}
 		}
 		return fmt.Errorf("not support the scheme '%s'", scheme)
-	})
-
-	return r
+	}
 }
 
 // NotSchemes checks whether the request is not one of the schemes before routing.
@@ -175,24 +211,63 @@ func (r *Route) NotSchemes(schemes ...string) *Route {
 	for i := 0; i < _len; i++ {
 		schemes[i] = strings.ToLower(schemes[i])
 	}
+	r.notSchemes = append(r.notSchemes, schemes...)
+	return r
+}
 
-	r.Match(func(req *http.Request) error {
+func (r *Route) buildNotSchemesMatcher() Matcher {
+	if len(r.notSchemes) == 0 {
+		return nil
+	}
+
+	return func(req *http.Request) error {
 		scheme := req.URL.Scheme
-		for _, s := range schemes {
+		for _, s := range r.notSchemes {
 			if s == scheme {
 				return fmt.Errorf("the scheme '%s' is not allowed", scheme)
 			}
 		}
 		return nil
-	})
-
-	return r
+	}
 }
 
 // Use adds some middlwares for the route.
 func (r *Route) Use(middlewares ...Middleware) *Route {
 	r.mdwares = append(r.mdwares, middlewares...)
 	return r
+}
+
+func (r *Route) buildMatcherMiddleware() Middleware {
+	ms := []Matcher{
+		r.buildHasHeadersMatcher(),
+		r.buildNotHeadersMatcher(),
+		r.buildHasSchemesMatcher(),
+		r.buildNotSchemesMatcher(),
+	}
+
+	matchers := make([]Matcher, 0, len(r.matchers)+4)
+	matchers = append(matchers, r.matchers...)
+	for _, m := range ms {
+		if m != nil {
+			matchers = append(matchers, m)
+		}
+	}
+
+	if len(matchers) == 0 {
+		return nil
+	}
+
+	return func(next Handler) Handler {
+		return func(ctx Context) (err error) {
+			req := ctx.Request()
+			for _, matcher := range matchers {
+				if err = matcher(req); err != nil {
+					return ErrNotFound.SetInnerError(err)
+				}
+			}
+			return next(ctx)
+		}
+	}
 }
 
 func (r *Route) addRoute(name, path string, handler Handler, methods ...string) *Route {
@@ -212,24 +287,12 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
 	}
 
-	middlewares := make([]Middleware, 0, len(r.mdwares)+1)
-	middlewares = append(middlewares, r.mdwares...)
-
-	// Add a middleware for the matchers.
-	if len(r.matches) > 0 {
-		matchers := make([]Matcher, len(r.matches))
-		copy(matchers, r.matches)
-		middlewares = append(middlewares, func(next Handler) Handler {
-			return func(ctx Context) (err error) {
-				req := ctx.Request()
-				for _, matcher := range matchers {
-					if err = matcher(req); err != nil {
-						return ErrNotFound.SetInnerError(err)
-					}
-				}
-				return next(ctx)
-			}
-		})
+	middlewares := r.mdwares
+	matcherMiddleware := r.buildMatcherMiddleware()
+	if matcherMiddleware != nil {
+		middlewares = make([]Middleware, 0, len(r.mdwares)+1)
+		middlewares = append(middlewares, r.mdwares...)
+		middlewares = append(middlewares, matcherMiddleware)
 	}
 
 	for i := len(middlewares) - 1; i >= 0; i-- {

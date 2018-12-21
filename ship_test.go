@@ -926,7 +926,7 @@ func TestRouteStatic(t *testing.T) {
 	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
 }
 
-func TestRouteMatch(t *testing.T) {
+func TestRouteMatcher(t *testing.T) {
 	s := New()
 
 	s.Route("/path1").HasHeader("Content-Type", "application/json").GET(
