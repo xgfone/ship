@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"bytes"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -927,7 +928,8 @@ func TestRouteStatic(t *testing.T) {
 }
 
 func TestRouteMatcher(t *testing.T) {
-	s := New()
+	buf := bytes.NewBuffer(nil)
+	s := New(Config{Logger: NewNoLevelLogger(buf)})
 
 	s.Route("/path1").HasHeader("Content-Type", "application/json").GET(
 		func(ctx Context) error { return ctx.String(200, "OK") })

@@ -87,6 +87,12 @@ func (r *Route) Name(name string) *Route {
 	return r
 }
 
+// Use adds some middlwares for the route.
+func (r *Route) Use(middlewares ...Middleware) *Route {
+	r.mdwares = append(r.mdwares, middlewares...)
+	return r
+}
+
 // Match adds the matchers of the request to check whether the request matches
 // these conditions.
 //
@@ -106,6 +112,7 @@ func (r *Route) Match(matchers ...Matcher) *Route {
 //     // The request must contains the header "Content-Type: application/json".
 //     s.R("/path/to").HasHeader("Content-Type", "application/json").POST(handler)
 //
+// Notice: it is implemented by using Matcher.
 func (r *Route) HasHeader(headerK, headerV string) *Route {
 	r.hasHeaders = append(r.hasHeaders, http.CanonicalHeaderKey(headerK), headerV)
 	return r
@@ -136,6 +143,7 @@ func (r *Route) buildHasHeadersMatcher() Matcher {
 //     // The request must not contains the header "Content-Type: application/json".
 //     s.R("/path/to").NotHeader("Content-Type", "application/json").POST(handler)
 //
+// Notice: it is implemented by using Matcher.
 func (r *Route) NotHeader(headerK, headerV string) *Route {
 	r.notHeaders = append(r.notHeaders, http.CanonicalHeaderKey(headerK), headerV)
 	return r
@@ -166,6 +174,7 @@ func (r *Route) buildNotHeadersMatcher() Matcher {
 //     // We only handle https and wss, others will be rejected.
 //     s.R("/path/to").HasSchemes("https", "wss").POST(handler)
 //
+// Notice: it is implemented by using Matcher.
 func (r *Route) HasSchemes(schemes ...string) *Route {
 	_len := len(schemes)
 	if _len == 0 {
@@ -194,7 +203,7 @@ func (r *Route) buildHasSchemesMatcher() Matcher {
 	}
 }
 
-// NotSchemes checks whether the request is not one of the schemes before routing.
+// NotSchemes checks whether the request is not one of the schemes.
 // If no, the request will be rejected.
 //
 // Example
@@ -203,6 +212,7 @@ func (r *Route) buildHasSchemesMatcher() Matcher {
 //     // We will reject the http and ws request.
 //     s.R("/path/to").NotSchemes("http", "ws").POST(handler)
 //
+// Notice: it is implemented by using Matcher.
 func (r *Route) NotSchemes(schemes ...string) *Route {
 	_len := len(schemes)
 	if _len == 0 {
@@ -229,12 +239,6 @@ func (r *Route) buildNotSchemesMatcher() Matcher {
 		}
 		return nil
 	}
-}
-
-// Use adds some middlwares for the route.
-func (r *Route) Use(middlewares ...Middleware) *Route {
-	r.mdwares = append(r.mdwares, middlewares...)
-	return r
 }
 
 func (r *Route) buildMatcherMiddleware() Middleware {
