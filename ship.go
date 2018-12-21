@@ -17,6 +17,7 @@ package ship
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -72,6 +73,9 @@ type Config struct {
 	//         "Get":    "GET",
 	//     }
 	DefaultMethodMapping map[string]string
+
+	// BindQuery binds the request query to v.
+	BindQuery func(queries url.Values, v interface{}) error
 
 	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
 	// But you can appoint yourself customized Logger implementation.
@@ -151,6 +155,10 @@ func (c *Config) init(s *Ship) {
 
 	if c.Binder == nil {
 		c.Binder = binder.NewBinder()
+	}
+
+	if c.BindQuery == nil {
+		c.BindQuery = binder.BindQuery
 	}
 
 	if c.Renderer == nil {

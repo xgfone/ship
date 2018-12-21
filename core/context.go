@@ -61,6 +61,7 @@ type Context interface {
 	URL(name string, params ...interface{}) string
 
 	Bind(v interface{}) error
+	BindQuery(v interface{}) error
 
 	Render(name string, code int, data interface{}) error
 

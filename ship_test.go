@@ -957,3 +957,20 @@ func TestRouteMatcher(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 	assert.Equal(t, "Not Found", rec.Body.String())
 }
+
+func TestContextBindQuery(t *testing.T) {
+	type V struct {
+		A string `query:"a"`
+		B int    `query:"b"`
+	}
+	vs := V{}
+
+	s := New()
+	s.Route("/path").GET(func(ctx Context) error { return ctx.BindQuery(&vs) })
+	req := httptest.NewRequest(http.MethodGet, "/path?a=xyz&b=2", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "xyz", vs.A)
+	assert.Equal(t, 2, vs.B)
+}

@@ -94,6 +94,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    URL(name string, params ...interface{}) string
 //
 //    Bind(v interface{}) error
+//    BindQuery(v interface{}) error
 //
 //    Render(name string, code int, data interface{}) error
 //
@@ -150,6 +151,7 @@ type context struct {
 	logger   Logger
 	binder   Binder
 	renderer Renderer
+	binderQ  func(url.Values, interface{}) error
 
 	store map[string]interface{}
 }
@@ -198,6 +200,7 @@ func (c *context) setShip(s *Ship) {
 	c.logger = s.config.Logger
 	c.binder = s.config.Binder
 	c.renderer = s.config.Renderer
+	c.binderQ = s.config.BindQuery
 }
 
 func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
@@ -441,6 +444,10 @@ func (c *context) SetCookie(cookie *http.Cookie) {
 // The default binder does it based on Content-Type header.
 func (c *context) Bind(v interface{}) error {
 	return c.binder.Bind(c, v)
+}
+
+func (c *context) BindQuery(v interface{}) error {
+	return c.binderQ(c.QueryParams(), v)
 }
 
 // Render renders a template with data and sends a text/html response with status

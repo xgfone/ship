@@ -75,6 +75,11 @@ type Config struct {
 	//     }
 	DefaultMethodMapping map[string]string
 
+    // BindQuery binds the request query to v.
+    //
+    // The default is binder.BindQuery().
+	BindQuery func(queries url.Values, v interface{}) error
+
 	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
 	// But you can appoint yourself customized Logger implementation.
 	Logger Logger
@@ -348,6 +353,7 @@ The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middlew
 - [Gzip](https://godoc.org/github.com/xgfone/ship/middleware#Gzip)
 - [Logger](https://godoc.org/github.com/xgfone/ship/middleware#Logger)
 - [Recover](https://godoc.org/github.com/xgfone/ship/middleware#Recover)
+- [Matchers](https://godoc.org/github.com/xgfone/ship/middleware#Matchers)
 - [CleanPath](https://godoc.org/github.com/xgfone/ship/middleware#CleanPath)
 - [BodyLimit](https://godoc.org/github.com/xgfone/ship/middleware#BodyLimit)
 - [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)

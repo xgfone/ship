@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -41,13 +42,23 @@ type BindUnmarshaler interface {
 	UnmarshalBind(param string) error
 }
 
+// BindQuery binds the request query to v.
+func BindQuery(queries url.Values, v interface{}) error {
+	if err := globalBinder.bindData(v, queries, "query"); err != nil {
+		return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
+	}
+	return nil
+}
+
 // NewBinder returns a new default Binder.
 func NewBinder() core.Binder {
-	return &defaultBinder{}
+	return globalBinder
 }
 
 // defaultBinder is the default implementation of the Binder interface.
 type defaultBinder struct{}
+
+var globalBinder = &defaultBinder{}
 
 // Bind implements the `Binder#Bind` function.
 func (b *defaultBinder) Bind(ctx core.Context, v interface{}) (err error) {
