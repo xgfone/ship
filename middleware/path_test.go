@@ -6,7 +6,6 @@
 package middleware
 
 import (
-	"runtime"
 	"testing"
 )
 
@@ -71,23 +70,6 @@ func TestPathClean(t *testing.T) {
 		}
 		if s := cleanPath(test.result); s != test.result {
 			t.Errorf("CleanPath(%q) = %q, want %q", test.result, s, test.result)
-		}
-	}
-}
-
-func TestPathCleanMallocs(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping malloc count in short mode")
-	}
-	if runtime.GOMAXPROCS(0) > 1 {
-		t.Log("skipping AllocsPerRun checks; GOMAXPROCS>1")
-		return
-	}
-
-	for _, test := range cleanTests {
-		allocs := testing.AllocsPerRun(100, func() { cleanPath(test.result) })
-		if allocs > 0 {
-			t.Errorf("CleanPath(%q): %v allocs, want zero", test.result, allocs)
 		}
 	}
 }
