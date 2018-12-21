@@ -45,7 +45,7 @@ type Binder = core.Binder
 // Renderer is the alias of core.Renderer, which is used to render the response.
 //
 // Methods:
-//    Render(ctx Context, w io.Writer, name string, code int, data interface{}) error
+//    Render(ctx Context, name string, code int, data interface{}) error
 type Renderer = core.Renderer
 
 // Matcher is used to check whether the request match some conditions.

@@ -15,7 +15,6 @@
 package ship
 
 import (
-	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -450,11 +449,7 @@ func (c *context) Render(name string, code int, data interface{}) error {
 	if c.renderer == nil {
 		return ErrRendererNotRegistered
 	}
-	buf := new(bytes.Buffer)
-	if err := c.renderer.Render(c, buf, name, code, data); err != nil {
-		return err
-	}
-	return c.HTMLBlob(code, buf.Bytes())
+	return c.renderer.Render(c, name, code, data)
 }
 
 func (c *context) writeContentType(value string) {
