@@ -37,6 +37,8 @@ type Route struct {
 	matchers []Matcher
 	headers  []string
 	schemes  []string
+
+	matcherM func([]Matcher) Middleware
 }
 
 func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
@@ -92,10 +94,19 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 // Match adds the matchers of the request to check whether the request matches
 // these conditions.
 //
-// These matchers will be executes as the middlewares. And if the matcher fails,
-// the middleware will return a HTTPError with 404.
+// These matchers will be executes as the middlewares.
 func (r *Route) Match(matchers ...Matcher) *Route {
 	r.matchers = append(r.matchers, matchers...)
+	return r
+}
+
+// MatchMiddleware sets the matcher middleware.
+//
+// The default implementation will be executes those matchers in turn.
+// If a certain matcher returns an error, it will return a HTTPError
+// with 404 and the error.
+func (r *Route) MatchMiddleware(f func([]Matcher) Middleware) *Route {
+	r.matcherM = f
 	return r
 }
 
@@ -196,6 +207,10 @@ func (r *Route) buildMatcherMiddleware() Middleware {
 
 	if len(matchers) == 0 {
 		return nil
+	}
+
+	if r.matcherM != nil {
+		return r.matcherM(matchers)
 	}
 
 	return func(next Handler) Handler {
