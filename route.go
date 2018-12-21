@@ -102,7 +102,7 @@ func (r *Route) Match(matchers ...Matcher) *Route {
 
 // MatchMiddleware sets the matcher middleware.
 //
-// The default implementation will be executes those matchers in turn.
+// The default implementation will execute those matchers in turn.
 // If a certain matcher returns an error, it will return a HTTPError
 // with 404 and the error.
 func (r *Route) MatchMiddleware(f func([]Matcher) Middleware) *Route {
