@@ -102,7 +102,7 @@ type Config struct {
 	//
 	///    router := New()
 	//     mr := router.MuxRender()
-	//     mr.Add("html", HtmlRenderer
+	//     mr.Add("html", HtmlRenderer)
 	//
 	Renderer Renderer
 

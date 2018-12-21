@@ -82,8 +82,30 @@ type Config struct {
 	// which is `NewBinder()` by default.
 	// But you can appoint yourself customized Binder implementation
 	Binder Binder
-	// Rendered is used to render the response to the peer, which has no
-	// the default implementation.
+	// Rendered is used to render the response to the peer.
+	//
+	// The default is MuxRender, and adds some renderer, for example,
+	// json, jsonpretty, xml, xmlpretty, etc, as follow.
+	//
+	//     renderer := NewMuxRender()
+	//     renderer.Add("json", render.JSON())
+	//     renderer.Add("jsonpretty", render.JSONPretty("    "))
+	//     renderer.Add("xml", render.XML())
+	//     renderer.Add("xmlpretty", render.XMLPretty("    "))
+	//
+	// So you can use it by the four ways:
+	//
+	//     renderer.Render(ctx, "json", 200, data)
+	//     renderer.Render(ctx, "jsonpretty", 200, data)
+	//     renderer.Render(ctx, "xml", 200, data)
+	//     renderer.Render(ctx, "xmlpretty", 200, data)
+	//
+	// You can use the default, then add yourself renderer as follow.
+	//
+	///    router := New()
+	//     mr := router.MuxRender()
+	//     mr.Add("html", HtmlRenderer)
+	//
 	Renderer Renderer
 
 	// Create a new router, which uses echo implementation by default.
@@ -428,6 +450,52 @@ func main() {
         }
         ...
     })
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+## Render JSON, XML, HTML or other format data
+
+```go
+func main() {
+    router := ship.New()
+
+    // For JSON
+    router.Route("/json").POST(func(ctx ship.Context) error {
+        if ctx.QueryParam("pretty") == "1" {
+            return ctx.JSONPretty(200, map[string]string{"msg": "json"}, "    ")
+            // Or
+            // return ctx.Render("jsonpretty", 200, map[string]string{"msg": "json"}, "    ")
+        } else {
+            return ctx.JSON(200, map[string]string{"msg": "json"})
+            // Or
+            // return ctx.Render("json", 200, map[string]string{"msg": "json"})
+        }
+    })
+
+    // For XML
+    router.Route("/xml").POST(func(ctx ship.Context) error {
+        if ctx.QueryParam("pretty") == "1" {
+            return ctx.XMLPretty(200, map[string]string{"msg": "xml"}, "    ")
+            // Or
+            // return ctx.Render("xmlpretty", 200, map[string]string{"msg": "xml"}, "    ")
+        } else {
+            return ctx.XML(200, map[string]string{"msg": "xml"})
+            // Or
+            // return ctx.Render("xml", 200, map[string]string{"msg": "xml"})
+        }
+    })
+
+    // For HTML
+    router.Route("/html").POST(func(ctx ship.Context) error {
+        return ctx.HTML(200, `<html>...</html>`)
+        // Or
+        // return ctx.Render("template.html", 200, nil)
+    })
+
+    // For others
+    // ...
 
     http.ListenAndServe(":8080", router)
 }
