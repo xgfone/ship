@@ -931,7 +931,7 @@ func TestRouteMatcher(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	s := New(Config{Logger: NewNoLevelLogger(buf)})
 
-	s.Route("/path1").HasHeader("Content-Type", "application/json").GET(
+	s.Route("/path1").Header("Content-Type", "application/json").GET(
 		func(ctx Context) error { return ctx.String(200, "OK") })
 	req := httptest.NewRequest(http.MethodGet, "/path1", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -940,10 +940,18 @@ func TestRouteMatcher(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "OK", rec.Body.String())
 
-	s.Route("/path2").NotHeader("Content-Type", "application/json").GET(
+	s.Route("/path3").Header("Content-Type").GET(
 		func(ctx Context) error { return ctx.String(200, "OK") })
-	req = httptest.NewRequest(http.MethodGet, "/path2", nil)
+	req = httptest.NewRequest(http.MethodGet, "/path3", nil)
 	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "OK", rec.Body.String())
+
+	s.Route("/path4").Header("Content-Type").GET(
+		func(ctx Context) error { return ctx.String(200, "OK") })
+	req = httptest.NewRequest(http.MethodGet, "/path4", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)

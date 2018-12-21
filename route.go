@@ -34,11 +34,9 @@ type Route struct {
 	router  Router
 	mdwares []Middleware
 
-	matchers   []Matcher
-	hasHeaders []string
-	notHeaders []string
-	hasSchemes []string
-	notSchemes []string
+	matchers []Matcher
+	headers  []string
+	schemes  []string
 }
 
 func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
@@ -73,11 +71,9 @@ func (r *Route) New() *Route {
 		router:  r.router,
 		mdwares: append([]Middleware{}, r.mdwares...),
 
-		matchers:   append([]Matcher{}, r.matchers...),
-		hasHeaders: append([]string{}, r.hasHeaders...),
-		notHeaders: append([]string{}, r.notHeaders...),
-		hasSchemes: append([]string{}, r.hasSchemes...),
-		notSchemes: append([]string{}, r.notSchemes...),
+		matchers: append([]Matcher{}, r.matchers...),
+		headers:  append([]string{}, r.headers...),
+		schemes:  append([]string{}, r.schemes...),
 	}
 }
 
@@ -103,8 +99,10 @@ func (r *Route) Match(matchers ...Matcher) *Route {
 	return r
 }
 
-// HasHeader checks whether the request contains the request header.
+// Header checks whether the request contains the request header.
 // If no, the request will be rejected.
+//
+// If the header value is given, it will be tested to match.
 //
 // Example
 //
@@ -113,52 +111,31 @@ func (r *Route) Match(matchers ...Matcher) *Route {
 //     s.R("/path/to").HasHeader("Content-Type", "application/json").POST(handler)
 //
 // Notice: it is implemented by using Matcher.
-func (r *Route) HasHeader(headerK, headerV string) *Route {
-	r.hasHeaders = append(r.hasHeaders, http.CanonicalHeaderKey(headerK), headerV)
+func (r *Route) Header(headerK string, headerV ...string) *Route {
+	var value string
+	if len(headerV) > 0 {
+		value = headerV[0]
+	}
+	r.headers = append(r.headers, http.CanonicalHeaderKey(headerK), value)
 	return r
 }
 
-func (r *Route) buildHasHeadersMatcher() Matcher {
-	if len(r.hasHeaders) == 0 {
+func (r *Route) buildHeadersMatcher() Matcher {
+	if len(r.headers) == 0 {
 		return nil
 	}
 
 	return func(req *http.Request) error {
-		for i, _len := 0, len(r.hasHeaders); i < _len; i += 2 {
-			key, value := r.hasHeaders[i], r.hasHeaders[i+1]
-			if req.Header.Get(key) != value {
-				return fmt.Errorf("missing the header '%s: %s'", key, value)
-			}
-		}
-		return nil
-	}
-}
-
-// NotHeader checks whether the request doesn't contains the request header.
-// If no, the request will be rejected.
-//
-// Example
-//
-//     s := ship.New()
-//     // The request must not contains the header "Content-Type: application/json".
-//     s.R("/path/to").NotHeader("Content-Type", "application/json").POST(handler)
-//
-// Notice: it is implemented by using Matcher.
-func (r *Route) NotHeader(headerK, headerV string) *Route {
-	r.notHeaders = append(r.notHeaders, http.CanonicalHeaderKey(headerK), headerV)
-	return r
-}
-
-func (r *Route) buildNotHeadersMatcher() Matcher {
-	if len(r.notHeaders) == 0 {
-		return nil
-	}
-
-	return func(req *http.Request) error {
-		for i, _len := 0, len(r.notHeaders); i < _len; i += 2 {
-			key, value := r.notHeaders[i], r.notHeaders[i+1]
-			if req.Header.Get(key) == value {
-				return fmt.Errorf("not support the header '%s: %s'", key, value)
+		for i, _len := 0, len(r.headers); i < _len; i += 2 {
+			key, value := r.headers[i], r.headers[i+1]
+			if value != "" {
+				if req.Header.Get(key) != value {
+					return fmt.Errorf("missing the header '%s: %s'", key, value)
+				}
+			} else {
+				if req.Header.Get(key) == "" {
+					return fmt.Errorf("missing the header '%s'", key)
+				}
 			}
 		}
 		return nil
@@ -183,18 +160,18 @@ func (r *Route) HasSchemes(schemes ...string) *Route {
 	for i := 0; i < _len; i++ {
 		schemes[i] = strings.ToLower(schemes[i])
 	}
-	r.hasSchemes = append(r.hasSchemes, schemes...)
+	r.schemes = append(r.schemes, schemes...)
 	return r
 }
 
-func (r *Route) buildHasSchemesMatcher() Matcher {
-	if len(r.hasSchemes) == 0 {
+func (r *Route) buildSchemesMatcher() Matcher {
+	if len(r.schemes) == 0 {
 		return nil
 	}
 
 	return func(req *http.Request) error {
 		scheme := req.URL.Scheme
-		for _, s := range r.hasSchemes {
+		for _, s := range r.schemes {
 			if s == scheme {
 				return nil
 			}
@@ -203,50 +180,10 @@ func (r *Route) buildHasSchemesMatcher() Matcher {
 	}
 }
 
-// NotSchemes checks whether the request is not one of the schemes.
-// If no, the request will be rejected.
-//
-// Example
-//
-//     s := ship.New()
-//     // We will reject the http and ws request.
-//     s.R("/path/to").NotSchemes("http", "ws").POST(handler)
-//
-// Notice: it is implemented by using Matcher.
-func (r *Route) NotSchemes(schemes ...string) *Route {
-	_len := len(schemes)
-	if _len == 0 {
-		return r
-	}
-	for i := 0; i < _len; i++ {
-		schemes[i] = strings.ToLower(schemes[i])
-	}
-	r.notSchemes = append(r.notSchemes, schemes...)
-	return r
-}
-
-func (r *Route) buildNotSchemesMatcher() Matcher {
-	if len(r.notSchemes) == 0 {
-		return nil
-	}
-
-	return func(req *http.Request) error {
-		scheme := req.URL.Scheme
-		for _, s := range r.notSchemes {
-			if s == scheme {
-				return fmt.Errorf("the scheme '%s' is not allowed", scheme)
-			}
-		}
-		return nil
-	}
-}
-
 func (r *Route) buildMatcherMiddleware() Middleware {
 	ms := []Matcher{
-		r.buildHasHeadersMatcher(),
-		r.buildNotHeadersMatcher(),
-		r.buildHasSchemesMatcher(),
-		r.buildNotSchemesMatcher(),
+		r.buildHeadersMatcher(),
+		r.buildSchemesMatcher(),
 	}
 
 	matchers := make([]Matcher, 0, len(r.matchers)+4)
