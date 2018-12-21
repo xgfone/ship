@@ -11,6 +11,11 @@ type MuxRender struct {
 	renders map[string]Renderer
 }
 
+// NewMuxRender returns a new MuxRender.
+func NewMuxRender() *MuxRender {
+	return &MuxRender{renders: make(map[string]Renderer, 8)}
+}
+
 func (mr *MuxRender) fmtSuffix(suffix string) string {
 	if s := path.Ext(suffix); s != "" {
 		suffix = s[1:]

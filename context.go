@@ -452,28 +452,6 @@ func (c *context) Render(name string, code int, data interface{}) error {
 	return c.renderer.Render(c, name, code, data)
 }
 
-func (c *context) writeContentType(value string) {
-	header := c.resp.Header()
-	if header.Get(HeaderContentType) == "" {
-		header.Set(HeaderContentType, value)
-	}
-}
-
-// HTML sends an HTTP response with status code.
-func (c *context) HTML(code int, html string) error {
-	return c.HTMLBlob(code, []byte(html))
-}
-
-// HTMLBlob sends an HTTP blob response with status code.
-func (c *context) HTMLBlob(code int, b []byte) error {
-	return c.Blob(code, MIMETextHTMLCharsetUTF8, b)
-}
-
-// String sends a string response with status code.
-func (c *context) String(code int, s string) error {
-	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(s))
-}
-
 // JSON sends a JSON response with status code.
 func (c *context) JSON(code int, i interface{}) error {
 	b, err := json.Marshal(i)
@@ -549,6 +527,28 @@ func (c *context) XMLBlob(code int, b []byte) (err error) {
 	}
 	_, err = c.resp.Write(b)
 	return
+}
+
+// HTML sends an HTTP response with status code.
+func (c *context) HTML(code int, html string) error {
+	return c.HTMLBlob(code, []byte(html))
+}
+
+// HTMLBlob sends an HTTP blob response with status code.
+func (c *context) HTMLBlob(code int, b []byte) error {
+	return c.Blob(code, MIMETextHTMLCharsetUTF8, b)
+}
+
+// String sends a string response with status code.
+func (c *context) String(code int, s string) error {
+	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(s))
+}
+
+func (c *context) writeContentType(value string) {
+	header := c.resp.Header()
+	if header.Get(HeaderContentType) == "" {
+		header.Set(HeaderContentType, value)
+	}
 }
 
 // Blob sends a blob response with status code and content type.

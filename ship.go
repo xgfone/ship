@@ -23,6 +23,7 @@ import (
 
 	"github.com/xgfone/ship/binder"
 	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship/render"
 	"github.com/xgfone/ship/router/echo"
 )
 
@@ -79,8 +80,30 @@ type Config struct {
 	// which is `NewBinder()` by default.
 	// But you can appoint yourself customized Binder implementation
 	Binder Binder
-	// Rendered is used to render the response to the peer, which has no
-	// the default implementation.
+	// Rendered is used to render the response to the peer.
+	//
+	// The default is MuxRender, and adds some renderer, for example,
+	// json, jsonpretty, xml, xmlpretty, etc, as follow.
+	//
+	//     renderer := NewMuxRender()
+	//     renderer.Add("json", render.JSON())
+	//     renderer.Add("jsonpretty", render.JSONPretty("    "))
+	//     renderer.Add("xml", render.XML())
+	//     renderer.Add("xmlpretty", render.XMLPretty("    "))
+	//
+	// So you can use it by the four ways:
+	//
+	//     renderer.Render(ctx, "json", 200, data)
+	//     renderer.Render(ctx, "jsonpretty", 200, data)
+	//     renderer.Render(ctx, "xml", 200, data)
+	//     renderer.Render(ctx, "xmlpretty", 200, data)
+	//
+	// You can use the default, then add yourself renderer as follow.
+	//
+	///    router := New()
+	//     mr := router.MuxRender()
+	//     mr.Add("html", HtmlRenderer
+	//
 	Renderer Renderer
 
 	// Create a new router, which uses echo implementation by default.
@@ -128,6 +151,15 @@ func (c *Config) init(s *Ship) {
 
 	if c.Binder == nil {
 		c.Binder = binder.NewBinder()
+	}
+
+	if c.Renderer == nil {
+		mr := NewMuxRender()
+		mr.Add("json", render.JSON())
+		mr.Add("jsonpretty", render.JSONPretty("    "))
+		mr.Add("xml", render.XML())
+		mr.Add("xmlpretty", render.XMLPretty("    "))
+		c.Renderer = mr
 	}
 
 	if c.NewRouter == nil {
@@ -191,6 +223,21 @@ func (s *Ship) VHost(host string) *Ship {
 // Logger returns the inner Logger
 func (s *Ship) Logger() Logger {
 	return s.config.Logger
+}
+
+// Renderer returns the inner Renderer.
+func (s *Ship) Renderer() Renderer {
+	return s.config.Renderer
+}
+
+// MuxRender check whether the inner Renderer is MuxRender.
+//
+// If yes, return it as "*MuxRender"; or return nil.
+func (s *Ship) MuxRender() *MuxRender {
+	if mr, ok := s.config.Renderer.(*MuxRender); ok {
+		return mr
+	}
+	return nil
 }
 
 // NewContext news and returns a Context.
