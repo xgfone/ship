@@ -1,0 +1,4 @@
+github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 h1:ZHx2BEERvWkuwuE7qWN9TuRxucHDH2JrsvneZjVJfo0=
+github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0/go.mod h1:rE0ErqqBaMcp9pzj8JxV1GcfDBpuypXYxlR1c37AUwg=
+github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5 h1:rhqTjzJlm7EbkELJDKMTU7udov+Se0xZkWmugr6zGok=
+github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
