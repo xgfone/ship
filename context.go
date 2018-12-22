@@ -86,6 +86,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    SetCookie(cookie *http.Cookie)
 //
 //    // Get and Set are used to store the key-value information about the context.
+//    Store() map[string]interface{}
 //    Get(key string) (value interface{})
 //    Set(key string, value interface{})
 //    Del(key string)
@@ -262,6 +263,10 @@ func (c *context) URLParamValues() []string {
 	}
 
 	return nil
+}
+
+func (c *context) Store() map[string]interface{} {
+	return c.store
 }
 
 // Get retrieves data from the context.

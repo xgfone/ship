@@ -67,6 +67,7 @@ type Context interface {
 	SetCookie(cookie *http.Cookie)
 
 	// Get and Set are used to store the key-value information about the context.
+	Store() map[string]interface{}
 	Get(key string) (value interface{})
 	Set(key string, value interface{})
 	Del(key string)
