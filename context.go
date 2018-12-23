@@ -393,7 +393,9 @@ func (c *context) ContentType() (ct string) {
 }
 
 func (c *context) SetContentType(contentType string) {
-	c.SetHeader(HeaderContentType, contentType)
+	if contentType != "" {
+		c.SetHeader(HeaderContentType, contentType)
+	}
 }
 
 func (c *context) ContentLength() int64 {
