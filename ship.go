@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -26,6 +27,7 @@ import (
 	"github.com/xgfone/ship/core"
 	"github.com/xgfone/ship/render"
 	"github.com/xgfone/ship/router/echo"
+	"github.com/xgfone/ship/utils"
 )
 
 // Router is the alias of core.Router, which is used to manage the routes.
@@ -63,6 +65,11 @@ type Config struct {
 
 	// If true, it won't remove the trailing slash from the registered url path.
 	KeepTrailingSlashPath bool
+
+	// The size of the the buffer initialized by the buffer pool.
+	//
+	// The default is 2KB.
+	BufferSize int
 
 	// It is the default mapping to map the method into router. The default is
 	//
@@ -132,6 +139,10 @@ type Config struct {
 func (c *Config) init(s *Ship) {
 	c.Prefix = strings.TrimSuffix(c.Prefix, "/")
 
+	if c.BufferSize <= 0 {
+		c.BufferSize = 2048
+	}
+
 	if c.DefaultMethodMapping == nil {
 		c.DefaultMethodMapping = map[string]string{
 			"Create": "POST",
@@ -179,6 +190,7 @@ func (c *Config) init(s *Ship) {
 type Ship struct {
 	config  Config
 	ctxpool sync.Pool
+	bufpool utils.BufferPool
 	maxNum  int
 
 	prehandler     Handler
@@ -198,6 +210,7 @@ func New(config ...Config) *Ship {
 
 	s.config.init(s)
 	s.prehandler = NothingHandler()
+	s.bufpool = utils.NewBufferPool(s.config.BufferSize)
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
 	s.router = s.config.NewRouter()
 	s.vhosts = make(map[string]*Ship)
@@ -266,6 +279,16 @@ func (s *Ship) ReleaseContext(c Context) {
 		c.(*context).reset()
 		s.ctxpool.Put(c)
 	}
+}
+
+// AcquireBuffer gets a Buffer from the pool.
+func (s *Ship) AcquireBuffer() *bytes.Buffer {
+	return s.bufpool.Get()
+}
+
+// ReleaseBuffer puts a Buffer into the pool.
+func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
+	s.bufpool.Put(buf)
 }
 
 // Pre registers the Pre-middlewares, which are executed before finding the route.
