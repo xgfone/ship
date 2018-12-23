@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -51,6 +52,9 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    FindHandler(method string, path string) Handler
 //
 //    NotFoundHandler() Handler
+//
+//    AcquireBuffer() *bytes.Buffer
+//    ReleaseBuffer(*bytes.Buffer)
 //
 //    Request() *http.Request
 //    Response() http.ResponseWriter
@@ -208,6 +212,14 @@ func (c *context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.resp.ResponseWriter = w
 	c.resp.ctx = c
+}
+
+func (c *context) AcquireBuffer() *bytes.Buffer {
+	return c.ship.AcquireBuffer()
+}
+
+func (c *context) ReleaseBuffer(buf *bytes.Buffer) {
+	c.ship.ReleaseBuffer(buf)
 }
 
 // URL generates an URL from route name and provided parameters.

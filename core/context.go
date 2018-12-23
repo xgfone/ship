@@ -15,6 +15,7 @@
 package core
 
 import (
+	"bytes"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -32,6 +33,9 @@ type Context interface {
 	FindHandler(method string, path string) Handler
 
 	NotFoundHandler() Handler
+
+	AcquireBuffer() *bytes.Buffer
+	ReleaseBuffer(*bytes.Buffer)
 
 	Request() *http.Request
 	Response() http.ResponseWriter
