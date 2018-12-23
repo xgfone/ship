@@ -49,9 +49,11 @@ type Context interface {
 	Header(name string) (value string)
 	SetHeader(name string, value string)
 
-	URLParams() map[string]string
-	URLParamValues() []string
-	URLParamByName(name string) (value string)
+	// URL Parameter. We remove the URL prefix for the convenience.
+	Param(name string) (value string)
+	Params() map[string]string // Return the key-value map of the url parameters
+	ParamNames() []string      // Return the list of the url parameter names
+	ParamValues() []string     // Return the list of the url parameter values
 
 	Scheme() string
 	RealIP() string

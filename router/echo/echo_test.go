@@ -25,7 +25,7 @@ func TestRouter(t *testing.T) {
 	router := NewRouter(nil, nil)
 	router.Add("static", "/static", "GET", func(ctx core.Context) error { return ctx.String(200, "STATIC") })
 	router.Add("param", "/test/:name", "POST", func(ctx core.Context) error {
-		return ctx.String(200, fmt.Sprintf("hello %s", ctx.URLParamByName("name")))
+		return ctx.String(200, fmt.Sprintf("hello %s", ctx.Param("name")))
 	})
 
 	router.Each(func(name, method, path string) {

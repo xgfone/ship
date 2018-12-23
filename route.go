@@ -467,7 +467,7 @@ func (r *Route) StaticFS(fs http.FileSystem) *Route {
 	rpath := path.Join(r.path, "/*filepath")
 
 	r.addRoute("", rpath, func(ctx Context) error {
-		filepath := ctx.URLParamByName("filepath")
+		filepath := ctx.Param("filepath")
 		if _, err := fs.Open(filepath); err != nil {
 			return ctx.NotFoundHandler()(ctx)
 		}

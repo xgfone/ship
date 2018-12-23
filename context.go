@@ -69,9 +69,11 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Header(name string) (value string)
 //    SetHeader(name string, value string)
 //
-//    URLParams() map[string]string
-//    URLParamValues() []string
-//    URLParamByName(name string) (value string)
+//    // URL Parameter. We remove the URL prefix for the convenience.
+//    Param(name string) (value string)
+//    Params() map[string]string // Return the key-value map of the url parameters
+//    ParamNames() []string      // Return the list of the url parameter names
+//    ParamValues() []string     // Return the list of the url parameter values
 //
 //    Scheme() string
 //    RealIP() string
@@ -243,8 +245,8 @@ func (c *context) IsResponse() bool {
 	return c.wrote
 }
 
-// URLParamByName returns the parameter in the url path by name.
-func (c *context) URLParamByName(name string) string {
+// Param returns the parameter value in the url path by name.
+func (c *context) Param(name string) string {
 	_len := len(c.pnames)
 	for i := 0; i < _len; i++ {
 		if len(c.pnames[i]) == 0 {
@@ -256,8 +258,8 @@ func (c *context) URLParamByName(name string) string {
 	return ""
 }
 
-// URLParams returns all the parameters in the url path.
-func (c *context) URLParams() map[string]string {
+// Params returns all the parameters as the key-value map in the url path.
+func (c *context) Params() map[string]string {
 	_len := len(c.pnames)
 	ms := make(map[string]string, _len)
 	for i := 0; i < _len; i++ {
@@ -269,14 +271,23 @@ func (c *context) URLParams() map[string]string {
 	return ms
 }
 
-func (c *context) URLParamValues() []string {
+func (c *context) ParamNames() []string {
+	_len := len(c.pnames)
+	for i := 0; i < _len; i++ {
+		if c.pnames[i] == "" {
+			return c.pnames[:i]
+		}
+	}
+	return nil
+}
+
+func (c *context) ParamValues() []string {
 	_len := len(c.pnames)
 	for i := 0; i < _len; i++ {
 		if c.pnames[i] == "" {
 			return c.pvalues[:i]
 		}
 	}
-
 	return nil
 }
 

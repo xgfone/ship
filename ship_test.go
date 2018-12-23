@@ -36,7 +36,7 @@ var defaultHandler = func(ctx Context) (err error) {
 
 var idHandler = func(ctx Context) (err error) {
 	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.URLParamByName("id"))); err != nil {
+	if _, err = resp.Write([]byte(ctx.Param("id"))); err != nil {
 		code := http.StatusInternalServerError
 		err = NewHTTPError(code).SetInnerError(err)
 	}
@@ -45,8 +45,7 @@ var idHandler = func(ctx Context) (err error) {
 
 var params2Handler = func(ctx Context) (err error) {
 	resp := ctx.Response()
-	get := ctx.URLParamByName
-	if _, err = resp.Write([]byte(get("p1") + "|" + get("p2"))); err != nil {
+	if _, err = resp.Write([]byte(ctx.Param("p1") + "|" + ctx.Param("p2"))); err != nil {
 		code := http.StatusInternalServerError
 		err = NewHTTPError(code).SetInnerError(err)
 	}
