@@ -14,8 +14,11 @@
 
 package core
 
+import "io"
+
 // Logger stands for a logger.
 type Logger interface {
+	Writer() io.Writer
 	Debug(foramt string, args ...interface{})
 	Info(foramt string, args ...interface{})
 	Warn(foramt string, args ...interface{})
