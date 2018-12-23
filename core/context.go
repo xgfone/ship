@@ -56,6 +56,9 @@ type Context interface {
 	Scheme() string
 	RealIP() string
 	ContentType() string
+	ContentLength() int64
+	GetBody() (string, error)
+	SetContentType(string)
 
 	QueryParam(name string) (value string)
 	QueryParams() url.Values

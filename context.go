@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship/utils"
 )
 
 var (
@@ -75,6 +76,8 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Scheme() string
 //    RealIP() string
 //    ContentType() string
+//    ContentLength() int64
+//    GetBody() (string, error)
 //
 //    QueryParam(name string) (value string)
 //    QueryParams() url.Values
@@ -336,6 +339,14 @@ func (c *context) SetResponse(resp http.ResponseWriter) {
 	}
 }
 
+func (c *context) GetBody() (string, error) {
+	buf := c.AcquireBuffer()
+	err := utils.ReadNBuffer(buf, c.req.Body, c.req.ContentLength)
+	body := buf.String()
+	c.ReleaseBuffer(buf)
+	return body, err
+}
+
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
 func (c *context) Scheme() (scheme string) {
 	// Can't use `r.Request.URL.Scheme`
@@ -374,11 +385,19 @@ func (c *context) RealIP() string {
 }
 
 func (c *context) ContentType() (ct string) {
-	ct = c.req.Header.Get("Content-Type")
+	ct = c.req.Header.Get(HeaderContentType)
 	if index := strings.IndexAny(ct, " ;"); index > 0 {
 		ct = ct[:index]
 	}
 	return
+}
+
+func (c *context) SetContentType(contentType string) {
+	c.SetHeader(HeaderContentType, contentType)
+}
+
+func (c *context) ContentLength() int64 {
+	return c.req.ContentLength
 }
 
 func (c *context) Header(name string) string {
