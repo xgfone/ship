@@ -16,12 +16,16 @@ package ship
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/xgfone/ship/binder"
 	"github.com/xgfone/ship/core"
@@ -80,6 +84,19 @@ type Config struct {
 	//         "Get":    "GET",
 	//     }
 	DefaultMethodMapping map[string]string
+
+	// The signal set that built-in http server will wrap and handle.
+	// The default is
+	//
+	//     []os.Signal{
+	//         os.Interrupt,
+	//         syscall.SIGTERM,
+	//         syscall.SIGQUIT,
+	//         syscall.SIGABRT,
+	//         syscall.SIGINT,
+	//     }
+	//
+	Signals []os.Signal
 
 	// BindQuery binds the request query to v.
 	BindQuery func(queries url.Values, v interface{}) error
@@ -152,6 +169,16 @@ func (c *Config) init(s *Ship) {
 		}
 	}
 
+	if c.Signals == nil {
+		c.Signals = []os.Signal{
+			os.Interrupt,
+			syscall.SIGTERM,
+			syscall.SIGQUIT,
+			syscall.SIGABRT,
+			syscall.SIGINT,
+		}
+	}
+
 	if c.Logger == nil {
 		c.Logger = NewNoLevelLogger(os.Stdout)
 	}
@@ -199,6 +226,8 @@ type Ship struct {
 
 	router Router
 	vhosts map[string]*Ship
+	server *http.Server
+	stopfs []func()
 }
 
 // New returns a new Ship.
@@ -408,4 +437,71 @@ func (s *Ship) handleError(ctx Context, err error) {
 			logger.Error("%s", err.Error())
 		}
 	}
+}
+
+// Shutdown stops the HTTP server.
+func (s *Ship) Shutdown(ctx context.Context) error {
+	if s.server == nil {
+		return fmt.Errorf("the server has not been stopped")
+	}
+	return s.server.Shutdown(ctx)
+}
+
+// RegisterOnShutdown registers a function to run when the http server is shut down.
+func (s *Ship) RegisterOnShutdown(f func()) {
+	s.stopfs = append(s.stopfs, f)
+}
+
+// Start starts a HTTP server with addr.
+//
+// If tlsFile is not nil, it must be certFile and keyFile. That's,
+//
+//     router := ship.New()
+//     rouetr.Start(addr, certFile, keyFile)
+//
+func (s *Ship) Start(addr string, tlsFiles ...string) error {
+	var cert, key string
+	if len(tlsFiles) == 2 && tlsFiles[0] != "" && tlsFiles[1] != "" {
+		cert = tlsFiles[0]
+		key = tlsFiles[1]
+	}
+	return s.startServer(&http.Server{Addr: addr}, cert, key)
+}
+
+// StartServer starts a HTTP server.
+func (s *Ship) StartServer(server *http.Server) error {
+	return s.startServer(server, "", "")
+}
+
+func (s *Ship) handleSignals(sigs ...os.Signal) {
+	ss := make(chan os.Signal, 1)
+	signal.Notify(ss, sigs...)
+	for {
+		<-ss
+		s.server.Shutdown(context.Background())
+	}
+}
+
+func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
+	server.ErrorLog = log.New(s.config.Logger.Writer(), "",
+		log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	if server.Handler == nil {
+		server.Handler = s
+	}
+
+	// Handle the signal
+	if len(s.config.Signals) > 0 {
+		go s.handleSignals(s.config.Signals...)
+	}
+
+	for _, f := range s.stopfs {
+		server.RegisterOnShutdown(f)
+	}
+
+	s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
+	s.server = server
+	if certFile != "" && keyFile != "" {
+		return server.ListenAndServeTLS(certFile, keyFile)
+	}
+	return server.ListenAndServe()
 }
