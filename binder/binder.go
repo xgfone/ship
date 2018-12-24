@@ -64,13 +64,7 @@ var globalBinder = &defaultBinder{}
 func (b *defaultBinder) Bind(ctx core.Context, v interface{}) (err error) {
 	req := ctx.Request()
 	if req.ContentLength == 0 {
-		if req.Method == http.MethodGet || req.Method == http.MethodDelete {
-			if err = b.bindData(v, ctx.QueryParams(), "query"); err != nil {
-				return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-			}
-			return
-		}
-		return core.NewHTTPError(http.StatusBadRequest, "Request body can't be empty")
+		return core.NewHTTPError(http.StatusBadRequest, "request body can't be empty")
 	}
 	ctype := req.Header.Get("Content-Type")
 	switch {
