@@ -268,7 +268,7 @@ func (s *Ship) NewContext(r *http.Request, w http.ResponseWriter) Context {
 
 // AcquireContext gets a Context from the pool.
 func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) Context {
-	c := s.ctxpool.Get().(*context)
+	c := s.ctxpool.Get().(*contextT)
 	c.setReqResp(r, w)
 	return c
 }
@@ -276,7 +276,7 @@ func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) Context {
 // ReleaseContext puts a Context into the pool.
 func (s *Ship) ReleaseContext(c Context) {
 	if c != nil {
-		c.(*context).reset()
+		c.(*contextT).reset()
 		s.ctxpool.Put(c)
 	}
 }
@@ -363,7 +363,7 @@ func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
 	var err error
-	var ctx = s.AcquireContext(r, w).(*context)
+	var ctx = s.AcquireContext(r, w).(*contextT)
 
 	if err = s.prehandler(ctx); err == nil {
 		h := router.Find(r.Method, r.URL.Path, ctx.pnames, ctx.pvalues)
@@ -386,10 +386,10 @@ func (s *Ship) handleError(ctx Context, err error) {
 		code := he.Code()
 		ct := he.ContentType()
 		msg := he.Message()
-		if ctx.IsDebug() {
+		if 400 <= code && code < 500 {
+			msg = fmt.Sprintf("%s: %s", msg, err.Error())
+		} else if code >= 500 && ctx.IsDebug() {
 			msg = err.Error()
-		} else if len(msg) == 0 {
-			msg = http.StatusText(code)
 		}
 
 		if ie := he.InnerError(); ie != nil {

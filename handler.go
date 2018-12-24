@@ -47,7 +47,7 @@ func newHTTPHandlerBridge(s *Ship, h Handler) httpHandlerBridge {
 }
 
 func (h httpHandlerBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := h.ship.AcquireContext(r, w).(*context)
+	ctx := h.ship.AcquireContext(r, w).(*contextT)
 	ctx.setShip(h.ship)
 	if h.Handler == nil {
 		h.ship.config.NotFoundHandler(ctx)
