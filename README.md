@@ -38,7 +38,10 @@ func main() {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
 	})
 
-	http.ListenAndServe(":8080", router)
+	// Start the HTTP server.
+	router.Start(":8080")
+	// or
+	// http.ListenAndServe(":8080", router)
 }
 ```
 
@@ -65,6 +68,11 @@ type Config struct {
 	// If true, it won't remove the trailing slash from the registered url path.
 	KeepTrailingSlashPath bool
 
+	// The size of the the buffer initialized by the buffer pool.
+	//
+	// The default is 2KB.
+	BufferSize int
+
 	// It is the default mapping to map the method into router. The default is
 	//
 	//     map[string]string{
@@ -75,9 +83,20 @@ type Config struct {
 	//     }
 	DefaultMethodMapping map[string]string
 
-    // BindQuery binds the request query to v.
-    //
-    // The default is binder.BindQuery().
+	// The signal set that built-in http server will wrap and handle.
+	// The default is
+	//
+	//     []os.Signal{
+	//         os.Interrupt,
+	//         syscall.SIGTERM,
+	//         syscall.SIGQUIT,
+	//         syscall.SIGABRT,
+	//         syscall.SIGINT,
+	//     }
+	//
+	Signals []os.Signal
+
+	// BindQuery binds the request query to v.
 	BindQuery func(queries url.Values, v interface{}) error
 
 	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
@@ -164,7 +183,8 @@ func main() {
     router.Route("/path/option").OPTIONS(optionHandler)
     router.Route("/path/connect").CONNECT(connectHandler)
 
-    http.ListenAndServe(":8080", router)
+    // Start the HTTP server.
+    router.Start(":8080")
 }
 ```
 
@@ -179,7 +199,8 @@ func main() {
     router := ship.New()
     router.R("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
 
-    http.ListenAndServe(":8080", router)
+    // Start the HTTP server.
+    router.Start(":8080")
 }
 ```
 
@@ -194,7 +215,8 @@ func main() {
         "DELETE": deleteHandler,
     })
 
-    http.ListenAndServe(":8080", router)
+    // Start the HTTP server.
+    router.Start(":8080")
 }
 ```
 
@@ -209,7 +231,8 @@ func main() {
         fmt.Println(ctx.URL("get_url", ctx.URLParamValues()))
     })
 
-    http.ListenAndServe(":8080", router)
+    // Start the HTTP server.
+    router.Start(":8080")
 }
 ```
 
@@ -223,7 +246,8 @@ func main() {
     router.R("/path1").Schemes("https", "wss").GET(handler)
     router.R("/path2").Headers("Content-Type", "application/json").POST(handler)
 
-    http.ListenAndServe(":8080", router)
+    // Start the HTTP server.
+    router.Start(":8080")
 }
 ```
 
@@ -249,10 +273,8 @@ func (t TestType) NotHandler()              {}
 
 func main() {
     router := ship.New()
-
     router.Route("/v1").MapType(TestType{})
-
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -307,13 +329,10 @@ import (
 
 func main() {
     router := ship.New()
-
     router.Use(middleware.Logger(), middleware.Recover())
     router.Use(MyAuthMiddleware())
-
     router.Route("/url/path").GET(handler)
-
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -342,8 +361,7 @@ func main() {
     router.Use(middleware.Recover())
 
     router.Route("/url/path").GET(handler)
-
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -378,7 +396,7 @@ func main() {
     v2.Use(MyAuthMiddleware())
     v2.Route("/post/path").POST(postHandler)
 
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -398,7 +416,7 @@ func main() {
         // post_name POST /post/path
     })
 
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -415,7 +433,7 @@ func main() {
     vhost2 := router.VHost("host2.example.com")
     vhost2.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost2") })
 
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -457,7 +475,7 @@ func main() {
         ...
     })
 
-    http.ListenAndServe(":8080", router)
+    router.Start(":8080")
 }
 ```
 
@@ -517,7 +535,8 @@ func main() {
 	// For others
 	// ...
 
-	http.ListenAndServe(":8080", router)
+	// Start the HTTP server.
+	router.Start(":8080")
 }
 
 ```
