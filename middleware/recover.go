@@ -34,7 +34,7 @@ func Recover(handle ...func(ship.Context, interface{})) Middleware {
 	}
 
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) (err error) {
+		return func(ctx ship.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
 					handlePanic(ctx, err)

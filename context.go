@@ -162,6 +162,7 @@ type contextT struct {
 	binder   Binder
 	renderer Renderer
 	binderQ  func(url.Values, interface{}) error
+	router   Router
 
 	store map[string]interface{}
 }
@@ -192,6 +193,7 @@ func (c *contextT) reset() {
 	c.resp.ctx = nil
 	c.query = nil
 	c.wrote = false
+	c.router = nil
 
 	c.resetURLParam()
 	for key := range c.store {

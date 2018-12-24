@@ -24,8 +24,6 @@ import (
 const middlewareoutput = `
 pre m1 start
 pre m2 start
-pre m2 end
-pre m1 end
 use m1 start
 use m2 start
 group m1 start
@@ -38,6 +36,8 @@ group m2 end
 group m1 end
 use m2 end
 use m1 end
+pre m2 end
+pre m1 end
 `
 
 func TestMiddleware(t *testing.T) {

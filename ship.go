@@ -193,7 +193,7 @@ type Ship struct {
 	bufpool utils.BufferPool
 	maxNum  int
 
-	prehandler     Handler
+	handler        Handler
 	premiddlewares []Middleware
 	middlewares    []Middleware
 
@@ -209,7 +209,7 @@ func New(config ...Config) *Ship {
 	}
 
 	s.config.init(s)
-	s.prehandler = NothingHandler()
+	s.handler = s.handleRequestMiddleware(NothingHandler())
 	s.bufpool = utils.NewBufferPool(s.config.BufferSize)
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
 	s.router = s.config.NewRouter()
@@ -295,11 +295,11 @@ func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 func (s *Ship) Pre(middlewares ...Middleware) {
 	s.premiddlewares = append(s.premiddlewares, middlewares...)
 
-	handler := NothingHandler()
+	handler := s.handleRequestMiddleware(NothingHandler())
 	for i := len(s.premiddlewares) - 1; i >= 0; i-- {
 		handler = s.premiddlewares[i](handler)
 	}
-	s.prehandler = handler
+	s.handler = handler
 }
 
 // Use registers the global middlewares.
@@ -361,18 +361,21 @@ func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handleRequest(s.router, w, r)
 }
 
-func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
-	var err error
-	var ctx = s.AcquireContext(r, w).(*contextT)
-
-	if err = s.prehandler(ctx); err == nil {
-		h := router.Find(r.Method, r.URL.Path, ctx.pnames, ctx.pvalues)
-		if h == nil {
-			err = s.config.NotFoundHandler(ctx)
-		} else {
-			err = h(ctx)
+func (s *Ship) handleRequestMiddleware(next Handler) Handler {
+	return func(ctx Context) error {
+		c := ctx.(*contextT)
+		h := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+		if h != nil {
+			return h(ctx)
 		}
+		return s.config.NotFoundHandler(ctx)
 	}
+}
+
+func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
+	ctx := s.AcquireContext(r, w).(*contextT)
+	ctx.router = router
+	err := s.handler(ctx)
 
 	if err != nil {
 		s.config.HandleError(ctx, err)
@@ -387,7 +390,7 @@ func (s *Ship) handleError(ctx Context, err error) {
 		ct := he.ContentType()
 		msg := he.Message()
 		if 400 <= code && code < 500 {
-			msg = fmt.Sprintf("%s: %s", msg, err.Error())
+			msg = err.Error()
 		} else if code >= 500 && ctx.IsDebug() {
 			msg = err.Error()
 		}

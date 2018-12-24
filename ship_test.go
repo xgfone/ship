@@ -954,7 +954,7 @@ func TestRouteMatcher(t *testing.T) {
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Equal(t, "Not Found", rec.Body.String())
+	assert.Equal(t, "code=404, msg=Not Found, err=missing the header 'Content-Type'", rec.Body.String())
 }
 
 func TestContextBindQuery(t *testing.T) {

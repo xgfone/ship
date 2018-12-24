@@ -78,7 +78,10 @@ func (he httpError) Message() string {
 }
 
 func (he httpError) Error() string {
-	return fmt.Sprintf("code=%d, msg=%s", he.code, he.msg)
+	if he.err == nil {
+		return fmt.Sprintf("code=%d, msg=%s", he.code, he.msg)
+	}
+	return fmt.Sprintf("code=%d, msg=%s, err=%s", he.code, he.msg, he.err.Error())
 }
 
 func (he httpError) ContentType() string {
