@@ -591,12 +591,12 @@ func main() {
 
 ## TODO
 
-- [x] Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host). We use the **Virtual Host** instead.
-- [x] Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries). We use `Matcher` to operate it.
+- [x] Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host). _We use the **Virtual Host** instead._
+- [x] Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries). _We use `Matcher` to operate it._
 - [ ] Add JWT middleware.
 - [ ] Add OAuth 2.0 middleware.
 - [ ] Add CORS middlware.
 - [x] Add HTML template render.
-- [ ] Add the serialization and deserialization middleware.
+- [x] Add the serialization and deserialization middleware. _We use `Binder` and `Renderer`._
 - [x] Give the more capacity to the default binder.
 - [ ] Add the `httprouter` router implementation.
