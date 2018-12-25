@@ -428,10 +428,6 @@ func (s *Ship) handleError(ctx Context, err error) {
 			msg = err.Error()
 		}
 
-		if ie := he.InnerError(); ie != nil {
-			err = fmt.Errorf("%s, %s", err.Error(), ie.Error())
-		}
-
 		ctx.Blob(code, ct, []byte(msg))
 	}
 
