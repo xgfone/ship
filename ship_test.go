@@ -973,3 +973,21 @@ func TestContextBindQuery(t *testing.T) {
 	assert.Equal(t, "xyz", vs.A)
 	assert.Equal(t, 2, vs.B)
 }
+
+func TestContextAccept(t *testing.T) {
+	expected := []string{"text/html", "application/xhtml+xml", "image/webp", "application/", ""}
+	var accepts []string
+	s := New()
+	s.R("/path").GET(func(ctx Context) error {
+		accepts = ctx.Accept()
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/path", nil)
+	req.Header.Set(HeaderAccept, "text/html, application/xhtml+xml, application/*;q=0.9, image/webp, */*;q=0.8")
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, expected, accepts)
+}

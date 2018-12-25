@@ -26,6 +26,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/xgfone/ship/core"
@@ -358,6 +360,58 @@ func (c *contextT) GetBody() (string, error) {
 	body := buf.String()
 	c.ReleaseBuffer(buf)
 	return body, err
+}
+
+type acceptT struct {
+	ct string
+	q  float64
+}
+
+func (c *contextT) Accept() []string {
+	accept := c.req.Header.Get(HeaderAccept)
+	if accept == "" {
+		return nil
+	}
+
+	ss := strings.Split(accept, ",")
+	accepts := make([]acceptT, 0, len(ss))
+	for _, s := range ss {
+		q := 1.0
+		if k := strings.IndexByte(s, ';'); k > 0 {
+			qs := s[k+1:]
+			s = s[:k]
+
+			if j := strings.IndexByte(qs, '='); j > 0 {
+				if qs = qs[j+1:]; qs == "" {
+					continue
+				}
+				if v, _ := strconv.ParseFloat(qs, 32); v > 1.0 || v <= 0.0 {
+					continue
+				} else {
+					q = v
+				}
+			} else {
+				continue
+			}
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		} else if s == "*/*" {
+			s = ""
+		} else if strings.HasSuffix(s, "/*") {
+			s = s[:len(s)-1]
+		}
+		accepts = append(accepts, acceptT{ct: s, q: -q})
+	}
+
+	sort.SliceStable(accepts, func(i, j int) bool { return accepts[i].q < accepts[j].q })
+
+	results := make([]string, len(accepts))
+	for i := range accepts {
+		results[i] = accepts[i].ct
+	}
+	return results
 }
 
 // Scheme returns the HTTP protocol scheme, `http` or `https`.

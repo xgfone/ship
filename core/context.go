@@ -55,6 +55,18 @@ type Context interface {
 	ParamNames() []string      // Return the list of the url parameter names
 	ParamValues() []string     // Return the list of the url parameter values
 
+	// Accept returns the content of the header Accept.
+	//
+	// If there is no the header Accept , it return nil.
+	//
+	// Notice:
+	//
+	//   1. It will sort the content by the q-factor weighting.
+	//   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
+	//      So you can use it to match the prefix.
+	//   3. If the value is "*/*", it will be amended as "".
+	//
+	Accept() []string
 	Scheme() string
 	RealIP() string
 	ContentType() string
