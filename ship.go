@@ -61,6 +61,9 @@ type Matcher func(*http.Request) error
 
 // Config is used to configure the router used by the default implementation.
 type Config struct {
+	// The name of the router, which is used when starting the http server.
+	Name string
+
 	// The route prefix, which is "" by default.
 	Prefix string
 
@@ -499,7 +502,13 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 		server.RegisterOnShutdown(f)
 	}
 
-	s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
+	if s.config.Name == "" {
+		s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
+	} else {
+		s.config.Logger.Info("The HTTP Server [%s] is running on %s",
+			s.config.Name, server.Addr)
+	}
+
 	s.server = server
 	if certFile != "" && keyFile != "" {
 		return server.ListenAndServeTLS(certFile, keyFile)
