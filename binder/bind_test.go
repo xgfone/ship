@@ -198,7 +198,7 @@ func TestBindQueryParams(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := ship.New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.Bind(u)
+	err := ctx.BindQuery(u)
 	if err == nil {
 		assert.Equal(t, 1, u.ID)
 		assert.Equal(t, "Jon Snow", u.Name)
@@ -212,7 +212,7 @@ func TestBindQueryParamsCaseInsensitive(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := ship.New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.Bind(u)
+	err := ctx.BindQuery(u)
 	if err == nil {
 		assert.Equal(t, 1, u.ID)
 		assert.Equal(t, "Jon Snow", u.Name)
@@ -226,7 +226,7 @@ func TestBindQueryParamsCaseSensitivePrioritized(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := ship.New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.Bind(u)
+	err := ctx.BindQuery(u)
 	if err == nil {
 		assert.Equal(t, 1, u.ID)
 		assert.Equal(t, "Jon Doe", u.Name)
@@ -265,7 +265,7 @@ func TestBindUnmarshalBindPtr(t *testing.T) {
 	result := struct {
 		Tptr *Timestamp `query:"ts"`
 	}{}
-	err := ctx.Bind(&result)
+	err := ctx.BindQuery(&result)
 	if err == nil {
 		assert.Equal(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), *result.Tptr)
 	} else {

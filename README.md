@@ -94,6 +94,7 @@ type Config struct {
 	//         syscall.SIGINT,
 	//     }
 	//
+	// In order to disable the signals, you can set it to []os.Signal{}.
 	Signals []os.Signal
 
 	// BindQuery binds the request query to v.
