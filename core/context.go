@@ -23,6 +23,9 @@ import (
 )
 
 // Context stands for a context interface.
+//
+// This interface will be used by the built-in implementation of this project.
+// And at the moment this project does not support the customized implementation.
 type Context interface {
 	// Report whether the response has been sent.
 	IsResponse() bool
