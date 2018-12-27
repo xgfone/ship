@@ -251,7 +251,13 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 		middlewares = append(middlewares, matcherMiddleware)
 	}
 
-	for i := len(middlewares) - 1; i >= 0; i-- {
+	middlewaresLen := len(middlewares)
+	if middlewaresLen > r.ship.config.MiddlewareMaxNum {
+		panic(fmt.Errorf("the number of middlewares '%d' has exceeded the maximum '%d'",
+			middlewaresLen, r.ship.config.MiddlewareMaxNum))
+	}
+
+	for i := middlewaresLen - 1; i >= 0; i-- {
 		handler = middlewares[i](handler)
 	}
 

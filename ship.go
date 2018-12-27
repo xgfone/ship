@@ -78,6 +78,9 @@ type Config struct {
 	// The default is 2KB.
 	BufferSize int
 
+	// The maximum number of the middlewares, which is 256 by default.
+	MiddlewareMaxNum int
+
 	// It is the default mapping to map the method into router. The default is
 	//
 	//     map[string]string{
@@ -162,6 +165,10 @@ func (c *Config) init(s *Ship) {
 
 	if c.BufferSize <= 0 {
 		c.BufferSize = 2048
+	}
+
+	if c.MiddlewareMaxNum <= 0 {
+		c.MiddlewareMaxNum = 256
 	}
 
 	if c.DefaultMethodMapping == nil {
