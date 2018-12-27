@@ -429,6 +429,13 @@ func (s *Ship) handleError(ctx Context, err error) {
 		}
 
 		ctx.Blob(code, ct, []byte(msg))
+
+		if code >= 500 {
+			if logger := ctx.Logger(); logger != nil {
+				logger.Error("%s", err.Error())
+			}
+		}
+		return
 	}
 
 	// For other errors, only log the error.
