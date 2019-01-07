@@ -263,6 +263,17 @@ func (s *Ship) setURLParamNum(num int) {
 	}
 }
 
+// Config returns the inner config.
+func (s *Ship) Config() Config {
+	return s.config
+}
+
+// ResetConfig resets the config.
+func (s *Ship) ResetConfig(config Config) {
+	config.init(s)
+	s.config = config
+}
+
 // VHost returns a new ship used to manage the virtual host.
 //
 // For the different virtual host, you can register the same route.
