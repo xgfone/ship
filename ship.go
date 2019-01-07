@@ -274,6 +274,21 @@ func (s *Ship) ResetConfig(config Config) {
 	s.config = config
 }
 
+// Clone returns a new Ship router with a new name by the current configuration.
+//
+// Notice: the new router will disable the signals and register the shutdown
+// function into the parent Ship router.
+func (s *Ship) Clone(name ...string) *Ship {
+	config := s.config
+	config.Signals = []os.Signal{}
+	if len(name) > 0 && name[0] != "" {
+		config.Name = name[0]
+	}
+	newShip := New(config)
+	s.RegisterOnShutdown(func() { newShip.Shutdown(context.Background()) })
+	return newShip
+}
+
 // VHost returns a new ship used to manage the virtual host.
 //
 // For the different virtual host, you can register the same route.
@@ -467,7 +482,7 @@ func (s *Ship) handleError(ctx Context, err error) {
 // Shutdown stops the HTTP server.
 func (s *Ship) Shutdown(ctx context.Context) error {
 	if s.server == nil {
-		return fmt.Errorf("the server has not been stopped")
+		return fmt.Errorf("the server has not been started")
 	}
 	return s.server.Shutdown(ctx)
 }
