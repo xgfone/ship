@@ -396,7 +396,7 @@ func main() {
     v1.Route("/get/path").GET(getHandler)
 
     // v2 SubRouter, which won't inherit the middlewares of the parent router.
-    v2 := router.GroupNone("/v2")
+    v2 := router.GroupWithoutMiddleware("/v2")
     v2.Use(MyAuthMiddleware())
     v2.Route("/post/path").POST(postHandler)
 

@@ -355,8 +355,8 @@ func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
 	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
 }
 
-// GroupNone is the same as Group, but not inherit the middlewares of Ship.
-func (s *Ship) GroupNone(prefix string, middlewares ...Middleware) *Group {
+// GroupWithoutMiddleware is the same as Group, but not inherit the middlewares of Ship.
+func (s *Ship) GroupWithoutMiddleware(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(middlewares))
 	ms = append(ms, middlewares...)
 	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)

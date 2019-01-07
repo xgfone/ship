@@ -56,8 +56,8 @@ func (g *Group) Group(prefix string, middlewares ...Middleware) *Group {
 	return newGroup(g.ship, g.router, g.prefix, prefix, append(g.mdwares, middlewares...)...)
 }
 
-// GroupNone is the same as Group, but not inherit the middlewares of the parent.
-func (g *Group) GroupNone(prefix string, middlewares ...Middleware) *Group {
+// GroupWithoutMiddleware is the same as Group, but not inherit the middlewares of the parent.
+func (g *Group) GroupWithoutMiddleware(prefix string, middlewares ...Middleware) *Group {
 	return newGroup(g.ship, g.router, g.prefix, prefix, middlewares...)
 }
 
