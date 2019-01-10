@@ -657,6 +657,9 @@ func (c *contextT) String(code int, s string) error {
 }
 
 func (c *contextT) writeContentType(value string) {
+	if value == "" {
+		return
+	}
 	header := c.resp.Header()
 	if header.Get(HeaderContentType) == "" {
 		header.Set(HeaderContentType, value)
