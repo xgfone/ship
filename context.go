@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
@@ -145,6 +146,21 @@ type responder struct {
 func (r responder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 	r.ctx.wrote = true
+}
+
+// See [http.Flusher](https://golang.org/pkg/net/http/#Flusher)
+func (r responder) Flush() {
+	r.ResponseWriter.(http.Flusher).Flush()
+}
+
+// See [http.Hijacker](https://golang.org/pkg/net/http/#Hijacker)
+func (r responder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return r.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+// See [http.CloseNotifier](https://golang.org/pkg/net/http/#CloseNotifier)
+func (r responder) CloseNotify() <-chan bool {
+	return r.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
 // Context stands for a request and response context.
