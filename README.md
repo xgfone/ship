@@ -68,10 +68,17 @@ type Config struct {
 	// If true, it won't remove the trailing slash from the registered url path.
 	KeepTrailingSlashPath bool
 
-	// The size of the the buffer initialized by the buffer pool.
+	// The size of the buffer initialized by the buffer pool.
 	//
 	// The default is 2KB.
 	BufferSize int
+
+	// The initializing size of the store, which is a map essentially,
+	// used by the context.
+	//
+	// The default is 0. If you use the store, such as Get(), Set(), you should
+	// set it to a appropriate value.
+	ContextStoreSize int
 
 	// The maximum number of the middlewares, which is 256 by default.
 	MiddlewareMaxNum int

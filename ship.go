@@ -73,10 +73,17 @@ type Config struct {
 	// If true, it won't remove the trailing slash from the registered url path.
 	KeepTrailingSlashPath bool
 
-	// The size of the the buffer initialized by the buffer pool.
+	// The size of the buffer initialized by the buffer pool.
 	//
 	// The default is 2KB.
 	BufferSize int
+
+	// The initializing size of the store, which is a map essentially,
+	// used by the context.
+	//
+	// The default is 0. If you use the store, such as Get(), Set(), you should
+	// set it to a appropriate value.
+	ContextStoreSize int
 
 	// The maximum number of the middlewares, which is 256 by default.
 	MiddlewareMaxNum int
@@ -165,6 +172,10 @@ func (c *Config) init(s *Ship) {
 
 	if c.BufferSize <= 0 {
 		c.BufferSize = 2048
+	}
+
+	if c.ContextStoreSize < 0 {
+		c.ContextStoreSize = 0
 	}
 
 	if c.MiddlewareMaxNum <= 0 {
@@ -269,6 +280,8 @@ func (s *Ship) Config() Config {
 }
 
 // ResetConfig resets the config.
+//
+// You must not call it during the ship router is running.
 func (s *Ship) ResetConfig(config Config) {
 	config.init(s)
 	s.config = config

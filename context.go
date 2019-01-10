@@ -181,7 +181,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 		pnames:  pnames,
 		pvalues: pvalues,
 
-		store: make(map[string]interface{}),
+		store: make(map[string]interface{}, s.config.ContextStoreSize),
 	}
 	ctx.setShip(s)
 	ctx.setReqResp(req, resp)
