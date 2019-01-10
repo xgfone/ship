@@ -519,6 +519,7 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 	for {
 		<-ss
 		s.server.Shutdown(context.Background())
+		return
 	}
 }
 
