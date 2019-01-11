@@ -456,6 +456,9 @@ func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Reque
 	ctx.router = router
 	err := s.handler(ctx)
 
+	if err == nil {
+		err = ctx.err
+	}
 	if err != nil {
 		s.config.HandleError(ctx, err)
 	}
