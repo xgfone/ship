@@ -12,7 +12,7 @@ import (
 //
 // If the number of the requests exceeds the maximum, it will call the handler,
 // which return the status code 429. But you can appoint yourself handler.
-func MaxRequests(max uint32, handler ...ship.Handler) ship.Middleware {
+func MaxRequests(max uint32, handler ...ship.Handler) Middleware {
 	h := func(c ship.Context) error { return c.NoContent(http.StatusTooManyRequests) }
 	if len(handler) > 0 && handler[0] != nil {
 		h = handler[0]
