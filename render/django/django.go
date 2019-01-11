@@ -18,7 +18,6 @@ import (
 	"io"
 
 	"github.com/flosch/pongo2"
-	"github.com/xgfone/ship/render"
 )
 
 // Type Aliases from pongo2.
@@ -69,8 +68,6 @@ var (
 	// SetAutoescape sets whether or not to escape automatically.
 	SetAutoescape = pongo2.SetAutoescape
 )
-
-var _ render.HTMLTemplateEngine = new(Engine)
 
 // Engine adapts the pongo2 engine.
 type Engine struct {
