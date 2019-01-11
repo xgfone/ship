@@ -486,6 +486,7 @@ func (s *Ship) handleError(ctx Context, err error) {
 
 	// For other errors, only log the error.
 	if err != ErrSkip {
+		ctx.NoContent(http.StatusInternalServerError)
 		if logger := ctx.Logger(); logger != nil {
 			logger.Error("%s", err.Error())
 		}
