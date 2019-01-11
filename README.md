@@ -379,6 +379,7 @@ func main() {
 The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middlewares as follow:
 
 - [CSRF](https://godoc.org/github.com/xgfone/ship/middleware#CSRF)
+- [Flat](https://godoc.org/github.com/xgfone/ship/middleware#Flat)
 - [Gzip](https://godoc.org/github.com/xgfone/ship/middleware#Gzip)
 - [Logger](https://godoc.org/github.com/xgfone/ship/middleware#Logger)
 - [Recover](https://godoc.org/github.com/xgfone/ship/middleware#Recover)
@@ -386,6 +387,7 @@ The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middlew
 - [CleanPath](https://godoc.org/github.com/xgfone/ship/middleware#CleanPath)
 - [BodyLimit](https://godoc.org/github.com/xgfone/ship/middleware#BodyLimit)
 - [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)
+- [MaxRequests](https://godoc.org/github.com/xgfone/ship/middleware#MaxRequests)
 - [ResetResponse](https://godoc.org/github.com/xgfone/ship/middleware#ResetResponse)
 - [RemoveTrailingSlash](https://godoc.org/github.com/xgfone/ship/middleware#RemoveTrailingSlash)
 

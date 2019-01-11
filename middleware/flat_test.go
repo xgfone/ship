@@ -64,3 +64,31 @@ func TestFlatFail(t *testing.T) {
 	assert.Equal(t, "[INFO] before handling the request\n[EROR] before error\n",
 		buf.String())
 }
+
+func TestFlatError(t *testing.T) {
+	beforeLog := func(ctx ship.Context) error {
+		ctx.Logger().Info("before handling the request")
+		return nil
+	}
+	afterLog := func(ctx ship.Context) error {
+		ctx.Logger().Info("after handling the request")
+		return nil
+	}
+
+	buf := bytes.NewBuffer(nil)
+	router := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
+	router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
+	router.R("/").GET(func(ctx ship.Context) error {
+		ctx.Logger().Info("handling the request")
+		ctx.SetError(fmt.Errorf("handler error"))
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, 500, rec.Code)
+	assert.Equal(t, "[INFO] before handling the request\n[INFO] handling the request\n[EROR] handler error\n",
+		buf.String())
+}

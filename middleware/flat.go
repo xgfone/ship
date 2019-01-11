@@ -21,30 +21,59 @@ import (
 //         ctx.Logger().Info("after handling the request")
 //         return nil
 //     }
-//
-//     router := ship.New()
-//     router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
-//     router.R("/").GET(func(ctx ship.Context) error {
+//     handler := func(ctx ship.Context) error {
 //         ctx.Logger().Info("handling the request")
 //         return nil
 //     })
 //
-func Flat(befores []ship.Handler, afters []ship.Handler) Middleware {
+//     router := ship.New()
+//     router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
+//     router.R("/").GET(handler)
+//
+// You can pass the error by the ctx.SetError(err). For example,
+//
+//     handler := func(ctx ship.Context) error {
+//         // ...
+//         ctx.SetError(err)
+//         return nil
+//     })
+//
+//     afterLog := func(ctx ship.Context) (err error) {
+//         if err = ctx.Error(); err != nil {
+//             ctx.Logger().Info("after handling the request: %s", err.Error())
+//             ctx.SetError(nil)  // Avoid to handle the error repeatedly by other middlewares.
+//         } else {
+//             ctx.Logger().Info("after handling the request")
+//         }
+//
+//         return
+//     }
+//
+func Flat(befores, afters []ship.Handler) Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx ship.Context) (err error) {
 			for _, h := range befores {
 				if err = h(ctx); err != nil {
 					return
+				} else if err = ctx.Error(); err != nil {
+					ctx.SetError(nil)
+					return err
 				}
 			}
 
 			if err = next(ctx); err != nil {
 				return
+			} else if err = ctx.Error(); err != nil {
+				ctx.SetError(nil)
+				return err
 			}
 
 			for _, h := range afters {
 				if err = h(ctx); err != nil {
 					return
+				} else if err = ctx.Error(); err != nil {
+					ctx.SetError(nil)
+					return err
 				}
 			}
 
