@@ -44,6 +44,11 @@ type Context interface {
 	Response() http.ResponseWriter
 	SetResponse(http.ResponseWriter)
 
+	// These may be passed the error between the handlers.
+	Error() error
+	HasError() bool
+	SetError(err error)
+
 	IsTLS() bool
 	IsDebug() bool
 	IsAjax() bool

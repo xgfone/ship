@@ -64,6 +64,11 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Response() http.ResponseWriter
 //    SetResponse(http.ResponseWriter)
 //
+//    // These may be passed the error between the handlers.
+//    Error() error
+//    HasError() bool
+//    SetError(err error)
+//
 //    IsTLS() bool
 //    IsDebug() bool
 //    IsAjax() bool
@@ -167,6 +172,7 @@ func (r responder) CloseNotify() <-chan bool {
 type contextT struct {
 	wrote bool
 
+	err   error
 	req   *http.Request
 	resp  responder
 	query url.Values
@@ -206,6 +212,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 }
 
 func (c *contextT) reset() {
+	c.err = nil
 	c.req = nil
 	c.resp.ResponseWriter = nil
 	c.resp.ctx = nil
@@ -263,6 +270,18 @@ func (c *contextT) NotFoundHandler() Handler {
 
 func (c *contextT) IsResponse() bool {
 	return c.wrote
+}
+
+func (c *contextT) Error() error {
+	return c.err
+}
+
+func (c *contextT) SetError(err error) {
+	c.err = err
+}
+
+func (c *contextT) HasError() bool {
+	return c.err != nil
 }
 
 // Param returns the parameter value in the url path by name.
