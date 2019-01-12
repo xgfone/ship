@@ -541,6 +541,10 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 }
 
 func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
+	if s.vhosts == nil {
+		return fmt.Errorf("forbid the virtual host to be started as a server")
+	}
+
 	server.ErrorLog = log.New(s.config.Logger.Writer(), "",
 		log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	if server.Handler == nil {
