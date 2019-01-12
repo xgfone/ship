@@ -71,11 +71,11 @@ func TestCSRFTokenFromForm(t *testing.T) {
 	req.Header.Add(ship.HeaderContentType, ship.MIMEApplicationForm)
 	ctx := s.NewContext(req, nil)
 
-	token, err := GetCSRFTokenFromForm("csrf")(ctx)
+	token, err := GetTokenFromForm("csrf")(ctx)
 	if assert.NoError(t, err) {
 		assert.Equal(t, "token", token)
 	}
-	_, err = GetCSRFTokenFromForm("invalid")(ctx)
+	_, err = GetTokenFromForm("invalid")(ctx)
 	assert.Error(t, err)
 }
 
@@ -89,10 +89,10 @@ func TestCSRFTokenFromQuery(t *testing.T) {
 	req.URL.RawQuery = form.Encode()
 	ctx := s.NewContext(req, nil)
 
-	token, err := GetCSRFTokenFromQuery("csrf")(ctx)
+	token, err := GetTokenFromQuery("csrf")(ctx)
 	if assert.NoError(t, err) {
 		assert.Equal(t, "token", token)
 	}
-	_, err = GetCSRFTokenFromQuery("invalid")(ctx)
+	_, err = GetTokenFromQuery("invalid")(ctx)
 	assert.Error(t, err)
 }

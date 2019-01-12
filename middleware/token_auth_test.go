@@ -36,7 +36,7 @@ func TestAuthToken(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	ctx := s.NewContext(req, rec)
-	authMiddleware := TokenAuth(validateToken, GetAuthTokenFromHeader(ship.HeaderAuthorization, "abc"))
+	authMiddleware := TokenAuth(validateToken, GetTokenFromHeader(ship.HeaderAuthorization, "abc"))
 	handler := authMiddleware(func(ctx ship.Context) error {
 		return ctx.String(http.StatusOK, "test")
 	})
@@ -58,7 +58,7 @@ func TestAuthToken(t *testing.T) {
 	assert.Equal(http.StatusBadRequest, he.Code())
 
 	// Token from custom header
-	handler = TokenAuth(validateToken, GetAuthTokenFromHeader("API-Token"))(
+	handler = TokenAuth(validateToken, GetTokenFromHeader("API-Token"))(
 		func(ctx ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})
@@ -66,7 +66,7 @@ func TestAuthToken(t *testing.T) {
 	assert.NoError(handler(ctx))
 
 	// Token from URL query
-	handler = TokenAuth(validateToken, GetAuthTokenFromQuery("token"))(
+	handler = TokenAuth(validateToken, GetTokenFromQuery("token"))(
 		func(ctx ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})
@@ -76,7 +76,7 @@ func TestAuthToken(t *testing.T) {
 	assert.NoError(handler(ctx))
 
 	// Token from Form
-	handler = TokenAuth(validateToken, GetAuthTokenFromForm("token"))(
+	handler = TokenAuth(validateToken, GetTokenFromForm("token"))(
 		func(ctx ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})

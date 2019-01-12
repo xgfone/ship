@@ -15,6 +15,7 @@
 package middleware
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"time"
@@ -32,6 +33,13 @@ const (
 )
 
 var defaultRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+// Predefine some errors.
+var (
+	ErrTokenFromHeader = errors.New("missing token in the url header")
+	ErrTokenFromQuery  = errors.New("missing token in the url query")
+	ErrTokenFromForm   = errors.New("missing token in the form parameter")
+)
 
 // Middleware is the alias of core.Middleware.
 //
@@ -59,5 +67,72 @@ func GenerateToken(n int, charsets ...string) func() string {
 			buf[i] = charset[defaultRand.Int63()%_len]
 		}
 		return string(buf)
+	}
+}
+
+// IsNoTokenError reports whether the error is that there is no token.
+func IsNoTokenError(err error) bool {
+	if err == ErrTokenFromForm || err == ErrTokenFromHeader || err == ErrTokenFromQuery {
+		return true
+	}
+	return false
+}
+
+// GetTokenFromHeaderWithType is the same as GetTokenFromHeader, but it also
+// supports the type of the token.
+func getTokenFromHeaderWithType(header, _type string) TokenFunc {
+	if header == "" {
+		panic(errors.New("the header is empty"))
+	}
+	if _type == "" {
+		panic(errors.New("the type is emtpy"))
+	}
+	typelen := len(_type)
+
+	return func(ctx ship.Context) (string, error) {
+		token := ctx.Request().Header.Get(header)
+		if token == "" {
+			return "", ErrTokenFromHeader
+		} else if len(token) > typelen+1 && token[:typelen] == _type {
+			return token[typelen+1:], nil
+		}
+		return "", ErrTokenFromHeader
+	}
+}
+
+// GetTokenFromHeader is used to get the token from the request header.
+//
+// You can appoint the type of the token, which is separated by a whitespace,
+// such as the header "Authorization".
+func GetTokenFromHeader(header string, _type ...string) TokenFunc {
+	if len(_type) > 0 {
+		return getTokenFromHeaderWithType(header, _type[0])
+	}
+
+	return func(ctx ship.Context) (string, error) {
+		if token := ctx.Request().Header.Get(header); token != "" {
+			return token, nil
+		}
+		return "", ErrTokenFromHeader
+	}
+}
+
+// GetTokenFromQuery is used to get the token from the request URL query.
+func GetTokenFromQuery(param string) TokenFunc {
+	return func(ctx ship.Context) (string, error) {
+		if token := ctx.QueryParam(param); token != "" {
+			return token, nil
+		}
+		return "", ErrTokenFromQuery
+	}
+}
+
+// GetTokenFromForm is used to get the token from the request FORM body.
+func GetTokenFromForm(param string) TokenFunc {
+	return func(ctx ship.Context) (string, error) {
+		if token := ctx.FormValue(param); token != "" {
+			return token, nil
+		}
+		return "", ErrTokenFromForm
 	}
 }

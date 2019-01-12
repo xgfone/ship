@@ -16,7 +16,6 @@ package middleware
 
 import (
 	"crypto/subtle"
-	"errors"
 	"net/http"
 	"time"
 
@@ -47,7 +46,7 @@ type CSRFConfig struct {
 //       CookieMaxAge: 86400,
 //
 //       GenerateToken:       GenerateToken(32),
-//       GetTokenFromRequest: GetCSRFTokenFromHeader(ship.HeaderXCSRFToken),
+//       GetTokenFromRequest: GetTokenFromHeader(ship.HeaderXCSRFToken),
 //   }
 //
 func CSRF(config ...CSRFConfig) Middleware {
@@ -69,7 +68,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 		conf.GenerateToken = GenerateToken(32)
 	}
 	if conf.GetTokenFromRequest == nil {
-		conf.GetTokenFromRequest = GetCSRFTokenFromHeader(ship.HeaderXCSRFToken)
+		conf.GetTokenFromRequest = GetTokenFromHeader(ship.HeaderXCSRFToken)
 	}
 
 	maxAge := time.Duration(conf.CookieMaxAge) * time.Second
@@ -90,6 +89,9 @@ func CSRF(config ...CSRFConfig) Middleware {
 				// Validate token only for requests which are not defined as 'safe' by RFC7231
 				clientToken, err := conf.GetTokenFromRequest(ctx)
 				if err != nil {
+					if _, ok := err.(ship.HTTPError); ok {
+						return err
+					}
 					return ship.NewHTTPError(http.StatusBadRequest, err.Error())
 				}
 				if !validateCSRFToken(token, clientToken) {
@@ -125,33 +127,4 @@ func CSRF(config ...CSRFConfig) Middleware {
 
 func validateCSRFToken(token, clientToken string) bool {
 	return subtle.ConstantTimeCompare([]byte(token), []byte(clientToken)) == 1
-}
-
-// GetCSRFTokenFromHeader is used to get the CSRF token from the request header.
-func GetCSRFTokenFromHeader(header string) TokenFunc {
-	return func(ctx ship.Context) (string, error) {
-		return ctx.Request().Header.Get(header), nil
-	}
-}
-
-// GetCSRFTokenFromForm is used to get the CSRF token from the request body FORM.
-func GetCSRFTokenFromForm(param string) TokenFunc {
-	return func(ctx ship.Context) (string, error) {
-		token := ctx.FormValue(param)
-		if token != "" {
-			return token, nil
-		}
-		return "", errors.New("missing CSRF token in the form parameter")
-	}
-}
-
-// GetCSRFTokenFromQuery is used to get the CSRF token from the request URL query.
-func GetCSRFTokenFromQuery(param string) TokenFunc {
-	return func(ctx ship.Context) (string, error) {
-		token := ctx.QueryParam(param)
-		if token != "" {
-			return token, nil
-		}
-		return "", errors.New("missing CSRF token in the url query")
-	}
 }
