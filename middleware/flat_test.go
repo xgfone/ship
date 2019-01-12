@@ -34,7 +34,7 @@ func TestFlat(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "[INFO] before handling the request\n[INFO] handling the request\n[INFO] after handling the request\n",
+	assert.Equal(t, "[I] before handling the request\n[I] handling the request\n[I] after handling the request\n",
 		buf.String())
 }
 
@@ -61,7 +61,7 @@ func TestFlatFail(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, 500, rec.Code)
-	assert.Equal(t, "[INFO] before handling the request\n[EROR] before error\n",
+	assert.Equal(t, "[I] before handling the request\n[E] before error\n",
 		buf.String())
 }
 
@@ -89,6 +89,6 @@ func TestFlatError(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, 500, rec.Code)
-	assert.Equal(t, "[INFO] before handling the request\n[INFO] handling the request\n[EROR] handler error\n",
+	assert.Equal(t, "[I] before handling the request\n[I] handling the request\n[E] handler error\n",
 		buf.String())
 }

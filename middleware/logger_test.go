@@ -51,11 +51,11 @@ func TestLogger(t *testing.T) {
 
 	// We removes the cost string, which is uncontrollable.
 	ss := strings.Split(strings.TrimSpace(bs.String()), "\n")
-	if ss[0] != "[INFO] handler" {
+	if ss[0] != "[I] handler" {
 		t.Fail()
 	}
 	if strings.Join(strings.Split(ss[1], ",")[:3], ",") !=
-		"[INFO] method=GET, url=/test, starttime=1543846200" {
+		"[I] method=GET, url=/test, starttime=1543846200" {
 		t.Fail()
 	}
 }

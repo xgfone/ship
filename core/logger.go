@@ -19,6 +19,7 @@ import "io"
 // Logger stands for a logger.
 type Logger interface {
 	Writer() io.Writer
+	Trace(format string, args ...interface{}) error
 	Debug(foramt string, args ...interface{}) error
 	Info(foramt string, args ...interface{}) error
 	Warn(foramt string, args ...interface{}) error

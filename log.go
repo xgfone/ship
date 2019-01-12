@@ -26,6 +26,7 @@ import (
 //
 // Methods:
 //   Writer() io.Writer // Return the underlying writer
+//   Trace(format string, args ...interface{}) error
 //   Debug(foramt string, args ...interface{}) error
 //   Info(foramt string, args ...interface{}) error
 //   Warn(foramt string, args ...interface{}) error
@@ -57,18 +58,22 @@ func (l *loggerT) output(level, format string, args ...interface{}) error {
 	return l.logger.Output(4, fmt.Sprintf(level+format, args...))
 }
 
+func (l *loggerT) Trace(format string, args ...interface{}) error {
+	return l.output("[T] ", format, args...)
+}
+
 func (l *loggerT) Debug(format string, args ...interface{}) error {
-	return l.output("[DBUG] ", format, args...)
+	return l.output("[D] ", format, args...)
 }
 
 func (l *loggerT) Info(format string, args ...interface{}) error {
-	return l.output("[INFO] ", format, args...)
+	return l.output("[I] ", format, args...)
 }
 
 func (l *loggerT) Warn(format string, args ...interface{}) error {
-	return l.output("[WARN] ", format, args...)
+	return l.output("[W] ", format, args...)
 }
 
 func (l *loggerT) Error(format string, args ...interface{}) error {
-	return l.output("[EROR] ", format, args...)
+	return l.output("[E] ", format, args...)
 }
