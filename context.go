@@ -391,7 +391,7 @@ func (c *contextT) SetResponse(resp http.ResponseWriter) {
 
 func (c *contextT) GetBody() (string, error) {
 	buf := c.AcquireBuffer()
-	err := utils.ReadNBuffer(buf, c.req.Body, c.req.ContentLength)
+	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
 	body := buf.String()
 	c.ReleaseBuffer(buf)
 	return body, err
