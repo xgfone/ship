@@ -26,10 +26,10 @@ import (
 //
 // Methods:
 //   Writer() io.Writer // Return the underlying writer
-//   Debug(foramt string, args ...interface{})
-//   Info(foramt string, args ...interface{})
-//   Warn(foramt string, args ...interface{})
-//   Error(foramt string, args ...interface{})
+//   Debug(foramt string, args ...interface{}) error
+//   Info(foramt string, args ...interface{}) error
+//   Warn(foramt string, args ...interface{}) error
+//   Error(foramt string, args ...interface{}) error
 type Logger = core.Logger
 
 // NewNoLevelLogger returns a new Logger, which has no level,
@@ -53,22 +53,22 @@ func (l *loggerT) Writer() io.Writer {
 	return l.writer
 }
 
-func (l *loggerT) output(level, format string, args ...interface{}) {
-	l.logger.Output(4, fmt.Sprintf(level+format, args...))
+func (l *loggerT) output(level, format string, args ...interface{}) error {
+	return l.logger.Output(4, fmt.Sprintf(level+format, args...))
 }
 
-func (l *loggerT) Debug(format string, args ...interface{}) {
-	l.output("[DBUG] ", format, args...)
+func (l *loggerT) Debug(format string, args ...interface{}) error {
+	return l.output("[DBUG] ", format, args...)
 }
 
-func (l *loggerT) Info(format string, args ...interface{}) {
-	l.output("[INFO] ", format, args...)
+func (l *loggerT) Info(format string, args ...interface{}) error {
+	return l.output("[INFO] ", format, args...)
 }
 
-func (l *loggerT) Warn(format string, args ...interface{}) {
-	l.output("[WARN] ", format, args...)
+func (l *loggerT) Warn(format string, args ...interface{}) error {
+	return l.output("[WARN] ", format, args...)
 }
 
-func (l *loggerT) Error(format string, args ...interface{}) {
-	l.output("[EROR] ", format, args...)
+func (l *loggerT) Error(format string, args ...interface{}) error {
+	return l.output("[EROR] ", format, args...)
 }

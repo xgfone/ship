@@ -19,8 +19,8 @@ import "io"
 // Logger stands for a logger.
 type Logger interface {
 	Writer() io.Writer
-	Debug(foramt string, args ...interface{})
-	Info(foramt string, args ...interface{})
-	Warn(foramt string, args ...interface{})
-	Error(foramt string, args ...interface{})
+	Debug(foramt string, args ...interface{}) error
+	Info(foramt string, args ...interface{}) error
+	Warn(foramt string, args ...interface{}) error
+	Error(foramt string, args ...interface{}) error
 }
