@@ -20,8 +20,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -995,47 +996,57 @@ func TestContextAccept(t *testing.T) {
 	assert.Equal(t, expected, accepts)
 }
 
-func ExampleShip_Link() {
-	// Only for test
-	logger := NewNoLevelLogger(os.Stdout, 0)
-
-	prouter := New(Config{Name: "parent", Logger: logger})
-	crouter1 := New(Config{Name: "child1", Logger: logger})
-	crouter2 := prouter.Clone("child2")
-	prouter.Link(crouter1).Link(crouter2)
-
-	go func() {
-		time.Sleep(time.Millisecond * 100) // For test
-		prouter.Shutdown(context.Background())
-	}()
-	go crouter1.Start("17.0.0.1:11111")
-	go crouter2.Start("17.0.0.1:11112")
-	prouter.Start("127.0.0.1:11113")
-
-	// Unordered output:
-	// [I] The HTTP Server [parent] is running on 127.0.0.1:11113
-	// [I] The HTTP Server [child2] is running on 17.0.0.1:11112
-	// [I] The HTTP Server [child1] is running on 17.0.0.1:11111
+type safeBufferWriter struct {
+	buf  *bytes.Buffer
+	lock *sync.Mutex
 }
 
-func ExampleShip_LinkTo() {
-	// Only for test
-	logger := NewNoLevelLogger(os.Stdout, 0)
+func (bw *safeBufferWriter) Write(p []byte) (int, error) {
+	bw.lock.Lock()
+	n, err := bw.buf.Write(p)
+	bw.lock.Unlock()
+	return n, err
+}
+
+func TestShipLink(t *testing.T) {
+	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
+	logger := NewNoLevelLogger(buf, 0)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
 
 	prouter := New(Config{Name: "parent", Logger: logger})
-	crouter1 := New(Config{Name: "child1", Logger: logger}).LinkTo(prouter)
-	crouter2 := prouter.Clone("child2").LinkTo(prouter)
+	crouter1 := New(Config{Name: "child1", Logger: logger}).Link(prouter)
+	crouter2 := prouter.Clone("child2").Link(prouter)
+
+	prouter.RegisterOnShutdown(func() { wg.Done() })
+	crouter1.RegisterOnShutdown(func() { wg.Done() })
+	crouter2.RegisterOnShutdown(func() { wg.Done() })
 
 	go func() {
-		time.Sleep(time.Millisecond * 100) // For test
+		time.Sleep(time.Millisecond * 100)
 		prouter.Shutdown(context.Background())
 	}()
-	go crouter1.Start("17.0.0.1:11111")
-	go crouter2.Start("17.0.0.1:11112")
+	go crouter1.Start("127.0.0.1:11111")
+	go crouter2.Start("127.0.0.1:11112")
 	prouter.Start("127.0.0.1:11113")
 
-	// Unordered output:
-	// [I] The HTTP Server [parent] is running on 127.0.0.1:11113
-	// [I] The HTTP Server [child2] is running on 17.0.0.1:11112
-	// [I] The HTTP Server [child1] is running on 17.0.0.1:11111
+	wg.Wait()
+	time.Sleep(time.Millisecond * 100)
+	buf.lock.Lock()
+	lines := strings.Split(strings.TrimSpace(buf.buf.String()), "\n")
+	buf.lock.Unlock()
+
+	assert.Equal(t, 6, len(lines))
+	if len(lines) != 6 {
+		return
+	}
+	sort.Strings(lines[:3])
+	sort.Strings(lines[3:])
+
+	assert.Equal(t, "[I] The HTTP Server [child1] is running on 127.0.0.1:11111", lines[0])
+	assert.Equal(t, "[I] The HTTP Server [child2] is running on 127.0.0.1:11112", lines[1])
+	assert.Equal(t, "[I] The HTTP Server [parent] is running on 127.0.0.1:11113", lines[2])
+	assert.Equal(t, "[I] The HTTP Server [child1] is shutdown", lines[3])
+	assert.Equal(t, "[I] The HTTP Server [child2] is shutdown", lines[4])
+	assert.Equal(t, "[I] The HTTP Server [parent] is shutdown", lines[5])
 }

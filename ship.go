@@ -34,8 +34,6 @@ import (
 	"github.com/xgfone/ship/utils"
 )
 
-var onceCall = sync.Once{}
-
 // Router is the alias of core.Router, which is used to manage the routes.
 //
 // Methods:
@@ -237,6 +235,15 @@ func (c *Config) init(s *Ship) {
 	}
 }
 
+type stopT struct {
+	once sync.Once
+	f    func()
+}
+
+func (s *stopT) run() {
+	s.once.Do(s.f)
+}
+
 // Ship is used to manage the router.
 type Ship struct {
 	config  Config
@@ -251,9 +258,10 @@ type Ship struct {
 	router Router
 	vhosts map[string]*Ship
 	server *http.Server
-	stopfs []func()
+	stopfs []*stopT
 	links  []*Ship
 	lock   *sync.RWMutex
+	once   sync.Once
 }
 
 // New returns a new Ship.
@@ -303,22 +311,24 @@ func (s *Ship) Clone(name ...string) *Ship {
 		config.Name = name[0]
 	}
 	newShip := New(config)
-	s.RegisterOnShutdown(func() { newShip.Shutdown(context.Background()) })
+	s.RegisterOnShutdown(newShip.shutdown)
 	return newShip
 }
 
-// Link links other to the current ship router, that's, other will be shutdown
-// when the current router is shutdown. At last, return the current router.
+// Link links other to the current router, that's, only if either of the two
+// routers is shutdown, another is also shutdown.
 //
-// Notice: when calling other.Shutdown(), s will be shutdown.
+// Return the current router.
 func (s *Ship) Link(other *Ship) *Ship {
-	s.links = append(s.links, other)
-	return s
-}
+	// Avoid to add each other repeatedly.
+	for i := range s.links {
+		if other == s.links[i] {
+			return s
+		}
+	}
 
-// LinkTo is equal to other.Link(s), but returns the current ship router s.
-func (s *Ship) LinkTo(other *Ship) *Ship {
-	other.Link(s)
+	s.links = append(s.links, other)
+	other.links = append(other.links, s)
 	return s
 }
 
@@ -531,7 +541,11 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 // RegisterOnShutdown registers some functions to run
 // when the http server is shut down.
 func (s *Ship) RegisterOnShutdown(functions ...func()) {
-	s.stopfs = append(s.stopfs, functions...)
+	s.lock.Lock()
+	for _, f := range functions {
+		s.stopfs = append(s.stopfs, &stopT{once: sync.Once{}, f: f})
+	}
+	s.lock.Unlock()
 }
 
 // Start starts a HTTP server with addr.
@@ -541,18 +555,18 @@ func (s *Ship) RegisterOnShutdown(functions ...func()) {
 //     router := ship.New()
 //     rouetr.Start(addr, certFile, keyFile)
 //
-func (s *Ship) Start(addr string, tlsFiles ...string) error {
+func (s *Ship) Start(addr string, tlsFiles ...string) {
 	var cert, key string
 	if len(tlsFiles) == 2 && tlsFiles[0] != "" && tlsFiles[1] != "" {
 		cert = tlsFiles[0]
 		key = tlsFiles[1]
 	}
-	return s.startServer(&http.Server{Addr: addr}, cert, key)
+	s.startServer(&http.Server{Addr: addr}, cert, key)
 }
 
 // StartServer starts a HTTP server.
-func (s *Ship) StartServer(server *http.Server) error {
-	return s.startServer(server, "", "")
+func (s *Ship) StartServer(server *http.Server) {
+	s.startServer(server, "", "")
 }
 
 func (s *Ship) handleSignals(sigs ...os.Signal) {
@@ -560,26 +574,29 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 	signal.Notify(ss, sigs...)
 	for {
 		<-ss
-		s.server.Shutdown(context.Background())
+		s.shutdown()
 		return
 	}
 }
 
 func (s *Ship) stop() {
-	for _, f := range s.stopfs {
-		onceCall.Do(f)
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	for _, r := range s.stopfs {
+		r.run()
 	}
 }
 
 func (s *Ship) shutdown() {
-	onceCall.Do(func() { s.Shutdown(context.Background()) })
+	s.once.Do(func() { s.Shutdown(context.Background()) })
 }
 
-func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
+func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	defer s.shutdown()
 
 	if s.vhosts == nil {
-		return fmt.Errorf("forbid the virtual host to be started as a server")
+		s.config.Logger.Error("forbid the virtual host to be started as a server")
+		return
 	}
 
 	server.ErrorLog = log.New(s.config.Logger.Writer(), "",
@@ -594,14 +611,17 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 	}
 
 	for _, r := range s.links {
-		server.RegisterOnShutdown(r.stop)
+		s.RegisterOnShutdown(r.shutdown)
 		r.RegisterOnShutdown(s.shutdown)
 	}
 	server.RegisterOnShutdown(s.stop)
 
+	var format string
 	if s.config.Name == "" {
+		format = "The HTTP Server is shutdown"
 		s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
 	} else {
+		format = fmt.Sprintf("The HTTP Server [%s] is shutdown", s.config.Name)
 		s.config.Logger.Info("The HTTP Server [%s] is running on %s",
 			s.config.Name, server.Addr)
 	}
@@ -610,8 +630,16 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 	s.server = server
 	s.lock.Unlock()
 
+	var err error
 	if certFile != "" && keyFile != "" {
-		return server.ListenAndServeTLS(certFile, keyFile)
+		err = server.ListenAndServeTLS(certFile, keyFile)
+	} else {
+		err = server.ListenAndServe()
 	}
-	return server.ListenAndServe()
+
+	if err == http.ErrServerClosed {
+		s.config.Logger.Info(format)
+	} else {
+		s.config.Logger.Error(format+": %s", err)
+	}
 }
