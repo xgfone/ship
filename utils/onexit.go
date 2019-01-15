@@ -2,9 +2,13 @@ package utils
 
 import (
 	"os"
+	"sync"
 )
 
-var funcs = make([]func(), 0)
+var (
+	onceC sync.Once
+	funcs = make([]func(), 0)
+)
 
 // OnExit registers a exit function.
 func OnExit(f func()) {
@@ -14,7 +18,7 @@ func OnExit(f func()) {
 // CallOnExit calls the exit functions.
 func CallOnExit() {
 	for _, f := range funcs {
-		f()
+		onceC.Do(f)
 	}
 }
 
