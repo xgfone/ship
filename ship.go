@@ -251,6 +251,7 @@ type Ship struct {
 	server *http.Server
 	stopfs []func()
 	links  []*Ship
+	lock   *sync.RWMutex
 }
 
 // New returns a new Ship.
@@ -266,6 +267,7 @@ func New(config ...Config) *Ship {
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
 	s.router = s.config.NewRouter()
 	s.vhosts = make(map[string]*Ship)
+	s.lock = new(sync.RWMutex)
 	return s
 }
 
@@ -512,10 +514,14 @@ func (s *Ship) handleError(ctx Context, err error) {
 
 // Shutdown stops the HTTP server.
 func (s *Ship) Shutdown(ctx context.Context) error {
-	if s.server == nil {
+	s.lock.RLock()
+	server := s.server
+	s.lock.RUnlock()
+
+	if server == nil {
 		return fmt.Errorf("the server has not been started")
 	}
-	return s.server.Shutdown(ctx)
+	return server.Shutdown(ctx)
 }
 
 // RegisterOnShutdown registers some functions to run
@@ -589,7 +595,10 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 			s.config.Name, server.Addr)
 	}
 
+	s.lock.Lock()
 	s.server = server
+	s.lock.Unlock()
+
 	if certFile != "" && keyFile != "" {
 		return server.ListenAndServeTLS(certFile, keyFile)
 	}
