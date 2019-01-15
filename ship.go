@@ -504,9 +504,10 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-// RegisterOnShutdown registers a function to run when the http server is shut down.
-func (s *Ship) RegisterOnShutdown(f func()) {
-	s.stopfs = append(s.stopfs, f)
+// RegisterOnShutdown registers some functions to run
+// when the http server is shut down.
+func (s *Ship) RegisterOnShutdown(functions ...func()) {
+	s.stopfs = append(s.stopfs, functions...)
 }
 
 // Start starts a HTTP server with addr.
