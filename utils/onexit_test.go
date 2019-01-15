@@ -8,7 +8,8 @@ import (
 
 func TestCallOnExit(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	OnExit(func() { buf.WriteString("call") })
+	OnExit(func() { buf.WriteString("call1\n") })
+	OnExit(func() { buf.WriteString("call2\n") })
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
@@ -20,7 +21,7 @@ func TestCallOnExit(t *testing.T) {
 	}
 	wg.Wait()
 
-	if buf.String() != "call" {
+	if buf.String() != "call1\ncall2\n" {
 		t.Error(buf.String())
 	}
 }

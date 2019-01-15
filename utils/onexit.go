@@ -17,8 +17,12 @@ func OnExit(f func()) {
 
 // CallOnExit calls the exit functions.
 func CallOnExit() {
+	onceC.Do(callOnExit)
+}
+
+func callOnExit() {
 	for _, f := range funcs {
-		onceC.Do(f)
+		f()
 	}
 }
 
