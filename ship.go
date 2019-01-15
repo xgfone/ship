@@ -576,6 +576,8 @@ func (s *Ship) shutdown() {
 }
 
 func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
+	defer s.shutdown()
+
 	if s.vhosts == nil {
 		return fmt.Errorf("forbid the virtual host to be started as a server")
 	}
