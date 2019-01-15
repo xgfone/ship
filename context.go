@@ -147,9 +147,10 @@ type contextKeyT int
 
 var contextKey contextKeyT
 
-func setContext(ctx *contextT, req *http.Request) *contextT {
-	ctx.req = ctx.req.WithContext(context.WithValue(context.TODO(), contextKey, ctx))
-	return ctx
+func setContext(ctx *contextT) {
+	if ctx.req != nil {
+		ctx.req = ctx.req.WithContext(context.WithValue(context.TODO(), contextKey, ctx))
+	}
 }
 
 // GetContext gets the Context from the http Request.
@@ -225,7 +226,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 	}
 	ctx.setShip(s)
 	ctx.setReqResp(req, resp)
-	return setContext(ctx, req)
+	return ctx
 }
 
 func (c *contextT) reset() {
@@ -261,6 +262,7 @@ func (c *contextT) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.resp.ResponseWriter = w
 	c.resp.ctx = c
+	setContext(c)
 }
 
 func (c *contextT) AcquireBuffer() *bytes.Buffer {

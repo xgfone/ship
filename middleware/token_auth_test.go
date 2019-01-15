@@ -72,7 +72,7 @@ func TestAuthToken(t *testing.T) {
 		})
 	query := req.URL.Query()
 	query.Add("token", "valid_token")
-	req.URL.RawQuery = query.Encode()
+	ctx.Request().URL.RawQuery = query.Encode()
 	assert.NoError(handler(ctx))
 
 	// Token from Form
