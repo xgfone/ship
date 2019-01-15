@@ -2,27 +2,27 @@ package utils
 
 import (
 	"os"
-	"sync"
+	"sync/atomic"
 )
 
 var (
-	onceC sync.Once
-	funcs = make([]func(), 0)
+	exited int32
+	funcs  = make([]func(), 0)
 )
 
-// OnExit registers a exit function.
-func OnExit(f func()) {
-	funcs = append(funcs, f)
+// OnExit registers some exit function.
+func OnExit(f ...func()) {
+	funcs = append(funcs, f...)
 }
 
 // CallOnExit calls the exit functions.
+//
+// This function can be called many times.
 func CallOnExit() {
-	onceC.Do(callOnExit)
-}
-
-func callOnExit() {
-	for _, f := range funcs {
-		f()
+	if atomic.CompareAndSwapInt32(&exited, 0, 1) {
+		for _, f := range funcs {
+			f()
+		}
 	}
 }
 
