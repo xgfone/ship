@@ -17,6 +17,7 @@ package ship
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -142,6 +143,23 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 type Context = core.Context
 
+type contextKeyT int
+
+var contextKey contextKeyT
+
+func setContext(ctx *contextT, req *http.Request) *contextT {
+	ctx.req = ctx.req.WithContext(context.WithValue(context.TODO(), contextKey, ctx))
+	return ctx
+}
+
+// GetContext gets the Context from the http Request.
+func GetContext(req *http.Request) Context {
+	if v := req.Context().Value(contextKey); v != nil {
+		return v.(Context)
+	}
+	return nil
+}
+
 type responder struct {
 	http.ResponseWriter
 	ctx *contextT
@@ -207,8 +225,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 	}
 	ctx.setShip(s)
 	ctx.setReqResp(req, resp)
-
-	return ctx
+	return setContext(ctx, req)
 }
 
 func (c *contextT) reset() {
