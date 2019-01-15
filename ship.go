@@ -34,6 +34,8 @@ import (
 	"github.com/xgfone/ship/utils"
 )
 
+var onceCall = sync.Once{}
+
 // Router is the alias of core.Router, which is used to manage the routes.
 //
 // Methods:
@@ -307,6 +309,8 @@ func (s *Ship) Clone(name ...string) *Ship {
 
 // Link links other to the current ship router, that's, other will be shutdown
 // when the current router is shutdown. At last, return the current router.
+//
+// Notice: when calling other.Shutdown(), s will be shutdown.
 func (s *Ship) Link(other *Ship) *Ship {
 	s.links = append(s.links, other)
 	return s
@@ -563,8 +567,12 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 
 func (s *Ship) stop() {
 	for _, f := range s.stopfs {
-		f()
+		onceCall.Do(f)
 	}
+}
+
+func (s *Ship) shutdown() {
+	onceCall.Do(func() { s.Shutdown(context.Background()) })
 }
 
 func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
@@ -585,6 +593,7 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 
 	for _, r := range s.links {
 		server.RegisterOnShutdown(r.stop)
+		r.RegisterOnShutdown(s.shutdown)
 	}
 	server.RegisterOnShutdown(s.stop)
 
