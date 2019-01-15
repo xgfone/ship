@@ -16,11 +16,14 @@ package ship
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -990,4 +993,49 @@ func TestContextAccept(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, expected, accepts)
+}
+
+func ExampleShip_Link() {
+	// Only for test
+	logger := NewNoLevelLogger(os.Stdout, 0)
+
+	prouter := New(Config{Name: "parent", Logger: logger})
+	crouter1 := New(Config{Name: "child1", Logger: logger})
+	crouter2 := prouter.Clone("child2")
+	prouter.Link(crouter1).Link(crouter2)
+
+	go func() {
+		time.Sleep(time.Millisecond * 100) // For test
+		prouter.Shutdown(context.Background())
+	}()
+	go crouter1.Start("17.0.0.1:11111")
+	go crouter2.Start("17.0.0.1:11112")
+	prouter.Start("127.0.0.1:11113")
+
+	// Unordered output:
+	// [I] The HTTP Server [parent] is running on 127.0.0.1:11113
+	// [I] The HTTP Server [child2] is running on 17.0.0.1:11112
+	// [I] The HTTP Server [child1] is running on 17.0.0.1:11111
+}
+
+func ExampleShip_LinkTo() {
+	// Only for test
+	logger := NewNoLevelLogger(os.Stdout, 0)
+
+	prouter := New(Config{Name: "parent", Logger: logger})
+	crouter1 := New(Config{Name: "child1", Logger: logger}).LinkTo(prouter)
+	crouter2 := prouter.Clone("child2").LinkTo(prouter)
+
+	go func() {
+		time.Sleep(time.Millisecond * 100) // For test
+		prouter.Shutdown(context.Background())
+	}()
+	go crouter1.Start("17.0.0.1:11111")
+	go crouter2.Start("17.0.0.1:11112")
+	prouter.Start("127.0.0.1:11113")
+
+	// Unordered output:
+	// [I] The HTTP Server [parent] is running on 127.0.0.1:11113
+	// [I] The HTTP Server [child2] is running on 17.0.0.1:11112
+	// [I] The HTTP Server [child1] is running on 17.0.0.1:11111
 }

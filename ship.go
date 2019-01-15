@@ -250,6 +250,7 @@ type Ship struct {
 	vhosts map[string]*Ship
 	server *http.Server
 	stopfs []func()
+	links  []*Ship
 }
 
 // New returns a new Ship.
@@ -300,6 +301,19 @@ func (s *Ship) Clone(name ...string) *Ship {
 	newShip := New(config)
 	s.RegisterOnShutdown(func() { newShip.Shutdown(context.Background()) })
 	return newShip
+}
+
+// Link links other to the current ship router, that's, other will be shutdown
+// when the current router is shutdown. At last, return the current router.
+func (s *Ship) Link(other *Ship) *Ship {
+	s.links = append(s.links, other)
+	return s
+}
+
+// LinkTo is equal to other.Link(s), but returns the current ship router s.
+func (s *Ship) LinkTo(other *Ship) *Ship {
+	other.Link(s)
+	return s
 }
 
 // VHost returns a new ship used to manage the virtual host.
@@ -541,6 +555,12 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 	}
 }
 
+func (s *Ship) stop() {
+	for _, f := range s.stopfs {
+		f()
+	}
+}
+
 func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error {
 	if s.vhosts == nil {
 		return fmt.Errorf("forbid the virtual host to be started as a server")
@@ -557,9 +577,10 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) error 
 		go s.handleSignals(s.config.Signals...)
 	}
 
-	for _, f := range s.stopfs {
-		server.RegisterOnShutdown(f)
+	for _, r := range s.links {
+		server.RegisterOnShutdown(r.stop)
 	}
+	server.RegisterOnShutdown(s.stop)
 
 	if s.config.Name == "" {
 		s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
