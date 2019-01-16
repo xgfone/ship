@@ -17,6 +17,7 @@ package binder
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/xgfone/ship/utils"
@@ -141,4 +142,39 @@ func SetValue(v interface{}, data interface{}) (err error) {
 		return fmt.Errorf("the unknown type '%T'", data)
 	}
 	return
+}
+
+// SetStructValue is equal to SetStructValueOf(reflect.ValueOf(s), attr, v)
+func SetStructValue(s interface{}, attr string, v interface{}) error {
+	if s == nil {
+		return errors.New("the struct value is nil")
+	}
+	return SetStructValueOf(reflect.ValueOf(s), attr, v)
+}
+
+// SetStructValueOf is the same as SetValue, but binds the attribute attr of
+// the struct s to v.
+func SetStructValueOf(s reflect.Value, attr string, v interface{}) error {
+	if attr == "" {
+		return errors.New("the name of the struct attribute is empty")
+	}
+	if v == nil {
+		return errors.New("the value is nil")
+	}
+
+	if s.Kind() != reflect.Ptr {
+		return errors.New("the struce value is not a pointer")
+	}
+	if s = s.Elem(); s.Kind() != reflect.Struct {
+		return errors.New("the struct value is not a pointer to a struct")
+	}
+
+	st := s.Type()
+	for i := st.NumField() - 1; i >= 0; i-- {
+		if st.Field(i).Name == attr {
+			return SetValue(s.Field(i).Addr().Interface(), v)
+		}
+	}
+
+	return fmt.Errorf("the struct has no field '%s'", attr)
 }

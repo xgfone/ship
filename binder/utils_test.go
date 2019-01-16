@@ -97,3 +97,20 @@ func TestSetValue(t *testing.T) {
 		t.Error(tt1.Second(), tt2.Second())
 	}
 }
+
+func TestSetStructValue(t *testing.T) {
+	type S struct {
+		Name string
+		Age  int
+	}
+	s := S{}
+	if err :=SetStructValue(&s, "Name", "abc"); err != nil {
+		t.Error(err)
+	}
+	if err := SetStructValue(&s, "Age", "123"); err != nil {
+		t.Error(err)
+	}
+	if s.Name != "abc" || s.Age != 123 {
+		t.Error(s.Name, s.Age)
+	}
+}
