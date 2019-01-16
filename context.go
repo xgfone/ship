@@ -103,6 +103,8 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    ContentType() string
 //    ContentLength() int64
 //    GetBody() (string, error)
+//    // You should call Context.ReleaseBuffer(buf) to release the buffer at last.
+//    GetBodyReader() (*bytes.Buffer, error)
 //    SetContentType(string)
 //
 //    QueryParam(name string) (value string)
@@ -429,6 +431,16 @@ func (c *contextT) GetBody() (string, error) {
 	body := buf.String()
 	c.ReleaseBuffer(buf)
 	return body, err
+}
+
+func (c *contextT) GetBodyReader() (*bytes.Buffer, error) {
+	buf := c.AcquireBuffer()
+	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	if err != nil {
+		c.ReleaseBuffer(buf)
+		return nil, err
+	}
+	return buf, err
 }
 
 type acceptT struct {

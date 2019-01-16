@@ -81,6 +81,8 @@ type Context interface {
 	ContentType() string
 	ContentLength() int64
 	GetBody() (string, error)
+	// You should call Context.ReleaseBuffer(buf) to release the buffer at last.
+	GetBodyReader() (buf *bytes.Buffer, err error)
 	SetContentType(string)
 
 	QueryParam(name string) (value string)
