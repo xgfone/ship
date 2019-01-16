@@ -134,6 +134,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Bind(v interface{}) error
 //    BindQuery(v interface{}) error
 //
+//    Write([]byte) (int, error)
 //    Render(name string, code int, data interface{}) error
 //
 //    NoContent(code int) error
@@ -652,6 +653,10 @@ func (c *contextT) Bind(v interface{}) error {
 
 func (c *contextT) BindQuery(v interface{}) error {
 	return c.binderQ(c.QueryParams(), v)
+}
+
+func (c *contextT) Write(b []byte) (int, error) {
+	return c.resp.Write(b)
 }
 
 // Render renders a template with data and sends a text/html response with status

@@ -113,6 +113,7 @@ type Context interface {
 	Bind(v interface{}) error
 	BindQuery(v interface{}) error
 
+	Write([]byte) (int, error)
 	Render(name string, code int, data interface{}) error
 
 	NoContent(code int) error
