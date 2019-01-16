@@ -75,6 +75,7 @@ type Context interface {
 	//   3. If the value is "*/*", it will be amended as "".
 	//
 	Accept() []string
+	Method() string
 	Scheme() string
 	RealIP() string
 	ContentType() string

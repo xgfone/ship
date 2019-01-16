@@ -84,11 +84,26 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    ParamNames() []string      // Return the list of the url parameter names
 //    ParamValues() []string     // Return the list of the url parameter values
 //
+//    // Accept returns the content of the header Accept.
+//    //
+//    // If there is no the header Accept , it return nil.
+//    //
+//    // Notice:
+//    //
+//    //   1. It will sort the content by the q-factor weighting.
+//    //   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
+//    //      So you can use it to match the prefix.
+//    //   3. If the value is "*/*", it will be amended as "".
+//    //
+//    Accept() []string
+//    Method() string
 //    Scheme() string
 //    RealIP() string
+//    Method() string
 //    ContentType() string
 //    ContentLength() int64
 //    GetBody() (string, error)
+//    SetContentType(string)
 //
 //    QueryParam(name string) (value string)
 //    QueryParams() url.Values
@@ -466,6 +481,10 @@ func (c *contextT) Accept() []string {
 		results[i] = accepts[i].ct
 	}
 	return results
+}
+
+func (c *contextT) Method() string {
+	return c.req.Method
 }
 
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
