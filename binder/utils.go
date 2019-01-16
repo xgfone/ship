@@ -17,30 +17,33 @@ package binder
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
+
+	"github.com/xgfone/ship/utils"
 )
 
-// SetValue binds data to v.
+// SetValue binds data to v which must be a pointer.
 //
-// v must be a pointer to the type as follow:
+// The converting rule between the types of data and v:
 //
-//     bool
-//     string
-//     []byte
-//     float32
-//     float64
-//     int
-//     int8
-//     int16
-//     int32
-//     int64
-//     uint
-//     uint8
-//     uint16
-//     uint32
-//     uint64
-//     time.Time
+//    bool, string, number           ->  *bool
+//    bool, string, number, []byte,  ->  *string
+//    bool, string, number, []byte,  ->  *[]byte
+//    bool, string, number           ->  *float32
+//    bool, string, number           ->  *float64
+//    bool, string, number           ->  *int
+//    bool, string, number           ->  *int8
+//    bool, string, number           ->  *int16
+//    bool, string, number           ->  *int32
+//    bool, string, number           ->  *int64
+//    bool, string, number           ->  *uint
+//    bool, string, number           ->  *uint8
+//    bool, string, number           ->  *uint16
+//    bool, string, number           ->  *uint32
+//    bool, string, number           ->  *uint64
+//    string, time.Time              ->  *time.Time
+//
+// Notice: number stands for all the integer and float types.
 //
 // For bool, "t", "T", "1", "on", "On", "ON", "true", "True", "TRUE" are true,
 // and "f", "F", "0", "off", "Off", "OFF", "false", "False", "FALSE" are false.
@@ -53,70 +56,89 @@ import (
 //     SetValue(&t1, "2019-01-16T15:39:40Z")
 //     SetValue(&t2, "2019-01-16T15:39:40+08:00")
 //
-func SetValue(v interface{}, data string) (err error) {
-	var f64 float64
+func SetValue(v interface{}, data interface{}) (err error) {
 	var u64 uint64
 	var i64 int64
 
 	switch p := v.(type) {
 	case *bool:
-		switch data {
-		case "t", "T", "1", "on", "On", "ON", "true", "True", "TRUE":
-			*p = true
-		case "f", "F", "0", "off", "Off", "OFF", "false", "False", "FALSE":
-			*p = false
+		switch data.(type) {
+		case bool:
+			*p = data.(bool)
+		case string, float32, float64,
+			int, int8, int16, int32, int64,
+			uint, uint8, uint16, uint32, uint64:
+			*p, err = utils.ToBool(data)
 		default:
-			return fmt.Errorf("invalid bool value '%s'", data)
+			return fmt.Errorf("the unknown type '%T'", data)
 		}
 	case *string:
-		*p = data
+		*p, err = utils.ToString(data)
 	case *[]byte:
-		*p = []byte(data)
+		switch d := data.(type) {
+		case string:
+			*p = []byte(d)
+		case []byte:
+			*p = d
+		default:
+			s, e := utils.ToString(data)
+			*p = []byte(s)
+			err = e
+		}
 	case *float32:
-		f64, err = strconv.ParseFloat(data, 32)
+		f64, e := utils.ToFloat64(data)
 		*p = float32(f64)
+		err = e
 	case *float64:
-		*p, err = strconv.ParseFloat(data, 64)
+		*p, err = utils.ToFloat64(data)
 	case *int:
-		i64, err = strconv.ParseInt(data, 10, 0)
+		i64, err = utils.ToInt64(data)
 		*p = int(i64)
 	case *int8:
-		i64, err = strconv.ParseInt(data, 10, 8)
+		i64, err = utils.ToInt64(data)
 		*p = int8(i64)
 	case *int16:
-		i64, err = strconv.ParseInt(data, 10, 16)
+		i64, err = utils.ToInt64(data)
 		*p = int16(i64)
 	case *int32:
-		i64, err = strconv.ParseInt(data, 10, 32)
+		i64, err = utils.ToInt64(data)
 		*p = int32(i64)
 	case *int64:
-		*p, err = strconv.ParseInt(data, 10, 64)
+		*p, err = utils.ToInt64(data)
 	case *uint:
-		u64, err = strconv.ParseUint(data, 10, 0)
+		u64, err = utils.ToUint64(data)
 		*p = uint(u64)
 	case *uint8:
-		u64, err = strconv.ParseUint(data, 10, 8)
+		u64, err = utils.ToUint64(data)
 		*p = uint8(u64)
 	case *uint16:
-		u64, err = strconv.ParseUint(data, 10, 16)
+		u64, err = utils.ToUint64(data)
 		*p = uint16(u64)
 	case *uint32:
-		u64, err = strconv.ParseUint(data, 10, 32)
+		u64, err = utils.ToUint64(data)
 		*p = uint32(u64)
 	case *uint64:
-		*p, err = strconv.ParseUint(data, 10, 64)
+		*p, err = utils.ToUint64(data)
 	case *time.Time:
-		_len := len(data)
-		if _len == 0 {
-			return errors.New("the data is empty")
-		}
-		if data[_len-1] == 'Z' {
-			*p, err = time.ParseInLocation("2006-01-02T15:04:05Z", data, time.UTC)
-		} else {
-			*p, err = time.Parse(time.RFC3339, data)
+
+		switch d := data.(type) {
+		case time.Time:
+			*p = d
+		case string:
+			_len := len(d)
+			if _len == 0 {
+				return errors.New("the data is empty")
+			}
+			if d[_len-1] == 'Z' {
+				*p, err = time.ParseInLocation("2006-01-02T15:04:05Z", d, time.UTC)
+			} else {
+				*p, err = time.Parse(time.RFC3339, d)
+			}
+		default:
+			return fmt.Errorf("the unknown type '%T'", data)
 		}
 	default:
-		return errors.New("type is not supported")
+		return fmt.Errorf("the unknown type '%T'", data)
 	}
 	return
 }
