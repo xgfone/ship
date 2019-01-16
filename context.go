@@ -96,10 +96,12 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    //   3. If the value is "*/*", it will be amended as "".
 //    //
 //    Accept() []string
+//    Host() string
 //    Method() string
 //    Scheme() string
 //    RealIP() string
-//    Method() string
+//    RemoteAddr() string
+//    RequestURI() string
 //    ContentType() string
 //    ContentLength() int64
 //    GetBody() (string, error)
@@ -495,6 +497,10 @@ func (c *contextT) Accept() []string {
 	return results
 }
 
+func (c *contextT) Host() string {
+	return c.req.Host
+}
+
 func (c *contextT) Method() string {
 	return c.req.Method
 }
@@ -534,6 +540,14 @@ func (c *contextT) RealIP() string {
 	}
 	ra, _, _ := net.SplitHostPort(c.req.RemoteAddr)
 	return ra
+}
+
+func (c *contextT) RemoteAddr() string {
+	return c.req.RemoteAddr
+}
+
+func (c *contextT) RequestURI() string {
+	return c.req.RequestURI
 }
 
 func (c *contextT) ContentType() (ct string) {

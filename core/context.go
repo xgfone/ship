@@ -75,9 +75,12 @@ type Context interface {
 	//   3. If the value is "*/*", it will be amended as "".
 	//
 	Accept() []string
+	Host() string
 	Method() string
 	Scheme() string
 	RealIP() string
+	RemoteAddr() string
+	RequestURI() string
 	ContentType() string
 	ContentLength() int64
 	GetBody() (string, error)
