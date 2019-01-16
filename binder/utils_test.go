@@ -72,7 +72,8 @@ func TestSetValue(t *testing.T) {
 	if err := SetValue(&tt1, "2019-01-16T15:39:40Z"); err != nil || tt1.String() != "2019-01-16 15:39:40 +0000 UTC" {
 		t.Error(tt1)
 	}
-	if err := SetValue(&tt2, "2019-01-16T15:39:40+08:00"); err != nil || tt2.String() != "2019-01-16 15:39:40 +0800 CST" {
+	if err := SetValue(&tt2, "2019-01-16T15:39:40+08:00"); err != nil ||
+		(tt2.String() != "2019-01-16 15:39:40 +0800 CST" && tt2.String() != "2019-01-16 15:39:40 +0800 +0800") {
 		t.Error(tt2)
 	}
 
@@ -104,7 +105,7 @@ func TestSetStructValue(t *testing.T) {
 		Age  int
 	}
 	s := S{}
-	if err :=SetStructValue(&s, "Name", "abc"); err != nil {
+	if err := SetStructValue(&s, "Name", "abc"); err != nil {
 		t.Error(err)
 	}
 	if err := SetStructValue(&s, "Age", "123"); err != nil {
