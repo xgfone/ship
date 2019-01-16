@@ -272,7 +272,7 @@ func New(config ...Config) *Ship {
 	}
 
 	s.config.init(s)
-	s.handler = s.handleRequestMiddleware(NothingHandler())
+	s.handler = s.handleRequestRoute
 	s.bufpool = utils.NewBufferPool(s.config.BufferSize)
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
 	s.router = s.config.NewRouter()
@@ -404,7 +404,7 @@ func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 func (s *Ship) Pre(middlewares ...Middleware) {
 	s.premiddlewares = append(s.premiddlewares, middlewares...)
 
-	handler := s.handleRequestMiddleware(NothingHandler())
+	handler := s.handleRequestRoute
 	for i := len(s.premiddlewares) - 1; i >= 0; i-- {
 		handler = s.premiddlewares[i](handler)
 	}
@@ -470,15 +470,13 @@ func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handleRequest(s.router, w, r)
 }
 
-func (s *Ship) handleRequestMiddleware(next Handler) Handler {
-	return func(ctx Context) error {
-		c := ctx.(*contextT)
-		h := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
-		if h != nil {
-			return h(ctx)
-		}
-		return s.config.NotFoundHandler(ctx)
+func (s *Ship) handleRequestRoute(ctx Context) error {
+	c := ctx.(*contextT)
+	h := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	if h != nil {
+		return h(ctx)
 	}
+	return s.config.NotFoundHandler(ctx)
 }
 
 func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
