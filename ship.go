@@ -262,6 +262,7 @@ type Ship struct {
 	links  []*Ship
 	lock   *sync.RWMutex
 	once   sync.Once
+	done   chan struct{}
 }
 
 // New returns a new Ship.
@@ -278,6 +279,7 @@ func New(config ...Config) *Ship {
 	s.router = s.config.NewRouter()
 	s.vhosts = make(map[string]*Ship)
 	s.lock = new(sync.RWMutex)
+	s.done = make(chan struct{}, 1)
 	return s
 }
 
@@ -577,11 +579,19 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 	}
 }
 
-func (s *Ship) stop() {
+func (s *Ship) runStop() {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	for _, r := range s.stopfs {
 		r.run()
+	}
+}
+
+func (s *Ship) stop() {
+	s.runStop()
+	select {
+	case s.done <- struct{}{}:
+	default:
 	}
 }
 
@@ -640,4 +650,9 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	} else {
 		s.config.Logger.Error(format+": %s", err)
 	}
+}
+
+// Wait waits until all the registered shutdown functions have finished.
+func (s *Ship) Wait() {
+	<-s.done
 }

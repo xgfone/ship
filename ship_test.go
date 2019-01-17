@@ -1011,16 +1011,14 @@ func (bw *safeBufferWriter) Write(p []byte) (int, error) {
 func TestShipLink(t *testing.T) {
 	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
 	logger := NewNoLevelLogger(buf, 0)
-	wg := sync.WaitGroup{}
-	wg.Add(3)
 
 	prouter := New(Config{Name: "parent", Logger: logger})
 	crouter1 := New(Config{Name: "child1", Logger: logger}).Link(prouter)
 	crouter2 := prouter.Clone("child2").Link(prouter)
 
-	prouter.RegisterOnShutdown(func() { wg.Done() })
-	crouter1.RegisterOnShutdown(func() { wg.Done() })
-	crouter2.RegisterOnShutdown(func() { wg.Done() })
+	prouter.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
+	crouter1.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
+	crouter2.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
@@ -1030,7 +1028,7 @@ func TestShipLink(t *testing.T) {
 	go crouter2.Start("127.0.0.1:11112")
 	prouter.Start("127.0.0.1:11113")
 
-	wg.Wait()
+	prouter.Wait()
 	time.Sleep(time.Millisecond * 100)
 	buf.lock.Lock()
 	lines := strings.Split(strings.TrimSpace(buf.buf.String()), "\n")
