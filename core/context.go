@@ -79,9 +79,10 @@ type Context interface {
 	Method() string
 	Scheme() string
 	RealIP() string
+	Charset() string
 	RemoteAddr() string
 	RequestURI() string
-	ContentType() string
+	ContentType() string // It should not contain the charset.
 	ContentLength() int64
 	GetBody() (string, error)
 	// You should call Context.ReleaseBuffer(buf) to release the buffer at last.

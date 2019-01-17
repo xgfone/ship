@@ -100,9 +100,10 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Method() string
 //    Scheme() string
 //    RealIP() string
+//    Charset() string
 //    RemoteAddr() string
 //    RequestURI() string
-//    ContentType() string
+//    ContentType() string // It should not contain the charset.
 //    ContentLength() int64
 //    GetBody() (string, error)
 //    // You should call Context.ReleaseBuffer(buf) to release the buffer at last.
@@ -549,6 +550,17 @@ func (c *contextT) RemoteAddr() string {
 
 func (c *contextT) RequestURI() string {
 	return c.req.RequestURI
+}
+
+func (c *contextT) Charset() string {
+	ct := c.req.Header.Get(HeaderContentType)
+	if index := strings.IndexByte(ct, ';'); index > 0 {
+		ct = ct[index:]
+		if index = strings.IndexByte(ct, '='); index > 0 {
+			return ct[index+1:]
+		}
+	}
+	return ""
 }
 
 func (c *contextT) ContentType() (ct string) {
