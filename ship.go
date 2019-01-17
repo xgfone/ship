@@ -261,7 +261,8 @@ type Ship struct {
 	stopfs []*stopT
 	links  []*Ship
 	lock   *sync.RWMutex
-	once   sync.Once
+	once1  sync.Once // For shutdown
+	once2  sync.Once // For stop
 	done   chan struct{}
 }
 
@@ -582,21 +583,18 @@ func (s *Ship) handleSignals(sigs ...os.Signal) {
 func (s *Ship) runStop() {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	defer close(s.done)
 	for _, r := range s.stopfs {
 		r.run()
 	}
 }
 
 func (s *Ship) stop() {
-	s.runStop()
-	select {
-	case s.done <- struct{}{}:
-	default:
-	}
+	s.once2.Do(s.runStop)
 }
 
 func (s *Ship) shutdown() {
-	s.once.Do(func() { s.Shutdown(context.Background()) })
+	s.once1.Do(func() { s.Shutdown(context.Background()) })
 }
 
 func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
@@ -635,6 +633,10 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	}
 
 	s.lock.Lock()
+	if s.server != nil {
+		s.config.Logger.Error(format + ": the server has been started")
+		return
+	}
 	s.server = server
 	s.lock.Unlock()
 

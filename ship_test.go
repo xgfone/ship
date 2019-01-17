@@ -1029,6 +1029,7 @@ func TestShipLink(t *testing.T) {
 	prouter.Start("127.0.0.1:11113")
 
 	prouter.Wait()
+	prouter.Wait()
 	time.Sleep(time.Millisecond * 100)
 	buf.lock.Lock()
 	lines := strings.Split(strings.TrimSpace(buf.buf.String()), "\n")

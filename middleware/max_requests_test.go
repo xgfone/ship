@@ -25,7 +25,7 @@ import (
 )
 
 func TestMaxRequests(t *testing.T) {
-	sleep := time.Millisecond * 100
+	sleep := time.Millisecond * 300
 	wg := sync.WaitGroup{}
 	wg.Add(3)
 
