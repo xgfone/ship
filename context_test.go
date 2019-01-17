@@ -15,6 +15,7 @@
 package ship
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,4 +30,60 @@ func TestSetContext(t *testing.T) {
 	if GetContext(ctx.Request()) != ctx {
 		t.Fail()
 	}
+}
+
+func ExampleContext_SetHandler() {
+	responder := func(ctx Context, args ...interface{}) error {
+		return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
+	}
+
+	sethandler := func(next Handler) Handler {
+		return func(ctx Context) error {
+			ctx.SetHandler(responder)
+			return next(ctx)
+		}
+	}
+
+	router := New()
+	router.Use(sethandler)
+	router.Route("/path/to").GET(func(c Context) error { return c.Handle("Hello", "World") })
+
+	// For test
+	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+	fmt.Println(resp.Code)
+	fmt.Println(resp.Body.String())
+
+	// Output:
+	// 200
+	// Hello, World
+}
+
+func ExampleContext_Handle() {
+	responder := func(ctx Context, args ...interface{}) error {
+		return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
+	}
+
+	sethandler := func(next Handler) Handler {
+		return func(ctx Context) error {
+			ctx.SetHandler(responder)
+			return next(ctx)
+		}
+	}
+
+	router := New()
+	router.Use(sethandler)
+	router.Route("/path/to").GET(func(c Context) error { return c.Handle("Hello", "World") })
+
+	// For test
+	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+	fmt.Println(resp.Code)
+	fmt.Println(resp.Body.String())
+
+	// Output:
+	// 200
+	// Hello, World
 }

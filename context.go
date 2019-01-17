@@ -129,6 +129,10 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Set(key string, value interface{})
 //    Del(key string)
 //
+//    // You can set a handler then call it across the functions.
+//    SetHandler(func(ctx Context, args ...interface{}) error)
+//    Handle(args ...interface{}) error
+//
 //    Logger() Logger
 //    URL(name string, params ...interface{}) string
 //
@@ -217,6 +221,7 @@ type contextT struct {
 	resp  responder
 	query url.Values
 
+	handler func(Context, ...interface{}) error
 	pnames  []string
 	pvalues []string
 
@@ -654,6 +659,17 @@ func (c *contextT) Cookies() []*http.Cookie {
 // SetCookie adds a `Set-Cookie` header in HTTP response.
 func (c *contextT) SetCookie(cookie *http.Cookie) {
 	http.SetCookie(c.resp, cookie)
+}
+
+func (c *contextT) SetHandler(h func(Context, ...interface{}) error) {
+	c.handler = h
+}
+
+func (c *contextT) Handle(args ...interface{}) error {
+	if c.handler == nil {
+		return ErrNoHandler
+	}
+	return c.handler(c, args...)
 }
 
 // Bind binds the request information into provided type v.

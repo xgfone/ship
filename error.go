@@ -41,6 +41,7 @@ var (
 	ErrRendererNotRegistered = errors.New("renderer not registered")
 	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
 	ErrCookieNotFound        = errors.New("cookie not found")
+	ErrNoHandler             = errors.New("no handler")
 )
 
 // ErrSkip is the alias of core.ErrSkip, which is not an error and used to

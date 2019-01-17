@@ -108,6 +108,10 @@ type Context interface {
 	Set(key string, value interface{})
 	Del(key string)
 
+	// You can set a handler then call it across the functions.
+	SetHandler(func(ctx Context, args ...interface{}) error)
+	Handle(args ...interface{}) error
+
 	Logger() Logger
 	URL(name string, params ...interface{}) string
 
