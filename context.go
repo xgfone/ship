@@ -279,6 +279,7 @@ func (c *contextT) reset() {
 	c.query = nil
 	c.wrote = false
 	c.router = nil
+	c.handler = nil
 
 	c.resetURLParam()
 	for key := range c.store {
