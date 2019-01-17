@@ -108,7 +108,23 @@ type Context interface {
 	Set(key string, value interface{})
 	Del(key string)
 
-	// You can set a handler then call it across the functions.
+	// You can set a handler then call it across the functions. For example,
+	//
+	//    responder := func(ctx Context, args ...interface{}) error {
+	//        return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
+	//    }
+	//
+	//    sethandler := func(next Handler) Handler {
+	//        return func(ctx Context) error {
+	//            ctx.SetHandler(responder)
+	//            return next(ctx)
+	//        }
+	//    }
+	//
+	//    router := New()
+	//    router.Use(sethandler)
+	//    router.Route("/path/to").GET(func(c Context) error { return c.Handle("Hello", "World") })
+	//
 	SetHandler(func(ctx Context, args ...interface{}) error)
 	Handle(args ...interface{}) error
 
