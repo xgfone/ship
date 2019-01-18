@@ -36,7 +36,7 @@ func RequestID(generateRequestID ...func() string) Middleware {
 			xid := req.Header.Get(ship.HeaderXRequestID)
 			if xid == "" {
 				xid = getRequestID()
-				req.Header.Set(ship.HeaderXRealIP, xid)
+				req.Header.Set(ship.HeaderXRequestID, xid)
 			}
 			ctx.Response().Header().Set(ship.HeaderXRequestID, xid)
 
