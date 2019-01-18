@@ -701,6 +701,9 @@ func (c *contextT) BindQuery(v interface{}) error {
 }
 
 func (c *contextT) Write(b []byte) (int, error) {
+	if !c.wrote {
+		c.resp.WriteHeader(http.StatusOK)
+	}
 	return c.resp.Write(b)
 }
 
