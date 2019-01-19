@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -1001,6 +1002,16 @@ type safeBufferWriter struct {
 	lock *sync.Mutex
 }
 
+func (bw *safeBufferWriter) String() string {
+	bw.lock.Lock()
+	defer bw.lock.Unlock()
+	return bw.buf.String()
+}
+
+func (bw *safeBufferWriter) WriteString(s string) (int, error) {
+	return bw.Write([]byte(s))
+}
+
 func (bw *safeBufferWriter) Write(p []byte) (int, error) {
 	bw.lock.Lock()
 	n, err := bw.buf.Write(p)
@@ -1048,4 +1059,29 @@ func TestShipLink(t *testing.T) {
 	assert.Equal(t, "[I] The HTTP Server [child1] is shutdown", lines[3])
 	assert.Equal(t, "[I] The HTTP Server [child2] is shutdown", lines[4])
 	assert.Equal(t, "[I] The HTTP Server [parent] is shutdown", lines[5])
+}
+
+func TestRegisterConnStateHandler(t *testing.T) {
+	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
+
+	router := New()
+	router.SetConnStateHandler(func(conn net.Conn, state http.ConnState) {
+		buf.WriteString(state.String())
+		buf.WriteString("\n")
+	})
+	router.R("/").GET(func(c Context) error { return nil })
+
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:11114/", nil)
+		req.Close = true
+		if resp, _ := http.DefaultClient.Do(req); resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(time.Millisecond * 100)
+		router.Shutdown(context.Background())
+	}()
+
+	router.Start("127.0.0.1:11114")
+	assert.Equal(t, "new\nactive\nclosed\n", buf.String())
 }

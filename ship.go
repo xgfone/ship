@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -264,6 +265,8 @@ type Ship struct {
 	once1  sync.Once // For shutdown
 	once2  sync.Once // For stop
 	done   chan struct{}
+
+	connState func(net.Conn, http.ConnState)
 }
 
 // New returns a new Ship.
@@ -549,6 +552,14 @@ func (s *Ship) RegisterOnShutdown(functions ...func()) {
 	s.lock.Unlock()
 }
 
+// SetConnStateHandler sets a handler to monitor the change of the connection
+// state, which is used by the HTTP server.
+func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) {
+	s.lock.Lock()
+	s.connState = h
+	s.lock.Unlock()
+}
+
 // Start starts a HTTP server with addr.
 //
 // If tlsFile is not nil, it must be certFile and keyFile. That's,
@@ -621,6 +632,10 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 		r.RegisterOnShutdown(s.shutdown)
 	}
 	server.RegisterOnShutdown(s.stop)
+
+	if server.ConnState == nil && s.connState != nil {
+		server.ConnState = s.connState
+	}
 
 	var format string
 	if s.config.Name == "" {
