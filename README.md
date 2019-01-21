@@ -389,6 +389,7 @@ The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middlew
 - [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)
 - [MaxRequests](https://godoc.org/github.com/xgfone/ship/middleware#MaxRequests)
 - [ResetResponse](https://godoc.org/github.com/xgfone/ship/middleware#ResetResponse)
+- [SetCtxHandler](https://godoc.org/github.com/xgfone/ship/middleware#SetCtxHandler)
 - [RemoveTrailingSlash](https://godoc.org/github.com/xgfone/ship/middleware#RemoveTrailingSlash)
 
 #### Using `SubRouter`
@@ -459,6 +460,51 @@ vhost1
 
 $ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
 vhost2
+```
+
+#### Handle the complex response
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/middleware"
+)
+
+func Responder := func(ctx ship.Context, args ...interface{}) error {
+	switch len(args) {
+	case 0:
+		return ctx.NoContent(http.StatusOK)
+	case 1:
+		switch v := args[0].(type) {
+		case int:
+			return ctx.NoContent(v)
+		case string:
+			return ctx.String(http.StatusOK, v)
+		}
+	case 2:
+		switch v0 := args[0].(type) {
+		case int:
+			return ctx.String(v0, fmt.Sprintf("%v", args[1]))
+		}
+	}
+	return ctx.NoContent(http.StatusInternalServerError)
+}
+
+func main() {
+	router := ship.New()
+	router.Use(middleware.SetCtxHandler(Responder))
+	router.Route("/path1").GET(func(c ship.Context) error { return c.Handle() })
+	router.Route("/path2").GET(func(c ship.Context) error { return c.Handle(200) })
+	router.Route("/path3").GET(func(c ship.Context) error { return c.Handle("Hello, World") })
+	router.Route("/path4").GET(func(c ship.Context) error { return c.Handle(200, "Hello, World") })
+
+	router.Start(":8080")
+}
 ```
 
 
