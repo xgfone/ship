@@ -300,10 +300,20 @@ func (s *Ship) Config() Config {
 
 // ResetConfig resets the config.
 //
-// You must not call it during the ship router is running.
+// You must not call it during the ship router is running. And you had better
+// call it before adding the routers.
+//
+// Notice: it will reset the Router, too, but not the middlewares.
+// So it maybe lose all the added routers.
 func (s *Ship) ResetConfig(config Config) {
 	config.init(s)
+	oldConfig := s.config
 	s.config = config
+
+	s.router = s.config.NewRouter()
+	if config.BufferSize != oldConfig.BufferSize {
+		s.bufpool = utils.NewBufferPool(s.config.BufferSize)
+	}
 }
 
 // Clone returns a new Ship router with a new name by the current configuration.
