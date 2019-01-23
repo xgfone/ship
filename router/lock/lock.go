@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package lock makes a unsafe Router implementation to be thread-safe.
+// So you can read and modify it concurrently between goroutines.
 package lock
 
 import (
