@@ -452,7 +452,12 @@ func (c *contextT) IsTLS() bool {
 
 // IsWebSocket returns true if HTTP connection is WebSocket otherwise false.
 func (c *contextT) IsWebSocket() bool {
-	return strings.ToLower(c.req.Header.Get(HeaderUpgrade)) == "websocket"
+	if c.req.Method == http.MethodGet &&
+		c.req.Header.Get(HeaderConnection) == "Upgrade" &&
+		c.req.Header.Get(HeaderUpgrade) == "websocket" {
+		return true
+	}
+	return false
 }
 
 func (c *contextT) IsAjax() bool {
