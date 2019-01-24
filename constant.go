@@ -48,6 +48,7 @@ const (
 	HeaderAcceptEncoding      = "Accept-Encoding"
 	HeaderAllow               = "Allow"
 	HeaderAuthorization       = "Authorization"
+	HeaderConnection          = "Connection"
 	HeaderContentDisposition  = "Content-Disposition"
 	HeaderContentEncoding     = "Content-Encoding"
 	HeaderContentLength       = "Content-Length"
