@@ -64,6 +64,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Request() *http.Request
 //    Response() http.ResponseWriter
 //    SetResponse(http.ResponseWriter)
+//    SetResponded(bool)
 //
 //    // These may be passed the error between the handlers.
 //    Error() error
@@ -352,6 +353,10 @@ func (c *contextT) NotFoundHandler() Handler {
 
 func (c *contextT) IsResponse() bool {
 	return c.wrote
+}
+
+func (c *contextT) SetResponded(yes bool) {
+	c.wrote = yes
 }
 
 func (c *contextT) Error() error {
