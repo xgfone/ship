@@ -44,6 +44,7 @@ type Context interface {
 	Response() http.ResponseWriter
 	SetResponse(http.ResponseWriter)
 	SetResponded(bool)
+	SetConnectionClose() // Tell the server to close the connection.
 
 	// These may be passed the error between the handlers.
 	Error() error

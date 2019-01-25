@@ -65,6 +65,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Response() http.ResponseWriter
 //    SetResponse(http.ResponseWriter)
 //    SetResponded(bool)
+//    SetConnectionClose() // Tell the server to close the connection.
 //
 //    // These may be passed the error between the handlers.
 //    Error() error
@@ -479,6 +480,10 @@ func (c *contextT) SetResponse(resp http.ResponseWriter) {
 	if resp != nil {
 		c.resp.ResponseWriter = resp
 	}
+}
+
+func (c *contextT) SetConnectionClose() {
+	c.resp.Header().Set(HeaderConnection, "close")
 }
 
 func (c *contextT) GetBody() (string, error) {
