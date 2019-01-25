@@ -61,6 +61,11 @@ func (g *Group) GroupWithoutMiddleware(prefix string, middlewares ...Middleware)
 	return newGroup(g.ship, g.router, g.prefix, prefix, middlewares...)
 }
 
+// RouteWithoutMiddleware is the same as Group, but not inherit the middlewares of the group.
+func (g *Group) RouteWithoutMiddleware(path string) *Route {
+	return newRoute(g.ship, g.router, g.prefix, path)
+}
+
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.

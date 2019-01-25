@@ -447,6 +447,11 @@ func (s *Ship) GroupWithoutMiddleware(prefix string, middlewares ...Middleware) 
 	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
 }
 
+// RouteWithoutMiddleware is the same as Route, but not inherit the middlewares of Ship.
+func (s *Ship) RouteWithoutMiddleware(path string) *Route {
+	return newRoute(s, s.router, s.config.Prefix, path)
+}
+
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
