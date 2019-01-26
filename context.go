@@ -125,6 +125,10 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Cookie(name string) (*http.Cookie, error)
 //    SetCookie(cookie *http.Cookie)
 //
+//    // If the session id does not exist, it maybe return (nil, nil).
+//    GetSession(id string) (interface{}, error)
+//    SetSession(id string, value interface{}) error
+//
 //    // Get and Set are used to store the key-value information about the context.
 //    Store() map[string]interface{}
 //    Get(key string) (value interface{})
@@ -270,6 +274,10 @@ type contextT struct {
 	renderer Renderer
 	binderQ  func(url.Values, interface{}) error
 	router   Router
+	session  Session
+
+	sessionK string
+	sessionV interface{}
 
 	store map[string]interface{}
 }
@@ -302,6 +310,8 @@ func (c *contextT) reset() {
 	c.wrote = false
 	c.router = nil
 	c.handler = nil
+	c.sessionK = ""
+	c.sessionV = nil
 
 	c.resetURLParam()
 	for key := range c.store {
@@ -321,6 +331,7 @@ func (c *contextT) setShip(s *Ship) {
 	c.binder = s.config.Binder
 	c.renderer = s.config.Renderer
 	c.binderQ = s.config.BindQuery
+	c.session = s.config.Session
 }
 
 func (c *contextT) setReqResp(r *http.Request, w http.ResponseWriter) {
@@ -711,6 +722,32 @@ func (c *contextT) Cookies() []*http.Cookie {
 // SetCookie adds a `Set-Cookie` header in HTTP response.
 func (c *contextT) SetCookie(cookie *http.Cookie) {
 	http.SetCookie(c.resp, cookie)
+}
+
+func (c *contextT) GetSession(id string) (v interface{}, err error) {
+	if c.sessionK == id {
+		return c.sessionV, nil
+	}
+	if c.session == nil {
+		return nil, ErrNoSession
+	}
+	if v, err = c.session.GetSession(id); err == nil {
+		c.sessionK = id
+		c.sessionV = v
+	}
+	return v, err
+}
+
+func (c *contextT) SetSession(id string, value interface{}) (err error) {
+	if c.session == nil {
+		return ErrNoSession
+	}
+	if err = c.session.SetSession(id, value); err != nil {
+		return err
+	}
+	c.sessionK = id
+	c.sessionV = value
+	return nil
 }
 
 func (c *contextT) SetHandler(h func(Context, ...interface{}) error) {

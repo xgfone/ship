@@ -57,6 +57,14 @@ type Binder = core.Binder
 //    Render(ctx Context, name string, code int, data interface{}) error
 type Renderer = core.Renderer
 
+// Session is the alias of core.Session, which is used to implement the store
+// for the session information.
+//
+// Methods:
+//    GetSession(id string) (value interface{}, err error)
+//    SetSession(id string, value interface{}) error
+type Session = core.Session
+
 // Matcher is used to check whether the request match some conditions.
 type Matcher func(*http.Request) error
 
@@ -148,6 +156,8 @@ type Config struct {
 	//     mr.Add("html", HtmlRenderer)
 	//
 	Renderer Renderer
+	// Session is used to acquire and store the session information.
+	Session Session
 
 	// Create a new router, which uses echo implementation by default.
 	// But you can appoint yourself customized Router implementation.

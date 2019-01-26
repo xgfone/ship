@@ -15,10 +15,13 @@
 package ship
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSetContext(t *testing.T) {
@@ -86,4 +89,41 @@ func ExampleContext_Handle() {
 	// Output:
 	// 200
 	// Hello, World
+}
+
+type sessionT struct {
+	stores map[string]interface{}
+}
+
+func (s sessionT) GetSession(id string) (interface{}, error) {
+	return s.stores[id], nil
+}
+
+func (s sessionT) SetSession(id string, value interface{}) error {
+	s.stores[id] = value
+	return nil
+}
+
+func TestContextSession(t *testing.T) {
+	session := sessionT{stores: make(map[string]interface{})}
+	buf := bytes.NewBuffer(nil)
+
+	s := New(Config{Session: session})
+	s.R("/").GET(func(ctx Context) error {
+		v, _ := ctx.GetSession("id")
+		fmt.Fprintf(buf, "%v", v)
+		return nil
+	}).POST(func(ctx Context) error {
+		return ctx.SetSession("id", "abc")
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, "abc", buf.String())
 }

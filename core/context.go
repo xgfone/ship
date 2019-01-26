@@ -104,6 +104,10 @@ type Context interface {
 	Cookie(name string) (*http.Cookie, error)
 	SetCookie(cookie *http.Cookie)
 
+	// If the session id does not exist, it maybe return (nil, nil).
+	GetSession(id string) (interface{}, error)
+	SetSession(id string, value interface{}) error
+
 	// Get and Set are used to store the key-value information about the context.
 	Store() map[string]interface{}
 	Get(key string) (value interface{})

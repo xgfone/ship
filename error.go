@@ -42,6 +42,7 @@ var (
 	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
 	ErrCookieNotFound        = errors.New("cookie not found")
 	ErrNoHandler             = errors.New("no handler")
+	ErrNoSession             = errors.New("no session support")
 )
 
 // ErrSkip is the alias of core.ErrSkip, which is not an error and used to
