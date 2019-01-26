@@ -130,6 +130,9 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    SetCookie(cookie *http.Cookie)
 //
 //    // If the session id does not exist, it maybe return (nil, nil).
+//    //
+//    // Notice: for the same session id, the context maybe optimize GetSession
+//    // by the cache, which will call the backend store only once.
 //    GetSession(id string) (interface{}, error)
 //    // id must not be "".
 //    //
