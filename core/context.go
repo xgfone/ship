@@ -106,7 +106,14 @@ type Context interface {
 
 	// If the session id does not exist, it maybe return (nil, nil).
 	GetSession(id string) (interface{}, error)
+	// id must not be "".
+	//
+	// value should not be nil. If nil, however, it will tell the context
+	// that the session id is missing, and the context should not forward
+	// the request to the underlying session store when calling GetSession.
 	SetSession(id string, value interface{}) error
+	// id must not be "".
+	DelSession(id string) error
 
 	// Get and Set are used to store the key-value information about the context.
 	Store() map[string]interface{}

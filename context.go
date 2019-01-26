@@ -131,7 +131,14 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //
 //    // If the session id does not exist, it maybe return (nil, nil).
 //    GetSession(id string) (interface{}, error)
+//    // id must not be "".
+//    //
+//    // value should not be nil. If nil, however, it will tell the context
+//    // that the session id is missing, and the context should not forward
+//    // the request to the underlying session store when calling GetSession.
 //    SetSession(id string, value interface{}) error
+//    // id must not be "".
+//    DelSession(id string) error
 //
 //    // Get and Set are used to store the key-value information about the context.
 //    Store() map[string]interface{}
@@ -730,33 +737,61 @@ func (c *contextT) SetCookie(cookie *http.Cookie) {
 
 func (c *contextT) GetSession(id string) (v interface{}, err error) {
 	if id == "" {
-		return nil, ErrInvalidSessionValue
+		return nil, ErrInvalidSession
 	}
 	if c.sessionK == id {
+		switch c.sessionV {
+		case nil, emptyValue:
+			return nil, ErrSessionNotExist
+		}
 		return c.sessionV, nil
 	}
+
 	if c.session == nil {
-		return nil, ErrNoSession
+		return nil, ErrNoSessionSupport
 	}
 	if v, err = c.session.GetSession(id); err == nil {
-		c.sessionK = id
 		c.sessionV = v
+	} else {
+		c.sessionV = emptyValue
 	}
-	return v, err
+	c.sessionK = id
+	return
 }
 
 func (c *contextT) SetSession(id string, value interface{}) (err error) {
 	if c.session == nil {
-		return ErrNoSession
+		return ErrNoSessionSupport
 	}
-	if id == "" || value == nil {
-		return ErrInvalidSessionValue
+	if id == "" {
+		return ErrInvalidSession
+	}
+	if value == nil {
+		c.sessionK = id
+		c.sessionV = emptyValue
+		return nil
 	}
 	if err = c.session.SetSession(id, value); err != nil {
 		return err
 	}
 	c.sessionK = id
 	c.sessionV = value
+	return nil
+}
+
+func (c *contextT) DelSession(id string) (err error) {
+	if id == "" {
+		return ErrInvalidSession
+	}
+	if c.session == nil {
+		return ErrNoSessionSupport
+	}
+	if err = c.session.DelSession(id); err != nil {
+		return
+	}
+	if c.sessionK == id {
+		c.sessionV = nil
+	}
 	return nil
 }
 

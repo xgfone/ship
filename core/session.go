@@ -16,6 +16,8 @@ package core
 
 // Session represents an interface about the session.
 type Session interface {
+	// If the session id does not exist, it should return (nil, nil).
 	GetSession(id string) (value interface{}, err error)
 	SetSession(id string, value interface{}) error
+	DelSession(id string) error
 }

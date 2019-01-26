@@ -104,6 +104,11 @@ func (s sessionT) SetSession(id string, value interface{}) error {
 	return nil
 }
 
+func (s sessionT) DelSession(id string) error {
+	delete(s.stores, id)
+	return nil
+}
+
 func TestContextSession(t *testing.T) {
 	session := sessionT{stores: make(map[string]interface{})}
 	buf := bytes.NewBuffer(nil)
@@ -111,10 +116,18 @@ func TestContextSession(t *testing.T) {
 	s := New(Config{Session: session})
 	s.R("/").GET(func(ctx Context) error {
 		v, _ := ctx.GetSession("id")
-		fmt.Fprintf(buf, "%v", v)
+		fmt.Fprintf(buf, "%v\n", v)
 		return nil
 	}).POST(func(ctx Context) error {
 		return ctx.SetSession("id", "abc")
+	}).PUT(func(ctx Context) error {
+		ctx.SetSession("id", "xyz")
+		v, _ := ctx.GetSession("id")
+		fmt.Fprintf(buf, "%v\n", v)
+		ctx.SetSession("id", nil)
+		v, _ = ctx.GetSession("id")
+		fmt.Fprintf(buf, "%v\n", v)
+		return nil
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
@@ -125,5 +138,13 @@ func TestContextSession(t *testing.T) {
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 
-	assert.Equal(t, "abc", buf.String())
+	req = httptest.NewRequest(http.MethodPut, "/", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, "abc\nxyz\n<nil>\nxyz\n", buf.String())
 }
