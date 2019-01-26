@@ -126,12 +126,14 @@ type Context interface {
 	// Store maybe use a map to store the key-value, so it asks the system
 	// to allocate the memory. If the interim context value is too few and
 	// you don't want the system to allocate the memory for the map,
-	// the context supplies two context variables for you and you can consider
+	// the context supplies three context variables for you and you can consider
 	// them as the context register to use.
 	Key1() (value interface{})
 	Key2() (value interface{})
+	Key3() (value interface{})
 	SetKey1(value interface{})
 	SetKey2(value interface{})
+	SetKey3(value interface{})
 
 	// You can set a handler then call it across the functions, which is used to
 	// handle the various arguments. For example,

@@ -149,14 +149,16 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    Set(key string, value interface{})
 //    Del(key string)
 //    // Store maybe use a map to store the key-value, so it asks the system
-//    // to allocate the memory. If the interim context value is few and
+//    // to allocate the memory. If the interim context value is too few and
 //    // you don't want the system to allocate the memory for the map,
-//    // the context supplies two context variables for you and you can consider
-//    // them as the context register.
+//    // the context supplies three context variables for you and you can consider
+//    // them as the context register to use.
 //    Key1() (value interface{})
 //    Key2() (value interface{})
+//    Key3() (value interface{})
 //    SetKey1(value interface{})
 //    SetKey2(value interface{})
+//    SetKey3(value interface{})
 //
 //    // You can set a handler then call it across the functions, which is used to
 //    // handle the various arguments. For example,
@@ -304,6 +306,7 @@ type contextT struct {
 
 	key1  interface{}
 	key2  interface{}
+	key3  interface{}
 	store map[string]interface{}
 }
 
@@ -339,6 +342,7 @@ func (c *contextT) reset() {
 	c.sessionV = nil
 	c.key1 = nil
 	c.key2 = nil
+	c.key3 = nil
 
 	c.resetURLParam()
 	for key := range c.store {
@@ -464,12 +468,20 @@ func (c *contextT) Key2() (value interface{}) {
 	return c.key2
 }
 
+func (c *contextT) Key3() (value interface{}) {
+	return c.key3
+}
+
 func (c *contextT) SetKey1(value interface{}) {
 	c.key1 = value
 }
 
 func (c *contextT) SetKey2(value interface{}) {
 	c.key2 = value
+}
+
+func (c *contextT) SetKey3(value interface{}) {
+	c.key3 = value
 }
 
 func (c *contextT) Store() map[string]interface{} {
