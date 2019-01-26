@@ -315,12 +315,12 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 		pvalues = make([]string, maxParam)
 	}
 
-	ctx := &contextT{
-		pnames:  pnames,
-		pvalues: pvalues,
-
-		store: make(map[string]interface{}, s.config.ContextStoreSize),
+	var store map[string]interface{}
+	if s.config.ContextStoreSize > 0 {
+		store = make(map[string]interface{}, s.config.ContextStoreSize)
 	}
+
+	ctx := &contextT{pnames: pnames, pvalues: pvalues, store: store}
 	ctx.setShip(s)
 	ctx.setReqResp(req, resp)
 	return ctx
@@ -473,21 +473,33 @@ func (c *contextT) SetKey2(value interface{}) {
 }
 
 func (c *contextT) Store() map[string]interface{} {
+	if c.store == nil {
+		c.store = make(map[string]interface{})
+	}
 	return c.store
 }
 
 // Get retrieves data from the context.
 func (c *contextT) Get(key string) interface{} {
+	if c.store == nil {
+		return nil
+	}
 	return c.store[key]
 }
 
 // Set saves data in the context.
 func (c *contextT) Set(key string, value interface{}) {
-	c.store[key] = value
+	if c.store == nil {
+		c.store = map[string]interface{}{key: value}
+	} else {
+		c.store[key] = value
+	}
 }
 
 func (c *contextT) Del(key string) {
-	delete(c.store, key)
+	if c.store != nil {
+		delete(c.store, key)
+	}
 }
 
 // Logger returns the logger implementation.
