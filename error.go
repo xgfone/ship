@@ -43,6 +43,7 @@ var (
 	ErrCookieNotFound        = errors.New("cookie not found")
 	ErrNoHandler             = errors.New("no handler")
 	ErrNoSession             = errors.New("no session support")
+	ErrInvalidSessionValue   = errors.New("invalid session value")
 )
 
 // ErrSkip is the alias of core.ErrSkip, which is not an error and used to

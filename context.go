@@ -39,7 +39,11 @@ import (
 var (
 	indexPage = "index.html"
 	emptyStrS = [256]string{}
+
+	emptyValue = emptyType(0)
 )
+
+type emptyType uint8
 
 // MaxMemoryLimit is the maximum memory.
 var MaxMemoryLimit int64 = 32 << 20 // 32MB
@@ -725,6 +729,9 @@ func (c *contextT) SetCookie(cookie *http.Cookie) {
 }
 
 func (c *contextT) GetSession(id string) (v interface{}, err error) {
+	if id == "" {
+		return nil, ErrInvalidSessionValue
+	}
 	if c.sessionK == id {
 		return c.sessionV, nil
 	}
@@ -741,6 +748,9 @@ func (c *contextT) GetSession(id string) (v interface{}, err error) {
 func (c *contextT) SetSession(id string, value interface{}) (err error) {
 	if c.session == nil {
 		return ErrNoSession
+	}
+	if id == "" || value == nil {
+		return ErrInvalidSessionValue
 	}
 	if err = c.session.SetSession(id, value); err != nil {
 		return err
