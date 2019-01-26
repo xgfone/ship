@@ -794,13 +794,16 @@ func (c *contextT) GetSession(id string) (v interface{}, err error) {
 	if c.session == nil {
 		return nil, ErrNoSessionSupport
 	}
-	if v, err = c.session.GetSession(id); err == nil || v != nil {
-		c.sessionV = v
-	} else {
-		c.sessionV = emptyValue
-		v = ErrSessionNotExist
+	if v, err = c.session.GetSession(id); err == nil {
+		c.sessionK = id
+		if v == nil {
+			err = ErrSessionNotExist
+			c.sessionV = emptyValue
+		} else {
+			c.sessionV = v
+		}
 	}
-	c.sessionK = id
+
 	return
 }
 
