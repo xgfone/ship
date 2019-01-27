@@ -573,24 +573,21 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 }
 
 // RegisterOnShutdown registers some functions to run when the http server is
-// shut down, then returns the origin ship router to write the chained router.
-func (s *Ship) RegisterOnShutdown(functions ...func()) *Ship {
+// shut down.
+func (s *Ship) RegisterOnShutdown(functions ...func()) {
 	s.lock.Lock()
 	for _, f := range functions {
 		s.stopfs = append(s.stopfs, &stopT{once: sync.Once{}, f: f})
 	}
 	s.lock.Unlock()
-	return s
 }
 
 // SetConnStateHandler sets a handler to monitor the change of the connection
-// state, which is used by the HTTP server, then returns the origin ship router
-// to write the chained router.
-func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) *Ship {
+// state, which is used by the HTTP server.
+func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) {
 	s.lock.Lock()
 	s.connState = h
 	s.lock.Unlock()
-	return s
 }
 
 // Start starts a HTTP server with addr.
