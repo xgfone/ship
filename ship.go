@@ -427,7 +427,8 @@ func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 }
 
 // Pre registers the Pre-middlewares, which are executed before finding the route.
-func (s *Ship) Pre(middlewares ...Middleware) {
+// then returns the origin ship router to write the chained router.
+func (s *Ship) Pre(middlewares ...Middleware) *Ship {
 	s.premiddlewares = append(s.premiddlewares, middlewares...)
 
 	handler := s.handleRequestRoute
@@ -435,11 +436,15 @@ func (s *Ship) Pre(middlewares ...Middleware) {
 		handler = s.premiddlewares[i](handler)
 	}
 	s.handler = handler
+
+	return s
 }
 
-// Use registers the global middlewares.
-func (s *Ship) Use(middlewares ...Middleware) {
+// Use registers the global middlewares and returns the origin ship router
+// to write the chained router.
+func (s *Ship) Use(middlewares ...Middleware) *Ship {
 	s.middlewares = append(s.middlewares, middlewares...)
+	return s
 }
 
 // Group returns a new sub-group.
@@ -567,22 +572,25 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 	return server.Shutdown(ctx)
 }
 
-// RegisterOnShutdown registers some functions to run
-// when the http server is shut down.
-func (s *Ship) RegisterOnShutdown(functions ...func()) {
+// RegisterOnShutdown registers some functions to run when the http server is
+// shut down, then returns the origin ship router to write the chained router.
+func (s *Ship) RegisterOnShutdown(functions ...func()) *Ship {
 	s.lock.Lock()
 	for _, f := range functions {
 		s.stopfs = append(s.stopfs, &stopT{once: sync.Once{}, f: f})
 	}
 	s.lock.Unlock()
+	return s
 }
 
 // SetConnStateHandler sets a handler to monitor the change of the connection
-// state, which is used by the HTTP server.
-func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) {
+// state, which is used by the HTTP server, then returns the origin ship router
+// to write the chained router.
+func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) *Ship {
 	s.lock.Lock()
 	s.connState = h
 	s.lock.Unlock()
+	return s
 }
 
 // Start starts a HTTP server with addr.

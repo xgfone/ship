@@ -46,9 +46,11 @@ func newGroup(s *Ship, router Router, pprefix, prefix string, middlewares ...Mid
 	}
 }
 
-// Use adds some middlwares for the group.
-func (g *Group) Use(middlewares ...Middleware) {
+// Use adds some middlwares for the group and returns the origin group to write
+// the chained router.
+func (g *Group) Use(middlewares ...Middleware) *Group {
 	g.mdwares = append(g.mdwares, middlewares...)
+	return g
 }
 
 // Group returns a new sub-group.
