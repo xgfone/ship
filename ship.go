@@ -32,6 +32,7 @@ import (
 	"github.com/xgfone/ship/core"
 	"github.com/xgfone/ship/render"
 	"github.com/xgfone/ship/router/echo"
+	"github.com/xgfone/ship/session/memory"
 	"github.com/xgfone/ship/utils"
 )
 
@@ -224,6 +225,10 @@ func (c *Config) init(s *Ship) {
 
 	if c.HandleError == nil {
 		c.HandleError = s.handleError
+	}
+
+	if c.Session == nil {
+		c.Session = memory.NewSession()
 	}
 
 	if c.Binder == nil {
