@@ -71,6 +71,11 @@ type Session = core.Session
 // Matcher is used to check whether the request match some conditions.
 type Matcher func(*http.Request) error
 
+// Resetter is an Reset interface.
+type Resetter interface {
+	Reset()
+}
+
 // Config is used to configure the router used by the default implementation.
 type Config struct {
 	// The name of the router, which is used when starting the http server.
@@ -172,6 +177,10 @@ type Config struct {
 	// Or only log it. So the handler and the middleware return a HTTPError,
 	// instead of sending the response to the peer.
 	HandleError func(Context, error)
+
+	// PreAllocateCtxData allocates a value to correlate to the context
+	// when allocating the context.
+	PreAllocateCtxData func() Resetter
 
 	// You can appoint the NotFound handler. The default is NotFoundHandler().
 	NotFoundHandler Handler

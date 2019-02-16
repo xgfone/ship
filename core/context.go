@@ -118,6 +118,8 @@ type Context interface {
 	// id must not be "".
 	DelSession(id string) error
 
+	// The user-defined data to be associated with the context.
+	Data() interface{}
 	// Get and Set are used to store the key-value information about the context.
 	Store() map[string]interface{}
 	Get(key string) (value interface{})

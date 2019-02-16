@@ -300,6 +300,7 @@ type contextT struct {
 	binderQ  func(url.Values, interface{}) error
 	router   Router
 	session  Session
+	ctxdata  Resetter
 
 	sessionK string
 	sessionV interface{}
@@ -348,6 +349,10 @@ func (c *contextT) reset() {
 	for key := range c.store {
 		delete(c.store, key)
 	}
+
+	if c.ctxdata != nil {
+		c.ctxdata.Reset()
+	}
 }
 
 func (c *contextT) resetURLParam() {
@@ -363,6 +368,9 @@ func (c *contextT) setShip(s *Ship) {
 	c.renderer = s.config.Renderer
 	c.binderQ = s.config.BindQuery
 	c.session = s.config.Session
+	if s.config.PreAllocateCtxData != nil {
+		c.ctxdata = s.config.PreAllocateCtxData()
+	}
 }
 
 func (c *contextT) setReqResp(r *http.Request, w http.ResponseWriter) {
@@ -458,6 +466,10 @@ func (c *contextT) ParamValues() []string {
 		}
 	}
 	return nil
+}
+
+func (c *contextT) Data() interface{} {
+	return c.ctxdata
 }
 
 func (c *contextT) Key1() (value interface{}) {
