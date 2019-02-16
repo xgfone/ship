@@ -128,9 +128,8 @@ type Config struct {
 	// instead of sending the response to the peer.
 	HandleError func(Context, error)
 
-	// PreAllocateCtxData allocates a value to correlate to the context
-	// when allocating the context.
-	PreAllocateCtxData func() Resetter
+	// NewCtxData news a value to correlate to the context when newing the context.
+	NewCtxData func() Resetter
 
 	// You can appoint the NotFound handler. The default is NotFoundHandler().
 	NotFoundHandler Handler
@@ -224,10 +223,10 @@ func SetLogger(log Logger) Option {
 	}
 }
 
-// SetCtxData resets Config.PreAllocateCtxData.
+// SetCtxData resets Config.NewCtxData.
 func SetCtxData(newCtxData func() Resetter) Option {
 	return func(c *Config) {
-		c.PreAllocateCtxData = newCtxData
+		c.NewCtxData = newCtxData
 	}
 }
 

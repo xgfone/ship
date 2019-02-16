@@ -368,8 +368,8 @@ func (c *contextT) setShip(s *Ship) {
 	c.renderer = s.config.Renderer
 	c.binderQ = s.config.BindQuery
 	c.session = s.config.Session
-	if s.config.PreAllocateCtxData != nil {
-		c.ctxdata = s.config.PreAllocateCtxData()
+	if s.config.NewCtxData != nil {
+		c.ctxdata = s.config.NewCtxData()
 	}
 }
 
