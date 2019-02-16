@@ -251,6 +251,15 @@ func SetRenderer(r Renderer) Option {
 	}
 }
 
+// SetContextStoreSize resets Config.ContextStoreSize.
+func SetContextStoreSize(size int) Option {
+	return func(c *Config) {
+		if size >= 0 {
+			c.ContextStoreSize = size
+		}
+	}
+}
+
 // SetNotFoundHandler resets Config.NotFoundHandler.
 func SetNotFoundHandler(h Handler) Option {
 	return func(c *Config) {
