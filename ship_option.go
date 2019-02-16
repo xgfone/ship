@@ -129,7 +129,7 @@ type Config struct {
 	HandleError func(Context, error)
 
 	// NewCtxData news a value to correlate to the context when newing the context.
-	NewCtxData func() Resetter
+	NewCtxData func(Context) Resetter
 
 	// You can appoint the NotFound handler. The default is NotFoundHandler().
 	NotFoundHandler Handler
@@ -224,7 +224,7 @@ func SetLogger(log Logger) Option {
 }
 
 // SetCtxData resets Config.NewCtxData.
-func SetCtxData(newCtxData func() Resetter) Option {
+func SetCtxData(newCtxData func(Context) Resetter) Option {
 	return func(c *Config) {
 		c.NewCtxData = newCtxData
 	}

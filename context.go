@@ -369,7 +369,7 @@ func (c *contextT) setShip(s *Ship) {
 	c.binderQ = s.config.BindQuery
 	c.session = s.config.Session
 	if s.config.NewCtxData != nil {
-		c.ctxdata = s.config.NewCtxData()
+		c.ctxdata = s.config.NewCtxData(c)
 	}
 }
 
