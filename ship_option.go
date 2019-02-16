@@ -214,6 +214,13 @@ func (c *Config) init(s *Ship) {
 // Option is used to configure Ship.
 type Option func(*Config)
 
+// SetName resets Config.Name.
+func SetName(name string) Option {
+	return func(c *Config) {
+		c.Name = name
+	}
+}
+
 // SetLogger resets Config.Logger.
 func SetLogger(log Logger) Option {
 	return func(c *Config) {
