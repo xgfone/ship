@@ -333,6 +333,17 @@ func (s *Ship) ResetConfig(config Config) {
 	}
 }
 
+// ResetLogger resets the logger if it's not nil.
+//
+// Notice: You must not call it during the ship router is running.
+// And you had better call it before adding the routers.
+func (s *Ship) ResetLogger(logger Logger) *Ship {
+	if logger != nil {
+		s.config.Logger = logger
+	}
+	return s
+}
+
 // Clone returns a new Ship router with a new name by the current configuration.
 //
 // Notice: the new router will disable the signals and register the shutdown
