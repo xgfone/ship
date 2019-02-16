@@ -138,7 +138,7 @@ func (s *Ship) Config() Config {
 //
 // Notice: it will reset the Router, too, but not the middlewares.
 // So it maybe lose all the added routers.
-func (s *Ship) ResetConfig(config Config) {
+func (s *Ship) ResetConfig(config Config) *Ship {
 	config.init(s)
 	oldConfig := s.config
 	s.config = config
@@ -147,14 +147,16 @@ func (s *Ship) ResetConfig(config Config) {
 	if config.BufferSize != oldConfig.BufferSize {
 		s.bufpool = utils.NewBufferPool(s.config.BufferSize)
 	}
+	return s
 }
 
 // ConfigOptions is the same as ResetConfig, but sets the configuration of Ship
 // by the options.
-func (s *Ship) ConfigOptions(options ...Option) {
+func (s *Ship) ConfigOptions(options ...Option) *Ship {
 	for _, opt := range options {
 		opt(&s.config)
 	}
+	return s
 }
 
 // Clone returns a new Ship router with a new name by the current configuration.
