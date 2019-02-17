@@ -131,6 +131,9 @@ type Config struct {
 	// NewCtxData news a value to correlate to the context when newing the context.
 	NewCtxData func(Context) Resetter
 
+	// The default global handler of Context.
+	CtxHandler func(Context, ...interface{}) error
+
 	// You can appoint the NotFound handler. The default is NotFoundHandler().
 	NotFoundHandler Handler
 
@@ -264,6 +267,13 @@ func SetContextStoreSize(size int) Option {
 		if size >= 0 {
 			c.ContextStoreSize = size
 		}
+	}
+}
+
+// SetCtxHandler resets Config.SetCtxHandler.
+func SetCtxHandler(h func(Context, ...interface{}) error) Option {
+	return func(c *Config) {
+		c.CtxHandler = h
 	}
 }
 

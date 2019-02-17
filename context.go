@@ -872,10 +872,12 @@ func (c *contextT) SetHandler(h func(Context, ...interface{}) error) {
 }
 
 func (c *contextT) Handle(args ...interface{}) error {
-	if c.handler == nil {
-		return ErrNoHandler
+	if c.handler != nil {
+		return c.handler(c, args...)
+	} else if c.ship.config.CtxHandler != nil {
+		c.ship.config.CtxHandler(c, args...)
 	}
-	return c.handler(c, args...)
+	return ErrNoHandler
 }
 
 // Bind binds the request information into provided type v.
