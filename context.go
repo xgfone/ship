@@ -337,7 +337,6 @@ func (c *contextT) reset() {
 	c.resp.ctx = nil
 	c.query = nil
 	c.wrote = false
-	c.router = nil
 	c.handler = nil
 	c.sessionK = ""
 	c.sessionV = nil
@@ -368,6 +367,7 @@ func (c *contextT) setShip(s *Ship) {
 	c.renderer = s.config.Renderer
 	c.binderQ = s.config.BindQuery
 	c.session = s.config.Session
+	c.router = s.router
 	if s.config.NewCtxData != nil {
 		c.ctxdata = s.config.NewCtxData(c)
 	}
@@ -395,7 +395,7 @@ func (c *contextT) URL(name string, params ...interface{}) string {
 
 func (c *contextT) FindHandler(method, path string) Handler {
 	c.resetURLParam()
-	return c.ship.router.Find(method, path, c.pnames, c.pvalues)
+	return c.router.Find(method, path, c.pnames, c.pvalues)
 }
 
 func (c *contextT) NotFoundHandler() Handler {
