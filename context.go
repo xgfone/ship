@@ -875,7 +875,7 @@ func (c *contextT) Handle(args ...interface{}) error {
 	if c.handler != nil {
 		return c.handler(c, args...)
 	} else if c.ship.config.CtxHandler != nil {
-		c.ship.config.CtxHandler(c, args...)
+		return c.ship.config.CtxHandler(c, args...)
 	}
 	return ErrNoHandler
 }
