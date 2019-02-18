@@ -366,15 +366,17 @@ func (s *Ship) handleError(ctx Context, err error) {
 	// Handle the HTTPError, and send the response
 	if he, ok := err.(HTTPError); ok {
 		code := he.Code()
-		ct := he.ContentType()
-		msg := he.Message()
-		if 400 <= code && code < 500 {
-			msg = err.Error()
-		} else if code >= 500 && ctx.IsDebug() {
-			msg = err.Error()
-		}
+		if !ctx.IsResponse() {
+			ct := he.ContentType()
+			msg := he.Message()
+			if 400 <= code && code < 500 {
+				msg = err.Error()
+			} else if code >= 500 && ctx.IsDebug() {
+				msg = err.Error()
+			}
 
-		ctx.Blob(code, ct, []byte(msg))
+			ctx.Blob(code, ct, []byte(msg))
+		}
 
 		if code >= 500 {
 			if logger := ctx.Logger(); logger != nil {
@@ -386,7 +388,9 @@ func (s *Ship) handleError(ctx Context, err error) {
 
 	// For other errors, only log the error.
 	if err != ErrSkip {
-		ctx.NoContent(http.StatusInternalServerError)
+		if !ctx.IsResponse() {
+			ctx.NoContent(http.StatusInternalServerError)
+		}
 		if logger := ctx.Logger(); logger != nil {
 			logger.Error("%s", err.Error())
 		}
