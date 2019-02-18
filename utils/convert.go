@@ -177,8 +177,10 @@ func ToString(_v interface{}) (v string, err error) {
 	case int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64:
 		v = fmt.Sprintf("%d", t)
-	case float32, float64:
-		v = fmt.Sprintf("%f", t)
+	case float32:
+		v = strconv.FormatFloat(float64(t), 'f', -1, 32)
+	case float64:
+		v = strconv.FormatFloat(t, 'f', -1, 64)
 	default:
 		err = fmt.Errorf("unknown type of %T", _v)
 	}
