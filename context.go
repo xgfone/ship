@@ -143,11 +143,16 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 //    // id must not be "".
 //    DelSession(id string) error
 //
+//    // The user-defined data to be associated with the context.
+//    Data() interface{}
+//
 //    // Get and Set are used to store the key-value information about the context.
 //    Store() map[string]interface{}
+//    Clear() // Clear the store.
 //    Get(key string) (value interface{})
 //    Set(key string, value interface{})
 //    Del(key string)
+//
 //    // Store maybe use a map to store the key-value, so it asks the system
 //    // to allocate the memory. If the interim context value is too few and
 //    // you don't want the system to allocate the memory for the map,
@@ -345,9 +350,7 @@ func (c *contextT) reset() {
 	c.key3 = nil
 
 	c.resetURLParam()
-	for key := range c.store {
-		delete(c.store, key)
-	}
+	c.Clear()
 
 	if c.ctxdata != nil {
 		c.ctxdata.Reset()
@@ -501,6 +504,12 @@ func (c *contextT) Store() map[string]interface{} {
 		c.store = make(map[string]interface{})
 	}
 	return c.store
+}
+
+func (c *contextT) Clear() {
+	for key := range c.store {
+		delete(c.store, key)
+	}
 }
 
 // Get retrieves data from the context.

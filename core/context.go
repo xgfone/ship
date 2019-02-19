@@ -120,11 +120,14 @@ type Context interface {
 
 	// The user-defined data to be associated with the context.
 	Data() interface{}
+
 	// Get and Set are used to store the key-value information about the context.
 	Store() map[string]interface{}
+	Clear() // Clear the store.
 	Get(key string) (value interface{})
 	Set(key string, value interface{})
 	Del(key string)
+
 	// Store maybe use a map to store the key-value, so it asks the system
 	// to allocate the memory. If the interim context value is too few and
 	// you don't want the system to allocate the memory for the map,
