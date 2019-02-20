@@ -23,6 +23,11 @@ import (
 	"github.com/xgfone/ship/utils"
 )
 
+// SetValuer is used to set the itself value to v.
+type SetValuer interface {
+	SetValue(v interface{}) error
+}
+
 // SetValue binds data to v which must be a pointer.
 //
 // The converting rule between the types of data and v:
@@ -57,11 +62,14 @@ import (
 //     SetValue(&t1, "2019-01-16T15:39:40Z")
 //     SetValue(&t2, "2019-01-16T15:39:40+08:00")
 //
+// If v support the interface SetValuer, it will call its SetValue method.
 func SetValue(v interface{}, data interface{}) (err error) {
 	var u64 uint64
 	var i64 int64
 
 	switch p := v.(type) {
+	case SetValuer:
+		return p.SetValue(data)
 	case *bool:
 		switch data.(type) {
 		case bool:

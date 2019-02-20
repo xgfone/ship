@@ -20,6 +20,32 @@ import (
 	"time"
 )
 
+type stringSetValuer struct {
+	name string
+}
+
+func (s *stringSetValuer) SetValue(v interface{}) error {
+	return SetValue(&s.name, v)
+}
+
+type mapSetValuer struct {
+	name string
+	age  int
+}
+
+func (m *mapSetValuer) SetValue(v interface{}) error {
+	if ms, ok := v.(map[string]interface{}); ok {
+		if err := SetValue(&m.name, ms["name"]); err != nil {
+			return err
+		}
+		if err := SetValue(&m.age, ms["age"]); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("the value is not a map")
+}
+
 func TestSetValue(t *testing.T) {
 	var b bool
 	var bs []byte
@@ -38,6 +64,15 @@ func TestSetValue(t *testing.T) {
 	var u64 uint64
 	var tt1 time.Time
 	var tt2 time.Time
+	var svaluer stringSetValuer
+	var mvaluer mapSetValuer
+
+	if err := SetValue(&svaluer, "abc"); err != nil || svaluer.name == "" {
+		t.Error(svaluer)
+	}
+	if err := SetValue(&mvaluer, map[string]interface{}{"name": "abc", "age": 123}); err != nil || mvaluer.name != "abc" || mvaluer.age != 123 {
+		t.Error(mvaluer)
+	}
 
 	if err := SetValue(&b, "on"); err != nil || !b {
 		t.Fail()
