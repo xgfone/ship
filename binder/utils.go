@@ -178,3 +178,72 @@ func SetStructValueOf(s reflect.Value, attr string, v interface{}) error {
 
 	return fmt.Errorf("the struct has no field '%s'", attr)
 }
+
+// BindMapToStruct binds a map to struct.
+//
+// Notice: it supports the json tag.
+func BindMapToStruct(value interface{}, m map[string]interface{}) (err error) {
+	if value == nil {
+		return errors.New("the value is nil")
+	}
+
+	v := reflect.ValueOf(value)
+	if v.Kind() != reflect.Ptr {
+		return errors.New("the value is not a pointer")
+	} else if v = v.Elem(); v.Kind() != reflect.Struct {
+		return errors.New("the value is not a pointer to struct")
+	}
+	return bindMapToStruct(v, m)
+}
+
+func bindMapToStruct(v reflect.Value, m map[string]interface{}) (err error) {
+	vtype := v.Type()
+	for i, num := 0, v.NumField(); i < num; i++ {
+		fieldv := v.Field(i)
+		fieldt := vtype.Field(i)
+
+		// Check whether the field can be set.
+		if !fieldv.CanSet() {
+			return fmt.Errorf("the field '%s' can't be set", fieldt.Name)
+		}
+
+		name := fieldt.Name
+		if n := fieldt.Tag.Get("json"); n != "" {
+			if n == "-" {
+				continue
+			}
+			name = n
+		}
+
+		if fieldv.Kind() == reflect.Ptr {
+			switch subfieldv := fieldv.Elem(); subfieldv.Kind() {
+			case reflect.Invalid:
+				continue
+			case reflect.Struct:
+				if mvalue, ok := m[name].(map[string]interface{}); ok {
+					if err = bindMapToStruct(subfieldv, mvalue); err != nil {
+						return err
+					}
+					continue
+				}
+				return fmt.Errorf("the value of '%s' is not a map", name)
+			}
+		} else if fieldv.Kind() == reflect.Struct {
+			if mvalue, ok := m[name].(map[string]interface{}); ok {
+				if err = bindMapToStruct(fieldv, mvalue); err != nil {
+					return err
+				}
+				continue
+			}
+			return fmt.Errorf("the value of '%s' is not a map", name)
+		} else {
+			fieldv = fieldv.Addr()
+		}
+
+		if err = SetValue(fieldv.Interface(), m[name]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

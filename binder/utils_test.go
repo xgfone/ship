@@ -15,6 +15,7 @@
 package binder
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -128,4 +129,81 @@ func TestSetStructValue(t *testing.T) {
 	if s.Name != "abc" || s.Age != 123 {
 		t.Error(s.Name, s.Age)
 	}
+}
+
+func TestBindMapToStruct(t *testing.T) {
+	type subTypeT struct {
+		Float float32 `json:"float"`
+	}
+	type typeT struct {
+		Int  int
+		Bool bool      `json:"bool"`
+		Str  string    `json:"-"`
+		Sub  subTypeT  `json:"sub"`
+		PSub *subTypeT `json:"psub"`
+		NPub *subTypeT `json:"npub"`
+	}
+
+	ms := map[string]interface{}{
+		"Int":  123,
+		"bool": "on",
+		"Str":  "abc",
+		"str":  "xyz",
+		"sub":  map[string]interface{}{"float": 1.2, "Float": 1.4},
+		"psub": map[string]interface{}{"float": 2.2, "Float": 2.4},
+		"nsub": map[string]interface{}{"float": 3.2, "Float": 3.4},
+	}
+
+	var t1 typeT
+	if err := BindMapToStruct(t1, ms); err == nil {
+		t.Fail()
+	}
+
+	var t2 typeT
+	t2.PSub = &subTypeT{}
+	if err := BindMapToStruct(&t2, ms); err != nil {
+		t.Error(err)
+	} else if t2.Int == 0 || !t2.Bool || t2.Str != "" || t2.Sub.Float != 1.2 || t2.PSub.Float != 2.2 || t2.NPub != nil {
+		t.Error(t2)
+	}
+}
+
+func ExampleBindMapToStruct() {
+	type testSubType struct {
+		Float float32 `json:"float"`
+	}
+	type testType struct {
+		Int  int
+		Bool bool         `json:"bool"`
+		Str  string       `json:"-"`
+		Sub  testSubType  `json:"sub"`
+		PSub *testSubType `json:"psub"`
+	}
+
+	ms := map[string]interface{}{
+		"Int":  123,
+		"bool": "on",
+		"Str":  "abc",
+		"str":  "xyz",
+		"sub":  map[string]interface{}{"float": 1.2, "Float": 1.4},
+		"psub": map[string]interface{}{"float": 2.2, "Float": 2.4},
+	}
+
+	v := testType{PSub: &testSubType{}}
+	if err := BindMapToStruct(&v, ms); err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(v.Int)
+		fmt.Println(v.Bool)
+		fmt.Println(v.Str)
+		fmt.Println(v.Sub.Float)
+		fmt.Println(v.PSub.Float)
+	}
+
+	// Output:
+	// 123
+	// true
+	//
+	// 1.2
+	// 2.2
 }
