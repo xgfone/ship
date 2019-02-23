@@ -821,7 +821,7 @@ func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
 
 // String sends a string response with status code.
 func (c *Context) String(code int, format string, args ...interface{}) error {
-	if len(args) == 0 {
+	if len(args) > 0 {
 		format = fmt.Sprintf(format, args...)
 	}
 	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(format))
