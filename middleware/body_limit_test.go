@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func TestBodyLimitReader(t *testing.T) {
 	reader.Reset(req.Body)
 	_, err := ioutil.ReadAll(reader)
 	he := err.(ship.HTTPError)
-	assert.Equal(t, http.StatusRequestEntityTooLarge, he.Code())
+	assert.Equal(t, http.StatusRequestEntityTooLarge, he.Code)
 
 	// reset reader and read six bytes must succeed.
 	buf := make([]byte, 6)
@@ -56,7 +56,7 @@ func TestBodyLimit(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := s.NewContext(req, rec)
 
-	handler := func(ctx ship.Context) error {
+	handler := func(ctx *ship.Context) error {
 		body, err := ioutil.ReadAll(ctx.Request().Body)
 		if err != nil {
 			return err
@@ -75,7 +75,7 @@ func TestBodyLimit(t *testing.T) {
 	rec = httptest.NewRecorder()
 	ctx = s.NewContext(req, rec)
 	he := BodyLimit(6)(handler)(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusRequestEntityTooLarge, he.Code())
+	assert.Equal(http.StatusRequestEntityTooLarge, he.Code)
 
 	// Based on content read (within limit)
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bs))
@@ -91,5 +91,5 @@ func TestBodyLimit(t *testing.T) {
 	rec = httptest.NewRecorder()
 	ctx = s.NewContext(req, rec)
 	he = BodyLimit(6)(handler)(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusRequestEntityTooLarge, he.Code())
+	assert.Equal(http.StatusRequestEntityTooLarge, he.Code)
 }

@@ -1,3 +1,17 @@
+// Copyright 2019 xgfone
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package utils
 
 import (
@@ -20,6 +34,8 @@ func bool2Int64(b bool) int64 {
 // For "f", "F", "0", "off", "Off", "OFF", "false", "False", "FALSE", it's false.
 func ToBool(v interface{}) (bool, error) {
 	switch _v := v.(type) {
+	case nil:
+		return false, nil
 	case bool:
 		return _v, nil
 	case string:
@@ -40,6 +56,7 @@ func ToBool(v interface{}) (bool, error) {
 // ToInt64 does the best to convert a certain value to int64.
 func ToInt64(_v interface{}) (v int64, err error) {
 	switch t := _v.(type) {
+	case nil:
 	case bool:
 		v = bool2Int64(t)
 	case string:
@@ -81,6 +98,7 @@ func ToInt64(_v interface{}) (v int64, err error) {
 // ToUint64 does the best to convert a certain value to uint64.
 func ToUint64(_v interface{}) (v uint64, err error) {
 	switch t := _v.(type) {
+	case nil:
 	case bool:
 		v = uint64(bool2Int64(t))
 	case string:
@@ -122,6 +140,7 @@ func ToUint64(_v interface{}) (v uint64, err error) {
 // ToFloat64 does the best to convert a certain value to float64.
 func ToFloat64(_v interface{}) (v float64, err error) {
 	switch t := _v.(type) {
+	case nil:
 	case bool:
 		v = float64(bool2Int64(t))
 	case string:

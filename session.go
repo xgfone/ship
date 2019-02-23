@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package ship
 
-import (
-	"sync"
+import "sync"
 
-	"github.com/xgfone/ship/core"
-)
+// Session represents an interface about the session.
+type Session interface {
+	// If the session id does not exist, it should return (nil, nil).
+	GetSession(id string) (value interface{}, err error)
+	SetSession(id string, value interface{}) error
+	DelSession(id string) error
+}
 
-// NewSession return a session implementation based on the memory.
-func NewSession() core.Session {
+// NewMemorySession return a Session implementation based on the memory.
+func NewMemorySession() Session {
 	return memorySession{store: new(sync.Map)}
 }
 

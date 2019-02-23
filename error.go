@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,24 +16,8 @@ package ship
 
 import (
 	"errors"
-
-	"github.com/xgfone/ship/core"
-)
-
-// Re-import some HTTP errors from the sub-package core.
-var (
-	ErrUnsupportedMediaType        = core.ErrUnsupportedMediaType
-	ErrNotFound                    = core.ErrNotFound
-	ErrUnauthorized                = core.ErrUnauthorized
-	ErrForbidden                   = core.ErrForbidden
-	ErrMethodNotAllowed            = core.ErrMethodNotAllowed
-	ErrStatusRequestEntityTooLarge = core.ErrStatusRequestEntityTooLarge
-	ErrTooManyRequests             = core.ErrTooManyRequests
-	ErrBadRequest                  = core.ErrBadRequest
-	ErrBadGateway                  = core.ErrBadGateway
-	ErrInternalServerError         = core.ErrInternalServerError
-	ErrRequestTimeout              = core.ErrRequestTimeout
-	ErrServiceUnavailable          = core.ErrServiceUnavailable
+	"fmt"
+	"net/http"
 )
 
 // Some non-HTTP Errors
@@ -45,28 +29,68 @@ var (
 	ErrNoSessionSupport      = errors.New("no session support")
 	ErrInvalidSession        = errors.New("invalid session")
 	ErrSessionNotExist       = errors.New("session does not exist")
+	ErrMissingContentType    = errors.New("missing the header 'Content-Type'")
 )
 
-// ErrSkip is the alias of core.ErrSkip, which is not an error and used to
-// suggest that the middeware should skip and return it back to the outer
-// middleware to handle.
+// Some HTTP error.
+var (
+	ErrUnsupportedMediaType        = NewHTTPError(http.StatusUnsupportedMediaType)
+	ErrNotFound                    = NewHTTPError(http.StatusNotFound)
+	ErrUnauthorized                = NewHTTPError(http.StatusUnauthorized)
+	ErrForbidden                   = NewHTTPError(http.StatusForbidden)
+	ErrMethodNotAllowed            = NewHTTPError(http.StatusMethodNotAllowed)
+	ErrStatusRequestEntityTooLarge = NewHTTPError(http.StatusRequestEntityTooLarge)
+	ErrTooManyRequests             = NewHTTPError(http.StatusTooManyRequests)
+	ErrBadRequest                  = NewHTTPError(http.StatusBadRequest)
+	ErrBadGateway                  = NewHTTPError(http.StatusBadGateway)
+	ErrInternalServerError         = NewHTTPError(http.StatusInternalServerError)
+	ErrRequestTimeout              = NewHTTPError(http.StatusRequestTimeout)
+	ErrServiceUnavailable          = NewHTTPError(http.StatusServiceUnavailable)
+)
+
+// ErrSkip is not an error, which is used to suggest that the middeware should
+// skip and return it back to the outer middleware to handle.
 //
 // Notice: it is only a suggestion.
-var ErrSkip = core.ErrSkip
+var ErrSkip = errors.New("skip")
 
-// HTTPError is the alias of core.HTTPError, which stands for an HTTP error.
-//
-// Methods:
-//    Code() int
-//    Message() string
-//    Error() string
-//    ContentType() string
-//    SetContentType(string) HTTPError
-//    InnerError() error
-//    SetInnerError(error) HTTPError
-type HTTPError = core.HTTPError
+// HTTPError represents an error with HTTP Status Code.
+type HTTPError struct {
+	Code int
+	Msg  string
+	Err  error
+	CT   string // For Content-Type
+}
 
 // NewHTTPError returns a new HTTPError.
 func NewHTTPError(code int, msg ...string) HTTPError {
-	return core.NewHTTPError(code, msg...)
+	if len(msg) > 0 {
+		return HTTPError{Code: code, Msg: msg[0]}
+	}
+	return HTTPError{Code: code}
+}
+
+func (e HTTPError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return fmt.Sprintf("code=%d, msg='%s'", e.Code, e.Err)
+}
+
+// NewError returns a new HTTPError with the new error.
+func (e HTTPError) NewError(err error) HTTPError {
+	nerr := e
+	nerr.Err = err
+	return nerr
+}
+
+// NewMsg returns a new HTTPError with the new msg.
+func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
+	nerr := e
+	if len(args) == 0 {
+		nerr.Msg = msg
+	} else {
+		nerr.Msg = fmt.Sprintf(msg, args...)
+	}
+	return nerr
 }

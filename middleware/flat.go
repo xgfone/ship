@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,15 +27,15 @@ import (
 //
 // Example
 //
-//     beforeLog := func(ctx ship.Context) error {
+//     beforeLog := func(ctx *ship.Context) error {
 //         ctx.Logger().Info("before handling the request")
 //         return nil
 //     }
-//     afterLog := func(ctx ship.Context) error {
+//     afterLog := func(ctx *ship.Context) error {
 //         ctx.Logger().Info("after handling the request")
 //         return nil
 //     }
-//     handler := func(ctx ship.Context) error {
+//     handler := func(ctx *ship.Context) error {
 //         ctx.Logger().Info("handling the request")
 //         return nil
 //     })
@@ -46,16 +46,16 @@ import (
 //
 // You can pass the error by the ctx.SetError(err). For example,
 //
-//     handler := func(ctx ship.Context) error {
+//     handler := func(ctx *ship.Context) error {
 //         // ...
-//         ctx.SetError(err)
+//         ctx.Err = err
 //         return nil
 //     })
 //
-//     afterLog := func(ctx ship.Context) (err error) {
-//         if err = ctx.Error(); err != nil {
-//             ctx.Logger().Info("after handling the request: %s", err.Error())
-//             ctx.SetError(nil)  // Avoid to handle the error repeatedly by other middlewares.
+//     afterLog := func(ctx *ship.Context) (err error) {
+//         if ctx.Err != nil {
+//             ctx.Logger().Info("after handling the request: %s", ctx.Err)
+//             ctx.Err = nil  // Avoid to handle the error repeatedly by other middlewares.
 //         } else {
 //             ctx.Logger().Info("after handling the request")
 //         }
@@ -65,28 +65,28 @@ import (
 //
 func Flat(befores, afters []ship.Handler) Middleware {
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) (err error) {
+		return func(ctx *ship.Context) (err error) {
 			for _, h := range befores {
 				if err = h(ctx); err != nil {
 					return
-				} else if err = ctx.Error(); err != nil {
-					ctx.SetError(nil)
+				} else if err = ctx.Err; err != nil {
+					ctx.Err = nil
 					return err
 				}
 			}
 
 			if err = next(ctx); err != nil {
 				return
-			} else if err = ctx.Error(); err != nil {
-				ctx.SetError(nil)
+			} else if err = ctx.Err; err != nil {
+				ctx.Err = nil
 				return err
 			}
 
 			for _, h := range afters {
 				if err = h(ctx); err != nil {
 					return
-				} else if err = ctx.Error(); err != nil {
-					ctx.SetError(nil)
+				} else if err = ctx.Err; err != nil {
+					ctx.Err = nil
 					return err
 				}
 			}

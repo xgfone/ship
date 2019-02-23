@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/core"
 )
 
 const (
@@ -41,13 +40,13 @@ var (
 	ErrTokenFromForm   = errors.New("missing token in the form parameter")
 )
 
-// Middleware is the alias of core.Middleware.
+// Middleware is the alias of ship.Middleware.
 //
 // We add it in order to show the middlewares in together by the godoc.
-type Middleware = core.Middleware
+type Middleware = ship.Middleware
 
 // TokenFunc stands for a function to get a token from the request context.
-type TokenFunc func(ctx ship.Context) (token string, err error)
+type TokenFunc func(ctx *ship.Context) (token string, err error)
 
 // TokenValidator stands for a validator to validate whether a token is valid.
 type TokenValidator func(token string) (ok bool, err error)
@@ -89,7 +88,7 @@ func getTokenFromHeaderWithType(header, _type string) TokenFunc {
 	}
 	typelen := len(_type)
 
-	return func(ctx ship.Context) (string, error) {
+	return func(ctx *ship.Context) (string, error) {
 		token := ctx.Request().Header.Get(header)
 		if token == "" {
 			return "", ErrTokenFromHeader
@@ -109,7 +108,7 @@ func GetTokenFromHeader(header string, _type ...string) TokenFunc {
 		return getTokenFromHeaderWithType(header, _type[0])
 	}
 
-	return func(ctx ship.Context) (string, error) {
+	return func(ctx *ship.Context) (string, error) {
 		if token := ctx.Request().Header.Get(header); token != "" {
 			return token, nil
 		}
@@ -119,7 +118,7 @@ func GetTokenFromHeader(header string, _type ...string) TokenFunc {
 
 // GetTokenFromQuery is used to get the token from the request URL query.
 func GetTokenFromQuery(param string) TokenFunc {
-	return func(ctx ship.Context) (string, error) {
+	return func(ctx *ship.Context) (string, error) {
 		if token := ctx.QueryParam(param); token != "" {
 			return token, nil
 		}
@@ -129,7 +128,7 @@ func GetTokenFromQuery(param string) TokenFunc {
 
 // GetTokenFromForm is used to get the token from the request FORM body.
 func GetTokenFromForm(param string) TokenFunc {
-	return func(ctx ship.Context) (string, error) {
+	return func(ctx *ship.Context) (string, error) {
 		if token := ctx.FormValue(param); token != "" {
 			return token, nil
 		}

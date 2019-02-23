@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,48 +21,46 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 
-	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship/router/echo"
 	"github.com/xgfone/ship/utils"
 )
 
-// Router is the alias of core.Router, which is used to manage the routes.
-//
-// Methods:
-//   URL(name string, params ...interface{}) string
-//   Add(name string, path string, method string, handler Handler) (paramNum int)
-//   Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
-//   Each(func(name string, method string, path string))
-type Router = core.Router
+// Router stands for a router management.
+type Router interface {
+	// Generate a URL by the url name and parameters.
+	URL(name string, params ...interface{}) string
 
-// Binder is the alias of core.Binder, which is used to bind the request
-// to v.
-//
-// Methods:
-//   Bind(ctx Context, v interface{}) error
-type Binder = core.Binder
+	// Add a route with name, path, method and handler,
+	// and return the number of the parameters if there are the parameters
+	// in the route. Or return 0.
+	//
+	// If the name has been added for the same path, it should be allowed.
+	// Or it should panic.
+	//
+	// If the router does not support the parameter, it should panic.
+	//
+	// Notice: for keeping consistent, the parameter should start with ":"
+	// or "*". ":" stands for a single parameter, and "*" stands for
+	// a wildcard parameter.
+	Add(name string, path string, method string, handler interface{}) (paramNum int)
 
-// Renderer is the alias of core.Renderer, which is used to render the response.
-//
-// Methods:
-//    Render(ctx Context, name string, code int, data interface{}) error
-type Renderer = core.Renderer
+	// Find a route handler by the method and path of the request.
+	//
+	// Return nil if the route does not exist.
+	//
+	// If the route has more than one parameter, the name and value
+	// of the parameters should be stored `pnames` and `pvalues` respectively.
+	Find(method string, path string, pnames []string, pvalues []string) (handler interface{})
 
-// Session is the alias of core.Session, which is used to implement the store
-// for the session information.
-//
-// Methods:
-//    // If the session id does not exist, it should return (nil, nil).
-//    GetSession(id string) (value interface{}, err error)
-//    SetSession(id string, value interface{}) error
-//    DelSession(id string) error
-type Session = core.Session
-
-// Matcher is used to check whether the request match some conditions.
-type Matcher func(*http.Request) error
+	// Traverse each route.
+	Each(func(name string, method string, path string))
+}
 
 // Resetter is an Reset interface.
 type Resetter interface {
@@ -78,46 +76,160 @@ func (s *stopT) run() {
 	s.once.Do(s.f)
 }
 
-// Ship is used to manage the router.
+var defaultSignals = []os.Signal{
+	os.Interrupt,
+	syscall.SIGTERM,
+	syscall.SIGQUIT,
+	syscall.SIGABRT,
+	syscall.SIGINT,
+}
+
+var defaultMethodMapping = map[string]string{
+	"Create": "POST",
+	"Delete": "DELETE",
+	"Update": "PUT",
+	"Get":    "GET",
+}
+
+// Ship is an app to be used to manage the router.
 type Ship struct {
-	config  Config
+	/// Configuration Options
+	name   string
+	debug  bool
+	prefix string
+
+	logger   Logger
+	binder   Binder
+	session  Session
+	renderer Renderer
+	signals  []os.Signal
+
+	bufferSize            int
+	ctxDataSize           int
+	middlewareMaxNum      int
+	keepTrailingSlashPath bool
+	defaultMethodMapping  map[string]string
+
+	notFoundHandler         Handler
+	optionsHandler          Handler
+	methodNotAllowedHandler Handler
+
+	newRouter   func() Router
+	newCtxData  func(*Context) Resetter
+	handleError func(*Context, error)
+	ctxHandler  func(*Context, ...interface{}) error
+	bindQuery   func(interface{}, url.Values) error
+
+	/// Inner settings
 	ctxpool sync.Pool
 	bufpool utils.BufferPool
-	maxNum  int
+
+	maxNum int
+	router Router
 
 	handler        Handler
 	premiddlewares []Middleware
 	middlewares    []Middleware
 
-	router Router
+	links  []*Ship
 	vhosts map[string]*Ship
+
 	server *http.Server
 	stopfs []*stopT
-	links  []*Ship
-	lock   *sync.RWMutex
 	once1  sync.Once // For shutdown
 	once2  sync.Once // For stop
 	done   chan struct{}
+	lock   sync.RWMutex
 
 	connState func(net.Conn, http.ConnState)
 }
 
 // New returns a new Ship.
-func New(config ...Config) *Ship {
+func New(options ...Option) *Ship {
 	s := new(Ship)
-	if len(config) > 0 {
-		s.config = config[0]
+
+	/// Initialize the default configuration.
+	s.logger = NewNoLevelLogger(os.Stderr)
+	s.session = NewMemorySession()
+	s.signals = defaultSignals
+	mb := NewMuxBinder()
+	mb.Add(MIMEApplicationJSON, JSONBinder())
+	mb.Add(MIMETextXML, XMLBinder())
+	mb.Add(MIMEApplicationXML, XMLBinder())
+	mb.Add(MIMEMultipartForm, FormBinder())
+	mb.Add(MIMEApplicationForm, FormBinder())
+	s.binder = mb
+	mr := NewMuxRenderer()
+	mr.Add("json", JSONRenderer())
+	mr.Add("jsonpretty", JSONPrettyRenderer("    "))
+	mr.Add("xml", XMLRenderer())
+	mr.Add("xmlpretty", XMLPrettyRenderer("    "))
+	s.renderer = mr
+
+	s.bufferSize = 2048
+	s.middlewareMaxNum = 256
+	s.defaultMethodMapping = defaultMethodMapping
+
+	s.notFoundHandler = NotFoundHandler()
+
+	s.handleError = s.handleErrorDefault
+	s.bindQuery = func(v interface{}, d url.Values) error {
+		return BindURLValues(v, d, "query")
+	}
+	s.newRouter = func() Router {
+		return echo.NewRouter(routerMethodNotAllowedHandler, routerOptionsHandler)
 	}
 
-	s.config.init(s)
-	s.handler = s.handleRequestRoute
-	s.bufpool = utils.NewBufferPool(s.config.BufferSize)
+	/// Initialize the inner variables.
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
-	s.router = s.config.NewRouter()
+	s.bufpool = utils.NewBufferPool(s.bufferSize)
+	s.router = s.newRouter()
+	s.handler = s.handleRequestRoute
 	s.vhosts = make(map[string]*Ship)
-	s.lock = new(sync.RWMutex)
 	s.done = make(chan struct{}, 1)
-	return s
+
+	return s.Configure(options...)
+}
+
+func (s *Ship) clone() *Ship {
+	newShip := Ship{
+		// Configurations
+		name:   s.name,
+		debug:  s.debug,
+		prefix: s.prefix,
+
+		logger:   s.logger,
+		binder:   s.binder,
+		session:  s.session,
+		renderer: s.renderer,
+		signals:  s.signals,
+
+		bufferSize:            s.bufferSize,
+		ctxDataSize:           s.ctxDataSize,
+		middlewareMaxNum:      s.middlewareMaxNum,
+		keepTrailingSlashPath: s.keepTrailingSlashPath,
+		defaultMethodMapping:  s.defaultMethodMapping,
+
+		notFoundHandler:         s.notFoundHandler,
+		optionsHandler:          s.optionsHandler,
+		methodNotAllowedHandler: s.methodNotAllowedHandler,
+
+		newRouter:   s.newRouter,
+		newCtxData:  s.newCtxData,
+		handleError: s.handleError,
+		ctxHandler:  s.ctxHandler,
+		bindQuery:   s.bindQuery,
+
+		// Inner variables
+		bufpool: utils.NewBufferPool(s.bufferSize),
+		router:  s.newRouter(),
+		handler: s.handleRequestRoute,
+		vhosts:  make(map[string]*Ship),
+		done:    make(chan struct{}, 1),
+	}
+
+	newShip.ctxpool.New = func() interface{} { return newShip.NewContext(nil, nil) }
+	return &newShip
 }
 
 func (s *Ship) setURLParamNum(num int) {
@@ -126,35 +238,19 @@ func (s *Ship) setURLParamNum(num int) {
 	}
 }
 
-// Config returns the inner config.
-func (s *Ship) Config() Config {
-	return s.config
-}
-
-// ResetConfig resets the config.
+// Configure configures the Ship.
 //
-// You must not call it during the ship router is running. And you had better
-// call it before adding the routers.
-//
-// Notice: it will reset the Router, too, but not the middlewares.
-// So it maybe lose all the added routers.
-func (s *Ship) ResetConfig(config Config) *Ship {
-	config.init(s)
-	oldConfig := s.config
-	s.config = config
+// Notice: the method must be called before starting the http server.
+func (s *Ship) Configure(options ...Option) *Ship {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
-	s.router = s.config.NewRouter()
-	if config.BufferSize != oldConfig.BufferSize {
-		s.bufpool = utils.NewBufferPool(s.config.BufferSize)
+	if s.server != nil {
+		panic(fmt.Errorf("the http server has been started"))
 	}
-	return s
-}
 
-// ConfigOptions is the same as ResetConfig, but sets the configuration of Ship
-// by the options.
-func (s *Ship) ConfigOptions(options ...Option) *Ship {
 	for _, opt := range options {
-		opt(&s.config)
+		opt(s)
 	}
 	return s
 }
@@ -164,14 +260,32 @@ func (s *Ship) ConfigOptions(options ...Option) *Ship {
 // Notice: the new router will disable the signals and register the shutdown
 // function into the parent Ship router.
 func (s *Ship) Clone(name ...string) *Ship {
-	config := s.config
-	config.Signals = []os.Signal{}
+	newShip := s.clone()
+	newShip.signals = []os.Signal{}
 	if len(name) > 0 && name[0] != "" {
-		config.Name = name[0]
+		newShip.name = name[0]
 	}
-	newShip := New(config)
 	s.RegisterOnShutdown(newShip.shutdown)
 	return newShip
+}
+
+// VHost returns a new ship used to manage the virtual host.
+//
+// For the different virtual host, you can register the same route.
+//
+// Notice: the new virtual host won't inherit anything except the configuration.
+func (s *Ship) VHost(host string) *Ship {
+	if s.vhosts == nil {
+		panic(fmt.Errorf("the virtual host cannot create the virtual host"))
+	}
+	if s.vhosts[host] != nil {
+		panic(fmt.Errorf("the virtual host '%s' has been added", host))
+	}
+
+	vhost := s.clone()
+	vhost.vhosts = nil
+	s.vhosts[host] = vhost
+	return vhost
 }
 
 // Link links other to the current router, that's, only if either of the two
@@ -191,60 +305,22 @@ func (s *Ship) Link(other *Ship) *Ship {
 	return s
 }
 
-// VHost returns a new ship used to manage the virtual host.
-//
-// For the different virtual host, you can register the same route.
-//
-// Notice: the new virtual host won't inherit anything except the configuration.
-func (s *Ship) VHost(host string) *Ship {
-	if s.vhosts == nil {
-		panic(fmt.Errorf("the virtual host cannot create the virtual host"))
-	}
-	if s.vhosts[host] != nil {
-		panic(fmt.Errorf("the virtual host '%s' has been added", host))
-	}
-	vhost := New(s.config)
-	vhost.vhosts = nil
-	s.vhosts[host] = vhost
-	return vhost
-}
-
-// Logger returns the inner Logger
-func (s *Ship) Logger() Logger {
-	return s.config.Logger
-}
-
-// Renderer returns the inner Renderer.
-func (s *Ship) Renderer() Renderer {
-	return s.config.Renderer
-}
-
-// MuxRender check whether the inner Renderer is MuxRender.
-//
-// If yes, return it as "*MuxRender"; or return nil.
-func (s *Ship) MuxRender() *MuxRender {
-	if mr, ok := s.config.Renderer.(*MuxRender); ok {
-		return mr
-	}
-	return nil
-}
-
 // NewContext news and returns a Context.
-func (s *Ship) NewContext(r *http.Request, w http.ResponseWriter) Context {
+func (s *Ship) NewContext(r *http.Request, w http.ResponseWriter) *Context {
 	return newContext(s, r, w, s.maxNum)
 }
 
 // AcquireContext gets a Context from the pool.
-func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) Context {
-	c := s.ctxpool.Get().(*contextT)
+func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) *Context {
+	c := s.ctxpool.Get().(*Context)
 	c.setReqResp(r, w)
 	return c
 }
 
 // ReleaseContext puts a Context into the pool.
-func (s *Ship) ReleaseContext(c Context) {
+func (s *Ship) ReleaseContext(c *Context) {
 	if c != nil {
-		c.(*contextT).reset()
+		c.reset()
 		s.ctxpool.Put(c)
 	}
 }
@@ -257,6 +333,41 @@ func (s *Ship) AcquireBuffer() *bytes.Buffer {
 // ReleaseBuffer puts a Buffer into the pool.
 func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 	s.bufpool.Put(buf)
+}
+
+// Logger returns the inner Logger
+func (s *Ship) Logger() Logger {
+	return s.logger
+}
+
+// Renderer returns the inner Renderer.
+func (s *Ship) Renderer() Renderer {
+	return s.renderer
+}
+
+// MuxRenderer check whether the inner Renderer is MuxRenderer.
+//
+// If yes, return it as "*MuxRenderer"; or return nil.
+func (s *Ship) MuxRenderer() *MuxRenderer {
+	if mr, ok := s.renderer.(*MuxRenderer); ok {
+		return mr
+	}
+	return nil
+}
+
+// Binder returns the inner Binder.
+func (s *Ship) Binder() Binder {
+	return s.binder
+}
+
+// MuxBinder check whether the inner Binder is MuxBinder.
+//
+// If yes, return it as "*MuxBinder"; or return nil.
+func (s *Ship) MuxBinder() *MuxBinder {
+	if mb, ok := s.binder.(*MuxBinder); ok {
+		return mb
+	}
+	return nil
 }
 
 // Pre registers the Pre-middlewares, which are executed before finding the route.
@@ -285,26 +396,26 @@ func (s *Ship) Group(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(s.middlewares)+len(middlewares))
 	ms = append(ms, s.middlewares...)
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.router, s.prefix, prefix, ms...)
 }
 
 // GroupWithoutMiddleware is the same as Group, but not inherit the middlewares of Ship.
 func (s *Ship) GroupWithoutMiddleware(prefix string, middlewares ...Middleware) *Group {
 	ms := make([]Middleware, 0, len(middlewares))
 	ms = append(ms, middlewares...)
-	return newGroup(s, s.router, s.config.Prefix, prefix, ms...)
+	return newGroup(s, s.router, s.prefix, prefix, ms...)
 }
 
 // RouteWithoutMiddleware is the same as Route, but not inherit the middlewares of Ship.
 func (s *Ship) RouteWithoutMiddleware(path string) *Route {
-	return newRoute(s, s.router, s.config.Prefix, path)
+	return newRoute(s, s.router, s.prefix, path)
 }
 
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (s *Ship) Route(path string) *Route {
-	return newRoute(s, s.router, s.config.Prefix, path, s.middlewares...)
+	return newRoute(s, s.router, s.prefix, path, s.middlewares...)
 }
 
 // R is short for Ship#Route(path).
@@ -335,66 +446,62 @@ func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	s.handleRequest(s.router, w, r)
 }
 
-func (s *Ship) handleRequestRoute(ctx Context) error {
-	c := ctx.(*contextT)
-	h := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
-	if h != nil {
-		return h(ctx)
+func (s *Ship) handleRequestRoute(c *Context) error {
+	if h := c.findHandler(c.req.Method, c.req.URL.Path); h != nil {
+		return h(c)
 	}
-	return s.config.NotFoundHandler(ctx)
+	return c.NotFoundHandler()(c)
 }
 
 func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
-	ctx := s.AcquireContext(r, w).(*contextT)
+	ctx := s.AcquireContext(r, w)
 	ctx.router = router
 	err := s.handler(ctx)
 
 	if err == nil {
-		err = ctx.err
+		err = ctx.Err
 	}
 	if err != nil {
-		s.config.HandleError(ctx, err)
+		s.handleError(ctx, err)
 	}
 	s.ReleaseContext(ctx)
 }
 
-func (s *Ship) handleError(ctx Context, err error) {
-	// Handle the HTTPError, and send the response
-	if he, ok := err.(HTTPError); ok {
-		code := he.Code()
-		if !ctx.IsResponse() {
-			ct := he.ContentType()
-			msg := he.Message()
-			if 400 <= code && code < 500 {
-				msg = err.Error()
-			} else if code >= 500 && ctx.IsDebug() {
-				msg = err.Error()
-			}
-
-			ctx.Blob(code, ct, []byte(msg))
-		}
-
-		if code >= 500 {
-			if logger := ctx.Logger(); logger != nil {
-				logger.Error("%s", err.Error())
-			}
-		}
+func (s *Ship) handleErrorDefault(ctx *Context, err error) {
+	switch err {
+	case nil, ErrSkip:
 		return
 	}
 
-	// For other errors, only log the error.
-	if err != ErrSkip {
-		if !ctx.IsResponse() {
+	if !ctx.IsResponded() {
+		switch e := err.(type) {
+		case HTTPError:
+			if e.Code < 500 {
+				if e.Msg == "" {
+					if e.Err == nil {
+						ctx.Blob(e.Code, e.CT, nil)
+					} else {
+						ctx.Blob(e.Code, e.CT, []byte(e.Err.Error()))
+					}
+				} else if e.Err == nil {
+					ctx.Blob(e.Code, e.CT, []byte(e.Msg))
+				} else {
+					ctx.Blob(e.Code, e.CT, []byte(fmt.Sprintf("msg='%s', err='%s'", e.Msg, e.Err)))
+				}
+				return
+			}
+			ctx.Blob(e.Code, e.CT, []byte(e.Msg))
+		default:
 			ctx.NoContent(http.StatusInternalServerError)
-		}
-		if logger := ctx.Logger(); logger != nil {
-			logger.Error("%s", err.Error())
+			goto END
 		}
 	}
+
+END:
+	s.logger.Error("%s", err)
 }
 
 // Shutdown stops the HTTP server.
@@ -411,20 +518,22 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 
 // RegisterOnShutdown registers some functions to run when the http server is
 // shut down.
-func (s *Ship) RegisterOnShutdown(functions ...func()) {
+func (s *Ship) RegisterOnShutdown(functions ...func()) *Ship {
 	s.lock.Lock()
 	for _, f := range functions {
 		s.stopfs = append(s.stopfs, &stopT{once: sync.Once{}, f: f})
 	}
 	s.lock.Unlock()
+	return s
 }
 
 // SetConnStateHandler sets a handler to monitor the change of the connection
 // state, which is used by the HTTP server.
-func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) {
+func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) *Ship {
 	s.lock.Lock()
 	s.connState = h
 	s.lock.Unlock()
+	return s
 }
 
 // Start starts a HTTP server with addr.
@@ -434,13 +543,14 @@ func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) {
 //     router := ship.New()
 //     rouetr.Start(addr, certFile, keyFile)
 //
-func (s *Ship) Start(addr string, tlsFiles ...string) {
+func (s *Ship) Start(addr string, tlsFiles ...string) *Ship {
 	var cert, key string
 	if len(tlsFiles) == 2 && tlsFiles[0] != "" && tlsFiles[1] != "" {
 		cert = tlsFiles[0]
 		key = tlsFiles[1]
 	}
 	s.startServer(&http.Server{Addr: addr}, cert, key)
+	return s
 }
 
 // StartServer starts a HTTP server.
@@ -479,19 +589,19 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	defer s.shutdown()
 
 	if s.vhosts == nil {
-		s.config.Logger.Error("forbid the virtual host to be started as a server")
+		s.logger.Error("forbid the virtual host to be started as a server")
 		return
 	}
 
-	server.ErrorLog = log.New(s.config.Logger.Writer(), "",
+	server.ErrorLog = log.New(s.logger.Writer(), "",
 		log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	if server.Handler == nil {
 		server.Handler = s
 	}
 
 	// Handle the signal
-	if len(s.config.Signals) > 0 {
-		go s.handleSignals(s.config.Signals...)
+	if len(s.signals) > 0 {
+		go s.handleSignals(s.signals...)
 	}
 
 	for _, r := range s.links {
@@ -505,18 +615,18 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	}
 
 	var format string
-	if s.config.Name == "" {
+	if s.name == "" {
 		format = "The HTTP Server is shutdown"
-		s.config.Logger.Info("The HTTP Server is running on %s", server.Addr)
+		s.logger.Info("The HTTP Server is running on %s", server.Addr)
 	} else {
-		format = fmt.Sprintf("The HTTP Server [%s] is shutdown", s.config.Name)
-		s.config.Logger.Info("The HTTP Server [%s] is running on %s",
-			s.config.Name, server.Addr)
+		format = fmt.Sprintf("The HTTP Server [%s] is shutdown", s.name)
+		s.logger.Info("The HTTP Server [%s] is running on %s",
+			s.name, server.Addr)
 	}
 
 	s.lock.Lock()
 	if s.server != nil {
-		s.config.Logger.Error(format + ": the server has been started")
+		s.logger.Error(format + ": the server has been started")
 		return
 	}
 	s.server = server
@@ -530,9 +640,9 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	}
 
 	if err == http.ErrServerClosed {
-		s.config.Logger.Info(format)
+		s.logger.Info(format)
 	} else {
-		s.config.Logger.Error(format+": %s", err)
+		s.logger.Error(format+": %s", err)
 	}
 }
 

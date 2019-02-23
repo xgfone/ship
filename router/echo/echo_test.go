@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package echo
+package echo_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/router/echo"
 )
 
 func TestRouter(t *testing.T) {
-	router := NewRouter(nil, nil)
-	router.Add("static", "/static", "GET", func(ctx core.Context) error { return ctx.String(200, "STATIC") })
-	router.Add("param", "/test/:name", "POST", func(ctx core.Context) error {
+	router := echo.NewRouter(nil, nil)
+	router.Add("static", "/static", "GET", func(ctx *ship.Context) error { return ctx.String(200, "STATIC") })
+	router.Add("param", "/test/:name", "POST", func(ctx *ship.Context) error {
 		return ctx.String(200, fmt.Sprintf("hello %s", ctx.Param("name")))
 	})
 
@@ -60,7 +61,7 @@ func TestRouter(t *testing.T) {
 
 	pnames[0] = ""
 	pvalues[0] = ""
-	router.Add("", "/static/*path", "GET", func(ctx core.Context) error { return nil })
+	router.Add("", "/static/*path", "GET", func(ctx *ship.Context) error { return nil })
 	if router.Find("GET", "/static/path/to/file", pnames, pvalues) == nil {
 		t.Fail()
 	}

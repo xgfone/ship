@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 func setupRouter() *ship.Ship {
 	router := ship.New()
-	router.Route("/ping").GET(func(ctx ship.Context) error {
+	router.Route("/ping").GET(func(ctx *ship.Context) error {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
 	})
 

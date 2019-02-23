@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 	maxAge := time.Duration(conf.CookieMaxAge) * time.Second
 
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) error {
+		return func(ctx *ship.Context) error {
 			var token string
 			if cookie, err := ctx.Cookie(conf.CookieName); err != nil {
 				token = conf.GenerateToken() // Generate the new token
@@ -115,7 +115,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 			ctx.SetCookie(cookie)
 
 			// Store token in the context
-			ctx.Set(conf.CookieCtxKey, token)
+			ctx.Data[conf.CookieCtxKey] = token
 
 			// Protect clients from caching the response
 			ctx.Response().Header().Set(ship.HeaderVary, ship.HeaderCookie)

@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,11 +26,11 @@ import (
 func TestRecover(t *testing.T) {
 	bs := bytes.NewBuffer(nil)
 	router := ship.New()
-	router.Use(Recover(func(ctx ship.Context, err interface{}) {
+	router.Use(Recover(func(ctx *ship.Context, err interface{}) {
 		bs.WriteString(err.(string))
 	}))
 
-	router.Route("/panic").GET(func(ctx ship.Context) error {
+	router.Route("/panic").GET(func(ctx *ship.Context) error {
 		panic("test panic")
 	})
 

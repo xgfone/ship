@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,22 +17,14 @@ package ship
 import (
 	"errors"
 	"net/http"
-
-	"github.com/xgfone/ship/core"
+	"strings"
 )
 
-// Handler is the alias of core.Handler, which stands for a request & response
-// Handler.
-//
-// Type:
-//   type Handler func(*Context) error
-type Handler = core.Handler
+// Handler is a handler of the HTTP request.
+type Handler func(*Context) error
 
-// Middleware is the alias of core.Middleware.
-//
-// Type:
-//   type Middleware func(Handler) Handler
-type Middleware = core.Middleware
+// Middleware represents a middleware.
+type Middleware func(Handler) Handler
 
 type httpHandlerBridge struct {
 	ship    *Ship
@@ -47,10 +39,9 @@ func newHTTPHandlerBridge(s *Ship, h Handler) httpHandlerBridge {
 }
 
 func (h httpHandlerBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := h.ship.AcquireContext(r, w).(*contextT)
-	ctx.setShip(h.ship)
+	ctx := h.ship.AcquireContext(r, w)
 	if h.Handler == nil {
-		h.ship.config.NotFoundHandler(ctx)
+		h.ship.notFoundHandler(ctx)
 	} else {
 		h.Handler(ctx)
 	}
@@ -63,7 +54,7 @@ func ToHTTPHandler(s *Ship, h Handler) http.Handler {
 
 // FromHTTPHandler converts http.Handler to Handler.
 func FromHTTPHandler(h http.Handler) Handler {
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		h.ServeHTTP(ctx.Response(), ctx.Request())
 		return nil
 	}
@@ -71,13 +62,13 @@ func FromHTTPHandler(h http.Handler) Handler {
 
 // FromHTTPHandlerFunc converts http.HandlerFunc to Handler.
 func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		h(ctx.Response(), ctx.Request())
 		return nil
 	}
 }
 
-func nothingHandler(ctx Context) error {
+func nothingHandler(ctx *Context) error {
 	return nil
 }
 
@@ -86,7 +77,7 @@ func NothingHandler() Handler {
 	return nothingHandler
 }
 
-func okHandler(ctx Context) error {
+func okHandler(ctx *Context) error {
 	return ctx.String(http.StatusOK, "OK")
 }
 
@@ -95,7 +86,7 @@ func OkHandler() Handler {
 	return okHandler
 }
 
-func notFoundHandler(ctx Context) error {
+func notFoundHandler(ctx *Context) error {
 	return ctx.String(http.StatusNotFound, "Not Found")
 }
 
@@ -104,7 +95,7 @@ func NotFoundHandler() Handler {
 	return notFoundHandler
 }
 
-func methodNotAllowedHandler(ctx Context) error {
+func methodNotAllowedHandler(ctx *Context) error {
 	return ctx.NoContent(http.StatusMethodNotAllowed)
 }
 
@@ -113,11 +104,25 @@ func MethodNotAllowedHandler() Handler {
 	return methodNotAllowedHandler
 }
 
-func optionsHandler(ctx Context) error {
+func optionsHandler(ctx *Context) error {
 	return ctx.NoContent(http.StatusOK)
 }
 
 // OptionsHandler returns OPTIONS handler.
 func OptionsHandler() Handler {
 	return optionsHandler
+}
+
+func routerOptionsHandler(methods []string) interface{} {
+	return func(ctx *Context) error {
+		ctx.SetHeader("Allow", strings.Join(methods, ", "))
+		return ctx.ship.optionsHandler(ctx)
+	}
+}
+
+func routerMethodNotAllowedHandler(methods []string) interface{} {
+	return func(ctx *Context) error {
+		ctx.SetHeader("Allow", strings.Join(methods, ", "))
+		return ctx.ship.methodNotAllowedHandler(ctx)
+	}
 }

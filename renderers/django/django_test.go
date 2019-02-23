@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/render"
 )
 
 func TestEngine(t *testing.T) {
@@ -60,15 +59,13 @@ func TestRouterTemplate(t *testing.T) {
 	file.Close()
 	defer os.Remove(filename)
 
-	django := New(".")
-	htmlTemplate := render.NewHTMLTemplateManager()
-	htmlTemplate.Register(django)
+	engine := New(".")
 
 	s := ship.New()
-	mr := s.MuxRender()
-	mr.Add(".html", htmlTemplate)
+	mr := s.MuxRenderer()
+	mr.Add(engine.Ext(), ship.HTMLTemplateRenderer(engine))
 
-	s.Route("/django").GET(func(ctx ship.Context) error {
+	s.Route("/django").GET(func(ctx *ship.Context) error {
 		return ctx.Render(filename, 200, map[string]interface{}{"data": "django"})
 	})
 	req := httptest.NewRequest(http.MethodGet, "/django", nil)

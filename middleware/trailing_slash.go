@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 // Notice: it should be used as the pre-middleware by ship#Pre().
 func RemoveTrailingSlash() Middleware {
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) (err error) {
+		return func(ctx *ship.Context) (err error) {
 			req := ctx.Request()
 			path := req.URL.Path
 			if path != "" && path != "/" && path[len(path)-1] == '/' {

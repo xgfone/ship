@@ -20,20 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package binder
+package ship
 
 import (
-	"encoding/json"
-	"encoding/xml"
 	"errors"
-	"fmt"
-	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
-
-	"github.com/xgfone/ship/core"
 )
 
 // BindUnmarshaler is the interface used to wrap the UnmarshalParam method.
@@ -42,74 +36,32 @@ type BindUnmarshaler interface {
 	UnmarshalBind(param string) error
 }
 
-// BindQuery binds the request query to v.
-func BindQuery(queries url.Values, v interface{}) error {
-	if err := globalBinder.bindData(v, queries, "query"); err != nil {
-		return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-	}
-	return nil
-}
+// // Bind implements the `Binder#Bind` function.
+// func (b *FormBinder) Bind(v interface{}, req *http.Request) (err error) {
+// 	if req.ContentLength == 0 {
+// 		return errors.New("request body can't be empty")
+// 	}
+// 	ctype := req.Header.Get("Content-Type")
+// 	switch {
+// 	case strings.HasPrefix(ctype, "application/x-www-form-urlencoded"):
+// 		if err = req.ParseMultipartForm(b.maxMemory); err != nil {
+// 			return
+// 		}
+// 		return b.bindData(v, req.Form, "form")
+// 	case strings.HasPrefix(ctype, "multipart/form-data"):
+// 		if err = req.ParseForm(); err != nil {
+// 			return err
+// 		}
+// 		return b.bindData(v, req.Form, "form")
+// 	default:
+// 		return fmt.Errorf("not support content-type '%s'", ctype)
+// 	}
+// }
 
-// NewBinder returns a new default Binder.
-func NewBinder() core.Binder {
-	return globalBinder
-}
-
-// defaultBinder is the default implementation of the Binder interface.
-type defaultBinder struct{}
-
-var globalBinder = &defaultBinder{}
-
-// Bind implements the `Binder#Bind` function.
-func (b *defaultBinder) Bind(ctx core.Context, v interface{}) (err error) {
-	req := ctx.Request()
-	if req.ContentLength == 0 {
-		return core.NewHTTPError(http.StatusBadRequest, "request body can't be empty")
-	}
-	ctype := req.Header.Get("Content-Type")
-	switch {
-	case strings.HasPrefix(ctype, "application/json"):
-		if err = json.NewDecoder(req.Body).Decode(v); err != nil {
-			if ute, ok := err.(*json.UnmarshalTypeError); ok {
-				return core.NewHTTPError(http.StatusBadRequest,
-					fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, offset=%v",
-						ute.Type, ute.Value, ute.Offset)).SetInnerError(err)
-			} else if se, ok := err.(*json.SyntaxError); ok {
-				return core.NewHTTPError(http.StatusBadRequest,
-					fmt.Sprintf("Syntax error: offset=%v, error=%v",
-						se.Offset, se.Error())).SetInnerError(err)
-			}
-			return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-		}
-	case strings.HasPrefix(ctype, "application/xml"), strings.HasPrefix(ctype, "text/xml"):
-		if err = xml.NewDecoder(req.Body).Decode(v); err != nil {
-			if ute, ok := err.(*xml.UnsupportedTypeError); ok {
-				return core.NewHTTPError(http.StatusBadRequest,
-					fmt.Sprintf("Unsupported type error: type=%v, error=%v",
-						ute.Type, ute.Error())).SetInnerError(err)
-			} else if se, ok := err.(*xml.SyntaxError); ok {
-				return core.NewHTTPError(http.StatusBadRequest,
-					fmt.Sprintf("Syntax error: line=%v, error=%v",
-						se.Line, se.Error())).SetInnerError(err)
-			}
-			return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-		}
-	case strings.HasPrefix(ctype, "application/x-www-form-urlencoded"),
-		strings.HasPrefix(ctype, "multipart/form-data"):
-		params, err := ctx.FormParams()
-		if err != nil {
-			return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-		}
-		if err = b.bindData(v, params, "form"); err != nil {
-			return core.NewHTTPError(http.StatusBadRequest, err.Error()).SetInnerError(err)
-		}
-	default:
-		return core.ErrUnsupportedMediaType
-	}
-	return
-}
-
-func (b *defaultBinder) bindData(ptr interface{}, data map[string][]string, tag string) error {
+// BindURLValues parses the data and assign to the pointer ptr to a struct.
+//
+// Notice: tag is the name of the struct tag. such as "form", "query", etc.
+func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 	typ := reflect.TypeOf(ptr).Elem()
 	val := reflect.ValueOf(ptr).Elem()
 
@@ -130,7 +82,7 @@ func (b *defaultBinder) bindData(ptr interface{}, data map[string][]string, tag 
 			inputFieldName = typeField.Name
 			// If tag is nil, we inspect if the field is a struct.
 			if _, ok := bindUnmarshaler(structField); !ok && structFieldKind == reflect.Struct {
-				if err := b.bindData(structField.Addr().Interface(), data, tag); err != nil {
+				if err := BindURLValues(structField.Addr().Interface(), data, tag); err != nil {
 					return err
 				}
 				continue

@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func TestGzip(t *testing.T) {
 	ctx := s.NewContext(req, rec)
 
 	// Skip if no Accept-Encoding header
-	handler := Gzip()(func(ctx ship.Context) error {
+	handler := Gzip()(func(ctx *ship.Context) error {
 		ctx.Response().Write([]byte("test"))
 		return nil
 	})
@@ -64,7 +64,7 @@ func TestGzipNoContent(t *testing.T) {
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
 	rec := httptest.NewRecorder()
 	ctx := s.NewContext(req, rec)
-	handler := Gzip()(func(ctx ship.Context) error {
+	handler := Gzip()(func(ctx *ship.Context) error {
 		return ctx.NoContent(http.StatusNoContent)
 	})
 
@@ -77,9 +77,9 @@ func TestGzipNoContent(t *testing.T) {
 
 func TestGzipErrorReturned(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	s := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
+	s := ship.New(ship.SetLogger(ship.NewNoLevelLogger(buf, 0)))
 	s.Use(Gzip())
-	s.R("/").GET(func(ctx ship.Context) error { return ship.ErrNotFound })
+	s.R("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")

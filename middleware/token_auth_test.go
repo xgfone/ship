@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ func TestAuthToken(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx := s.NewContext(req, rec)
 	authMiddleware := TokenAuth(validateToken, GetTokenFromHeader(ship.HeaderAuthorization, "abc"))
-	handler := authMiddleware(func(ctx ship.Context) error {
+	handler := authMiddleware(func(ctx *ship.Context) error {
 		return ctx.String(http.StatusOK, "test")
 	})
 
@@ -50,16 +50,16 @@ func TestAuthToken(t *testing.T) {
 	auth = "abc invalid_token"
 	req.Header.Set(ship.HeaderAuthorization, auth)
 	he := handler(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusUnauthorized, he.Code())
+	assert.Equal(http.StatusUnauthorized, he.Code)
 
 	// Missing Authorization header
 	req.Header.Del(ship.HeaderAuthorization)
 	he = handler(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusBadRequest, he.Code())
+	assert.Equal(http.StatusBadRequest, he.Code)
 
 	// Token from custom header
 	handler = TokenAuth(validateToken, GetTokenFromHeader("API-Token"))(
-		func(ctx ship.Context) error {
+		func(ctx *ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})
 	req.Header.Set("API-Token", "valid_token")
@@ -67,7 +67,7 @@ func TestAuthToken(t *testing.T) {
 
 	// Token from URL query
 	handler = TokenAuth(validateToken, GetTokenFromQuery("token"))(
-		func(ctx ship.Context) error {
+		func(ctx *ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})
 	query := req.URL.Query()
@@ -77,7 +77,7 @@ func TestAuthToken(t *testing.T) {
 
 	// Token from Form
 	handler = TokenAuth(validateToken, GetTokenFromForm("token"))(
-		func(ctx ship.Context) error {
+		func(ctx *ship.Context) error {
 			return ctx.String(http.StatusOK, "test")
 		})
 	form := make(url.Values)

@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,10 +37,10 @@ func TestLogger(t *testing.T) {
 	bs := bytes.NewBuffer(nil)
 	logger := ship.NewNoLevelLogger(bs, 0)
 
-	router := ship.New(ship.Config{Logger: logger})
+	router := ship.New(ship.SetLogger(logger))
 	router.Use(Logger(getNow))
 
-	router.Route("/test").GET(func(ctx ship.Context) error {
+	router.Route("/test").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Info("handler")
 		return nil
 	})

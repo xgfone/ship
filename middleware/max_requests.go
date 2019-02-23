@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 // If the number of the requests exceeds the maximum, it will call the handler,
 // which return the status code 429. But you can appoint yourself handler.
 func MaxRequests(max uint32, handler ...ship.Handler) Middleware {
-	h := func(c ship.Context) error { return c.NoContent(http.StatusTooManyRequests) }
+	h := func(c *ship.Context) error { return c.NoContent(http.StatusTooManyRequests) }
 	if len(handler) > 0 && handler[0] != nil {
 		h = handler[0]
 	}
@@ -36,7 +36,7 @@ func MaxRequests(max uint32, handler ...ship.Handler) Middleware {
 	var current int32
 
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) error {
+		return func(ctx *ship.Context) error {
 			atomic.AddInt32(&current, 1)
 			defer atomic.AddInt32(&current, -1)
 

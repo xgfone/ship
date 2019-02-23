@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 xgfone <xgfone@126.com>
+// Copyright (c) 2018 xgfone
 // Copyright (c) 2017 LabStack
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,13 +21,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package binder_test
+package ship
 
 import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -38,7 +37,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xgfone/ship"
 )
 
 //////////////////////////////////////////////////////////////////////////////
@@ -46,8 +44,8 @@ import (
 func testBindOkay(t *testing.T, r io.Reader, ctype string) {
 	req := httptest.NewRequest(http.MethodPost, "/", r)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
-	req.Header.Set(ship.HeaderContentType, ctype)
+	ctx := New().NewContext(req, rec)
+	req.Header.Set(HeaderContentType, ctype)
 	u := new(user)
 	err := ctx.Bind(u)
 	if err == nil {
@@ -61,27 +59,12 @@ func testBindOkay(t *testing.T, r io.Reader, ctype string) {
 func testBindError(t *testing.T, r io.Reader, ctype string, expectedInternal error) {
 	req := httptest.NewRequest(http.MethodPost, "/", r)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
-	req.Header.Set(ship.HeaderContentType, ctype)
+	ctx := New().NewContext(req, rec)
+	req.Header.Set(HeaderContentType, ctype)
 	u := new(user)
 	err := ctx.Bind(u)
 
-	switch {
-	case strings.HasPrefix(ctype, ship.MIMEApplicationJSON),
-		strings.HasPrefix(ctype, ship.MIMEApplicationXML),
-		strings.HasPrefix(ctype, ship.MIMETextXML),
-		strings.HasPrefix(ctype, ship.MIMEApplicationForm),
-		strings.HasPrefix(ctype, ship.MIMEMultipartForm):
-		if assert.IsType(t, ship.NewHTTPError(200), err) {
-			assert.Equal(t, http.StatusBadRequest, err.(ship.HTTPError).Code())
-			assert.IsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
-		}
-	default:
-		if assert.IsType(t, ship.NewHTTPError(200), err) {
-			assert.Equal(t, ship.ErrUnsupportedMediaType, err)
-			assert.IsType(t, expectedInternal, err.(ship.HTTPError).InnerError())
-		}
-	}
+	assert.IsType(t, expectedInternal, err)
 }
 
 type (
@@ -162,31 +145,30 @@ func (s *Struct) UnmarshalBind(src string) error {
 }
 
 func TestBindJSON(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userJSON), ship.MIMEApplicationJSON)
-	testBindError(t, strings.NewReader(invalidContent), ship.MIMEApplicationJSON,
+	testBindOkay(t, strings.NewReader(userJSON), MIMEApplicationJSON)
+	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationJSON,
 		&json.SyntaxError{})
 	testBindError(t, strings.NewReader(userJSONInvalidType),
-		ship.MIMEApplicationJSON, &json.UnmarshalTypeError{})
+		MIMEApplicationJSON, &json.UnmarshalTypeError{})
 }
 
 func TestBindXML(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userXML), ship.MIMEApplicationXML)
-	testBindError(t, strings.NewReader(invalidContent), ship.MIMEApplicationXML, errors.New(""))
-	testBindError(t, strings.NewReader(userXMLConvertNumberError), ship.MIMEApplicationXML, &strconv.NumError{})
-	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), ship.MIMEApplicationXML, &xml.SyntaxError{})
-	testBindOkay(t, strings.NewReader(userXML), ship.MIMETextXML)
-	testBindError(t, strings.NewReader(invalidContent), ship.MIMETextXML, errors.New(""))
-	testBindError(t, strings.NewReader(userXMLConvertNumberError), ship.MIMETextXML, &strconv.NumError{})
-	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), ship.MIMETextXML, &xml.SyntaxError{})
+	testBindOkay(t, strings.NewReader(userXML), MIMEApplicationXML)
+	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationXML, ErrMissingContentType)
+	testBindError(t, strings.NewReader(userXMLConvertNumberError), MIMEApplicationXML, &strconv.NumError{})
+	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), MIMEApplicationXML, &xml.SyntaxError{})
+	testBindOkay(t, strings.NewReader(userXML), MIMETextXML)
+	testBindError(t, strings.NewReader(invalidContent), MIMETextXML, ErrMissingContentType)
+	testBindError(t, strings.NewReader(userXMLConvertNumberError), MIMETextXML, &strconv.NumError{})
+	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), MIMETextXML, &xml.SyntaxError{})
 }
 
 func TestBindForm(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userForm), ship.MIMEApplicationForm)
-	testBindError(t, nil, ship.MIMEApplicationForm, nil)
+	testBindOkay(t, strings.NewReader(userForm), MIMEApplicationForm)
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(userForm))
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
-	req.Header.Set(ship.HeaderContentType, ship.MIMEApplicationForm)
+	ctx := New().NewContext(req, rec)
+	req.Header.Set(HeaderContentType, MIMEApplicationForm)
 	err := ctx.Bind(&[]struct{ Field string }{})
 	if err == nil {
 		t.Fail()
@@ -196,7 +178,7 @@ func TestBindForm(t *testing.T) {
 func TestBindQueryParams(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?id=1&name=Jon+Snow", nil)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	u := new(user)
 	err := ctx.BindQuery(u)
 	if err == nil {
@@ -210,7 +192,7 @@ func TestBindQueryParams(t *testing.T) {
 func TestBindQueryParamsCaseInsensitive(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?ID=1&NAME=Jon+Snow", nil)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	u := new(user)
 	err := ctx.BindQuery(u)
 	if err == nil {
@@ -224,7 +206,7 @@ func TestBindQueryParamsCaseInsensitive(t *testing.T) {
 func TestBindQueryParamsCaseSensitivePrioritized(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?id=1&ID=2&NAME=Jon+Snow&name=Jon+Doe", nil)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	u := new(user)
 	err := ctx.BindQuery(u)
 	if err == nil {
@@ -240,7 +222,7 @@ func TestBindUnmarshalBind(t *testing.T) {
 		"/?ts=2016-12-06T19:09:05Z&sa=one,two,three&ta=2016-12-06T19:09:05Z&ta=2016-12-06T19:09:05Z&ST=baz",
 		nil)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	result := struct {
 		T  Timestamp   `query:"ts"`
 		TA []Timestamp `query:"ta"`
@@ -261,7 +243,7 @@ func TestBindUnmarshalBind(t *testing.T) {
 func TestBindUnmarshalBindPtr(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?ts=2016-12-06T19:09:05Z", nil)
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	result := struct {
 		Tptr *Timestamp `query:"ts"`
 	}{}
@@ -284,22 +266,19 @@ func TestBindMultipartForm(t *testing.T) {
 }
 
 func TestBindUnsupportedMediaType(t *testing.T) {
-	testBindError(t, strings.NewReader(invalidContent), ship.MIMEApplicationJSON,
+	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationJSON,
 		&json.SyntaxError{})
 }
 
 func TestBindUnmarshalTypeError(t *testing.T) {
 	body := bytes.NewBufferString(`{ "id": "text" }`)
 	req := httptest.NewRequest(http.MethodPost, "/", body)
-	req.Header.Set(ship.HeaderContentType, ship.MIMEApplicationJSON)
+	req.Header.Set(HeaderContentType, MIMEApplicationJSON)
 
 	rec := httptest.NewRecorder()
-	ctx := ship.New().NewContext(req, rec)
+	ctx := New().NewContext(req, rec)
 	u := new(user)
 
-	err := ctx.Bind(u).(ship.HTTPError)
-	he := ship.NewHTTPError(http.StatusBadRequest, "Unmarshal type error: expected=int, got=string, offset=14")
-
-	assert.Equal(t, he.Code(), err.Code())
-	assert.Equal(t, he.Message(), err.Message())
+	err := ctx.Bind(u)
+	assert.Equal(t, "json: cannot unmarshal string into Go struct field user.id of type int", err.Error())
 }

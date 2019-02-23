@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,43 +16,39 @@ package ship
 
 import (
 	"bytes"
-	"context"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var defaultHandler = func(ctx Context) (err error) {
+var defaultHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.Request().Method)); err != nil {
 		code := http.StatusInternalServerError
-		err = NewHTTPError(code).SetInnerError(err)
+		err = HTTPError{Code: code, Err: err}
 	}
 	return
 }
 
-var idHandler = func(ctx Context) (err error) {
+var idHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.Param("id"))); err != nil {
 		code := http.StatusInternalServerError
-		err = NewHTTPError(code).SetInnerError(err)
+		err = HTTPError{Code: code, Err: err}
 	}
 	return
 }
 
-var params2Handler = func(ctx Context) (err error) {
+var params2Handler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.Param("p1") + "|" + ctx.Param("p2"))); err != nil {
 		code := http.StatusInternalServerError
-		err = NewHTTPError(code).SetInnerError(err)
+		err = HTTPError{Code: code, Err: err}
 	}
 	return
 }
@@ -101,7 +97,7 @@ func TestRouteMap(t *testing.T) {
 func TestAllMethods(t *testing.T) {
 	p := New()
 	p.Use(func(next Handler) Handler {
-		return func(c Context) error {
+		return func(c *Context) error {
 			return next(c)
 		}
 	})
@@ -269,36 +265,16 @@ func TestAllMethods(t *testing.T) {
 	p2 := New()
 	p2.Route("/test").Any(defaultHandler)
 
-	test2 := []struct {
-		method string
-	}{
-		{
-			method: http.MethodConnect,
-		},
-		{
-			method: http.MethodDelete,
-		},
-		{
-			method: http.MethodGet,
-		},
-		{
-			method: http.MethodHead,
-		},
-		{
-			method: http.MethodOptions,
-		},
-		{
-			method: http.MethodPatch,
-		},
-		{
-			method: http.MethodPost,
-		},
-		{
-			method: http.MethodPut,
-		},
-		{
-			method: http.MethodTrace,
-		},
+	test2 := []struct{ method string }{
+		{method: http.MethodConnect},
+		{method: http.MethodDelete},
+		{method: http.MethodGet},
+		{method: http.MethodHead},
+		{method: http.MethodOptions},
+		{method: http.MethodPatch},
+		{method: http.MethodPost},
+		{method: http.MethodPut},
+		{method: http.MethodTrace},
 	}
 
 	for _, tt := range test2 {
@@ -322,7 +298,7 @@ func TestRouterAPI(t *testing.T) {
 	p := New()
 
 	for _, route := range githubAPI {
-		p.Route(route.path).Method(func(ctx Context) error {
+		p.Route(route.path).Method(func(ctx *Context) error {
 			if _, err := ctx.Response().Write([]byte(ctx.Request().URL.Path)); err != nil {
 				panic(err)
 			}
@@ -338,10 +314,8 @@ func TestRouterAPI(t *testing.T) {
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	p := New(Config{
-		KeepTrailingSlashPath:   true,
-		MethodNotAllowedHandler: MethodNotAllowedHandler(),
-	})
+	p := New(SetKeepTrailingSlashPath(true),
+		SetMethodNotAllowedHandler(MethodNotAllowedHandler()))
 
 	p.Route("/home/").PUT(defaultHandler)
 	p.Route("/home/").POST(defaultHandler)
@@ -379,10 +353,8 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestMethodNotAllowed2(t *testing.T) {
-	p := New(Config{
-		KeepTrailingSlashPath:   true,
-		MethodNotAllowedHandler: MethodNotAllowedHandler(),
-	})
+	p := New(SetKeepTrailingSlashPath(true),
+		SetMethodNotAllowedHandler(MethodNotAllowedHandler()))
 
 	p.Route("/home/").GET(defaultHandler)
 	p.Route("/home/").HEAD(defaultHandler)
@@ -415,10 +387,8 @@ func TestMethodNotAllowed2(t *testing.T) {
 }
 
 func TestAutomaticallyHandleOPTIONS(t *testing.T) {
-	p := New(Config{
-		OptionsHandler:          OptionsHandler(),
-		MethodNotAllowedHandler: MethodNotAllowedHandler(),
-	})
+	p := New(SetOptionsHandler(OptionsHandler()),
+		SetMethodNotAllowedHandler(MethodNotAllowedHandler()))
 
 	p.Route("/home").GET(defaultHandler)
 	p.Route("/home").POST(defaultHandler)
@@ -444,12 +414,12 @@ func TestAutomaticallyHandleOPTIONS(t *testing.T) {
 }
 
 func TestNotFound(t *testing.T) {
-	notFound := func(ctx Context) error {
+	notFound := func(ctx *Context) error {
 		http.Error(ctx.Response(), http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return nil
 	}
 
-	p := New(Config{NotFoundHandler: notFound})
+	p := New(SetNotFoundHandler(notFound))
 	p.Route("/home/").GET(defaultHandler)
 	p.Route("/home/").POST(defaultHandler)
 	p.Route("/users/:id").GET(defaultHandler)
@@ -740,12 +710,12 @@ var githubAPI = []route{
 
 type TestType struct{}
 
-func (t TestType) Create(ctx Context) error { return nil }
-func (t TestType) Delete(ctx Context) error { return nil }
-func (t TestType) Update(ctx Context) error { return nil }
-func (t TestType) Get(ctx Context) error    { return nil }
-func (t TestType) Has(ctx Context) error    { return nil }
-func (t TestType) NotHandler()              {}
+func (t TestType) Create(ctx *Context) error { return nil }
+func (t TestType) Delete(ctx *Context) error { return nil }
+func (t TestType) Update(ctx *Context) error { return nil }
+func (t TestType) Get(ctx *Context) error    { return nil }
+func (t TestType) Has(ctx *Context) error    { return nil }
+func (t TestType) NotHandler()               {}
 
 func strIsInSlice(s string, ss []string) bool {
 	for _, _s := range ss {
@@ -810,13 +780,13 @@ func TestRouteMapType(t *testing.T) {
 
 func TestShipVHost(t *testing.T) {
 	s := New()
-	s.Route("/router").GET(func(c Context) error { return c.String(200, "default") })
+	s.Route("/router").GET(func(c *Context) error { return c.String(200, "default") })
 
 	vhost1 := s.VHost("host1.example.com")
-	vhost1.Route("/router").GET(func(c Context) error { return c.String(200, "vhost1") })
+	vhost1.Route("/router").GET(func(c *Context) error { return c.String(200, "vhost1") })
 
 	vhost2 := s.VHost("host2.example.com")
-	vhost2.Route("/router").GET(func(c Context) error { return c.String(200, "vhost2") })
+	vhost2.Route("/router").GET(func(c *Context) error { return c.String(200, "vhost2") })
 
 	req := httptest.NewRequest(http.MethodGet, "/router", nil)
 	rec := httptest.NewRecorder()
@@ -880,15 +850,15 @@ func TestRouteStaticFS(t *testing.T) {
 	assert.NotZero(t, rec.Body.Len())
 	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
 
-	req = httptest.NewRequest(http.MethodHead, "/ship/core/", nil)
+	req = httptest.NewRequest(http.MethodHead, "/ship/_benchmark/", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.NotZero(t, rec.Body.Len())
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
-	assert.Contains(t, rec.Body.String(), `"router.go"`)
+	assert.Contains(t, rec.Body.String(), `"router_test.go"`)
 
-	req = httptest.NewRequest(http.MethodGet, "/ship/core/router.go", nil)
+	req = httptest.NewRequest(http.MethodGet, "/ship/_benchmark/router_test.go", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -915,15 +885,15 @@ func TestRouteStatic(t *testing.T) {
 	assert.NotZero(t, rec.Body.Len())
 	assert.NotZero(t, rec.Header().Get(HeaderContentLength))
 
-	req = httptest.NewRequest(http.MethodHead, "/ship/core/", nil)
+	req = httptest.NewRequest(http.MethodHead, "/ship/_benchmark/", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.NotZero(t, rec.Body.Len())
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get(HeaderContentType))
-	assert.NotContains(t, rec.Body.String(), `"router.go"`)
+	assert.NotContains(t, rec.Body.String(), `"router_test.go"`)
 
-	req = httptest.NewRequest(http.MethodGet, "/ship/core/router.go", nil)
+	req = httptest.NewRequest(http.MethodGet, "/ship/_benchmark/router_test.go", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -933,10 +903,10 @@ func TestRouteStatic(t *testing.T) {
 
 func TestRouteMatcher(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	s := New(Config{Logger: NewNoLevelLogger(buf)})
+	s := New(SetLogger(NewNoLevelLogger(buf)))
 
 	s.Route("/path1").Header("Content-Type", "application/json").GET(
-		func(ctx Context) error { return ctx.String(200, "OK") })
+		func(ctx *Context) error { return ctx.String(200, "OK") })
 	req := httptest.NewRequest(http.MethodGet, "/path1", nil)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -945,7 +915,7 @@ func TestRouteMatcher(t *testing.T) {
 	assert.Equal(t, "OK", rec.Body.String())
 
 	s.Route("/path3").Header("Content-Type").GET(
-		func(ctx Context) error { return ctx.String(200, "OK") })
+		func(ctx *Context) error { return ctx.String(200, "OK") })
 	req = httptest.NewRequest(http.MethodGet, "/path3", nil)
 	req.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
@@ -953,13 +923,14 @@ func TestRouteMatcher(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "OK", rec.Body.String())
 
-	s.Route("/path4").Header("Content-Type").GET(
-		func(ctx Context) error { return ctx.String(200, "OK") })
+	s.Route("/path4").
+		Header("Content-Type").
+		GET(func(ctx *Context) error { return ctx.String(200, "OK") })
 	req = httptest.NewRequest(http.MethodGet, "/path4", nil)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Equal(t, "code=404, msg=Not Found, err=missing the header 'Content-Type'", rec.Body.String())
+	assert.Equal(t, "missing the header 'Content-Type'", rec.Body.String())
 }
 
 func TestContextBindQuery(t *testing.T) {
@@ -970,7 +941,7 @@ func TestContextBindQuery(t *testing.T) {
 	vs := V{}
 
 	s := New()
-	s.Route("/path").GET(func(ctx Context) error { return ctx.BindQuery(&vs) })
+	s.Route("/path").GET(func(ctx *Context) error { return ctx.BindQuery(&vs) })
 	req := httptest.NewRequest(http.MethodGet, "/path?a=xyz&b=2", nil)
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
@@ -983,7 +954,7 @@ func TestContextAccept(t *testing.T) {
 	expected := []string{"text/html", "application/xhtml+xml", "image/webp", "application/", ""}
 	var accepts []string
 	s := New()
-	s.R("/path").GET(func(ctx Context) error {
+	s.R("/path").GET(func(ctx *Context) error {
 		accepts = ctx.Accept()
 		return nil
 	})
@@ -1019,69 +990,174 @@ func (bw *safeBufferWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func TestShipLink(t *testing.T) {
-	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
-	logger := NewNoLevelLogger(buf, 0)
+// func TestShipLink(t *testing.T) {
+// 	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
+// 	logger := NewNoLevelLogger(buf, 0)
 
-	prouter := New(Config{Name: "parent", Logger: logger})
-	crouter1 := New(Config{Name: "child1", Logger: logger}).Link(prouter)
-	crouter2 := prouter.Clone("child2").Link(prouter)
+// 	prouter := New(SetName("parent"), SetLogger(logger))
+// 	crouter1 := New(SetName("child1"), SetLogger(logger)).Link(prouter)
+// 	crouter2 := prouter.Clone("child2").Link(prouter)
 
-	prouter.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
-	crouter1.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
-	crouter2.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
+// 	prouter.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
+// 	crouter1.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
+// 	crouter2.RegisterOnShutdown(func() { time.Sleep(time.Millisecond) })
 
-	go func() {
-		time.Sleep(time.Millisecond * 100)
-		prouter.Shutdown(context.Background())
-	}()
-	go crouter1.Start("127.0.0.1:11111")
-	go crouter2.Start("127.0.0.1:11112")
-	prouter.Start("127.0.0.1:11113")
+// 	ch := make(chan struct{}, 1)
+// 	go func() {
+// 		time.Sleep(time.Millisecond * 100)
+// 		for {
+// 			select {
+// 			case <-ch:
+// 				return
+// 			default:
+// 				prouter.Shutdown(context.Background())
+// 			}
+// 		}
+// 	}()
+// 	go crouter1.Start("127.0.0.1:11111")
+// 	go crouter2.Start("127.0.0.1:11112")
+// 	prouter.Start("127.0.0.1:11113")
 
-	prouter.Wait()
-	prouter.Wait()
-	time.Sleep(time.Millisecond * 100)
-	buf.lock.Lock()
-	lines := strings.Split(strings.TrimSpace(buf.buf.String()), "\n")
-	buf.lock.Unlock()
+// 	prouter.Wait()
+// 	prouter.Wait()
+// 	time.Sleep(time.Millisecond * 100)
+// 	buf.lock.Lock()
+// 	lines := strings.Split(strings.TrimSpace(buf.buf.String()), "\n")
+// 	buf.lock.Unlock()
 
-	assert.Equal(t, 6, len(lines))
-	if len(lines) != 6 {
-		return
-	}
-	sort.Strings(lines[:3])
-	sort.Strings(lines[3:])
+// 	assert.Equal(t, 6, len(lines))
+// 	if len(lines) != 6 {
+// 		return
+// 	}
+// 	sort.Strings(lines[:3])
+// 	sort.Strings(lines[3:])
 
-	assert.Equal(t, "[I] The HTTP Server [child1] is running on 127.0.0.1:11111", lines[0])
-	assert.Equal(t, "[I] The HTTP Server [child2] is running on 127.0.0.1:11112", lines[1])
-	assert.Equal(t, "[I] The HTTP Server [parent] is running on 127.0.0.1:11113", lines[2])
-	assert.Equal(t, "[I] The HTTP Server [child1] is shutdown", lines[3])
-	assert.Equal(t, "[I] The HTTP Server [child2] is shutdown", lines[4])
-	assert.Equal(t, "[I] The HTTP Server [parent] is shutdown", lines[5])
-}
+// 	assert.Equal(t, "[I] The HTTP Server [child1] is running on 127.0.0.1:11111", lines[0])
+// 	assert.Equal(t, "[I] The HTTP Server [child2] is running on 127.0.0.1:11112", lines[1])
+// 	assert.Equal(t, "[I] The HTTP Server [parent] is running on 127.0.0.1:11113", lines[2])
+// 	assert.Equal(t, "[I] The HTTP Server [child1] is shutdown", lines[3])
+// 	assert.Equal(t, "[I] The HTTP Server [child2] is shutdown", lines[4])
+// 	assert.Equal(t, "[I] The HTTP Server [parent] is shutdown", lines[5])
+// }
 
-func TestRegisterConnStateHandler(t *testing.T) {
-	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
+// func TestRegisterConnStateHandler(t *testing.T) {
+// 	buf := &safeBufferWriter{buf: bytes.NewBuffer(nil), lock: new(sync.Mutex)}
 
-	router := New()
-	router.SetConnStateHandler(func(conn net.Conn, state http.ConnState) {
-		buf.WriteString(state.String())
-		buf.WriteString("\n")
-	})
-	router.R("/").GET(func(c Context) error { return nil })
+// 	router := New()
+// 	router.SetConnStateHandler(func(conn net.Conn, state http.ConnState) {
+// 		buf.WriteString(state.String())
+// 		buf.WriteString("\n")
+// 	})
+// 	router.R("/").GET(func(c *Context) error { return nil })
 
-	go func() {
-		time.Sleep(time.Millisecond * 100)
-		req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:11114/", nil)
-		req.Close = true
-		if resp, _ := http.DefaultClient.Do(req); resp != nil {
-			resp.Body.Close()
+// 	go func() {
+// 		time.Sleep(time.Millisecond * 100)
+// 		req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:11114/", nil)
+// 		req.Close = true
+// 		if resp, _ := http.DefaultClient.Do(req); resp != nil {
+// 			resp.Body.Close()
+// 		}
+// 		time.Sleep(time.Millisecond * 100)
+// 		router.Shutdown(context.Background())
+// 	}()
+
+// 	router.Start("127.0.0.1:11114")
+// 	assert.Equal(t, "new\nactive\nclosed\n", buf.String())
+// }
+
+const middlewareoutput = `
+pre m1 start
+pre m2 start
+use m1 start
+use m2 start
+group m1 start
+group m2 start
+route m1 start
+route m2 start
+route m2 end
+route m1 end
+group m2 end
+group m1 end
+use m2 end
+use m1 end
+pre m2 end
+pre m1 end
+`
+
+func TestMiddleware(t *testing.T) {
+	bs := bytes.NewBufferString("\n")
+	s := New()
+	s.Pre(func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("pre m1 start\n")
+			err := next(ctx)
+			bs.WriteString("pre m1 end\n")
+			return err
 		}
-		time.Sleep(time.Millisecond * 100)
-		router.Shutdown(context.Background())
-	}()
+	}, func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("pre m2 start\n")
+			err := next(ctx)
+			bs.WriteString("pre m2 end\n")
+			return err
+		}
+	})
 
-	router.Start("127.0.0.1:11114")
-	assert.Equal(t, "new\nactive\nclosed\n", buf.String())
+	s.Use(func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("use m1 start\n")
+			err := next(ctx)
+			bs.WriteString("use m1 end\n")
+			return err
+		}
+	}, func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("use m2 start\n")
+			err := next(ctx)
+			bs.WriteString("use m2 end\n")
+			return err
+		}
+	})
+
+	group := s.Group("/v1")
+	group.Use(func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("group m1 start\n")
+			err := next(ctx)
+			bs.WriteString("group m1 end\n")
+			return err
+		}
+	}, func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("group m2 start\n")
+			err := next(ctx)
+			bs.WriteString("group m2 end\n")
+			return err
+		}
+	})
+
+	group.R("/route").Use(func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("route m1 start\n")
+			err := next(ctx)
+			bs.WriteString("route m1 end\n")
+			return err
+		}
+	}, func(next Handler) Handler {
+		return func(ctx *Context) error {
+			bs.WriteString("route m2 start\n")
+			err := next(ctx)
+			bs.WriteString("route m2 end\n")
+			return err
+		}
+	}).GET(OkHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/route", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	if bs.String() != middlewareoutput {
+		t.Error(bs.String())
+		t.Fail()
+	}
 }

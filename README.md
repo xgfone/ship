@@ -34,7 +34,7 @@ import (
 
 func main() {
 	router := ship.New()
-	router.Route("/ping").GET(func(ctx ship.Context) error {
+	router.Route("/ping").GET(func(ctx *ship.Context) error {
 		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
 	})
 
@@ -52,126 +52,6 @@ $ go run example.go
 ```shell
 $ curl http://127.0.0.1:8080/ping
 {"message":"pong"}
-```
-
-
-## Configure `Router`
-
-```go
-type Config struct {
-	// The route prefix, which is "" by default.
-	Prefix string
-
-	// If ture, it will enable the debug mode.
-	Debug bool
-
-	// If true, it won't remove the trailing slash from the registered url path.
-	KeepTrailingSlashPath bool
-
-	// The size of the buffer initialized by the buffer pool.
-	//
-	// The default is 2KB.
-	BufferSize int
-
-	// The initializing size of the store, which is a map essentially,
-	// used by the context.
-	//
-	// The default is 0. If you use the store, such as Get(), Set(), you should
-	// set it to a appropriate value.
-	ContextStoreSize int
-
-	// The maximum number of the middlewares, which is 256 by default.
-	MiddlewareMaxNum int
-
-	// It is the default mapping to map the method into router. The default is
-	//
-	//     map[string]string{
-	//         "Create": "POST",
-	//         "Delete": "DELETE",
-	//         "Update": "PUT",
-	//         "Get":    "GET",
-	//     }
-	DefaultMethodMapping map[string]string
-
-	// The signal set that built-in http server will wrap and handle.
-	// The default is
-	//
-	//     []os.Signal{
-	//         os.Interrupt,
-	//         syscall.SIGTERM,
-	//         syscall.SIGQUIT,
-	//         syscall.SIGABRT,
-	//         syscall.SIGINT,
-	//     }
-	//
-	// In order to disable the signals, you can set it to []os.Signal{}.
-	Signals []os.Signal
-
-	// BindQuery binds the request query to v.
-	BindQuery func(queries url.Values, v interface{}) error
-
-	// The logger management, which is `NewNoLevelLogger(os.Stdout)` by default.
-	// But you can appoint yourself customized Logger implementation.
-	Logger Logger
-	// Binder is used to bind the request data to the given value,
-	// which is `NewBinder()` by default.
-	// But you can appoint yourself customized Binder implementation
-	Binder Binder
-	// Rendered is used to render the response to the peer.
-	//
-	// The default is MuxRender, and adds some renderer, for example,
-	// json, jsonpretty, xml, xmlpretty, etc, as follow.
-	//
-	//     renderer := NewMuxRender()
-	//     renderer.Add("json", render.JSON())
-	//     renderer.Add("jsonpretty", render.JSONPretty("    "))
-	//     renderer.Add("xml", render.XML())
-	//     renderer.Add("xmlpretty", render.XMLPretty("    "))
-	//
-	// So you can use it by the four ways:
-	//
-	//     renderer.Render(ctx, "json", 200, data)
-	//     renderer.Render(ctx, "jsonpretty", 200, data)
-	//     renderer.Render(ctx, "xml", 200, data)
-	//     renderer.Render(ctx, "xmlpretty", 200, data)
-	//
-	// You can use the default, then add yourself renderer as follow.
-	//
-	///    router := New()
-	//     mr := router.MuxRender()
-	//     mr.Add("html", HtmlRenderer)
-	//
-	Renderer Renderer
-
-	// Create a new router, which uses echo implementation by default.
-	// But you can appoint yourself customized Router implementation.
-	NewRouter func() Router
-
-	// Handle the error at last.
-	//
-	// The default will send the response to the peer if the error is a HTTPError.
-	// Or only log it. So the handler and the middleware return a HTTPError,
-	// instead of sending the response to the peer.
-	HandleError func(Context, error)
-
-	// You can appoint the NotFound handler. The default is NotFoundHandler().
-	NotFoundHandler Handler
-
-	// OPTIONS and MethodNotAllowed handler, which are used for the default router.
-	OptionsHandler          Handler
-	MethodNotAllowedHandler Handler
-}
-```
-
-```go
-func main() {
-    config := ship.Config{
-        ...
-    }
-    router := ship.New(config)
-
-    ...
-}
 ```
 
 
@@ -238,8 +118,8 @@ You can name the route a name when registering the route, then you can build a U
 func main() {
     router := ship.New()
 
-    router.Route("/path/:id").Name("get_url").GET(func(ctx Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.URLParamValues()))
+    router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
+        fmt.Println(ctx.URL("get_url", ctx.ParamValues()...))
     })
 
     // Start the HTTP server.
@@ -253,7 +133,7 @@ func main() {
 func main() {
     router := ship.New()
 
-    handler := func(ctx Context) error { return nil }
+    handler := func(ctx *ship.Context) error { return nil }
     router.R("/path1").Schemes("https", "wss").GET(handler)
     router.R("/path2").Headers("Content-Type", "application/json").POST(handler)
 
@@ -275,11 +155,11 @@ import (
 
 type TestType struct{}
 
-func (t TestType) Create(ctx Context) error { return nil }
-func (t TestType) Delete(ctx Context) error { return nil }
-func (t TestType) Update(ctx Context) error { return nil }
-func (t TestType) Get(ctx Context) error    { return nil }
-func (t TestType) Has(ctx Context) error    { return nil }
+func (t TestType) Create(ctx *ship.Context) error { return nil }
+func (t TestType) Delete(ctx *ship.Context) error { return nil }
+func (t TestType) Update(ctx *ship.Context) error { return nil }
+func (t TestType) Get(ctx *ship.Context) error    { return nil }
+func (t TestType) Has(ctx *ship.Context) error    { return nil }
 func (t TestType) NotHandler()              {}
 
 func main() {
@@ -299,32 +179,23 @@ router.Route("/v1/testtype/create").Name("testtype_create").POST(tv.Create)
 router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(tv.Delete)
 ```
 
-The default mapping method is `Ship.Config.DefaultMethodMapping`, which is initialized as follow if not given when creating a new router `Ship`.
+The default method mapping is as follow, which can be reset by `SetDefaultMethodMapping` when configuring `Ship`.
 ```go
-Ship.Config.DefaultMethodMapping = map[string]string{
+opt := SetDefaultMethodMapping (map[string]string{
     // "MethodName": "RequestMethod"
     "Create": "POST",
     "Delete": "DELETE",
     "Update": "PUT",
     "Get":    "GET",
-}
-```
-
-If the default is not what you want, you can customize it, for example,
-```go
-router := ship.New(ship.Config{
-    DefaultMethodMapping: map[string]string{
-        "GetMethod": "GET",
-        "PostMethod": "POST",
-    },
 })
+router.Configure(opt)
 ```
 
 **Notice:**
 - The name of type and method will be converted to the lower.
 - The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
 - The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
-- The type of the method must be `func(ship.Context) error`, or it will be ignored.
+- The type of the method must be `func(*ship.Context) error`, or it will be ignored.
 
 #### Using `Middleware`
 
@@ -356,7 +227,7 @@ func RemovePathPrefix(prefix string) ship.Middleware {
     }
 
     return func(next ship.Handler) Handler {
-        return func(ctx ship.Context) error {
+        return func(ctx *ship.Context) error {
             req := ctx.Request()
             req.URL.Path = strings.TrimPrefix(req.URL.Path, prefix)
         }
@@ -439,13 +310,13 @@ func main() {
 ```go
 func main() {
     router := ship.New()
-    router.Route("/router").GET(func(c ship.Context) error { return c.String(200, "default") })
+    router.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "default") })
 
     vhost1 := router.VHost("host1.example.com")
-    vhost1.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost1") })
+    vhost1.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost1") })
 
     vhost2 := router.VHost("host2.example.com")
-    vhost2.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost2") })
+    vhost2.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost2") })
 
     router.Start(":8080")
 }
@@ -475,7 +346,7 @@ import (
 	"github.com/xgfone/ship/middleware"
 )
 
-func Responder := func(ctx ship.Context, args ...interface{}) error {
+func Responder := func(ctx *ship.Context, args ...interface{}) error {
 	switch len(args) {
 	case 0:
 		return ctx.NoContent(http.StatusOK)
@@ -489,7 +360,7 @@ func Responder := func(ctx ship.Context, args ...interface{}) error {
 	case 2:
 		switch v0 := args[0].(type) {
 		case int:
-			return ctx.String(v0, fmt.Sprintf("%v", args[1]))
+			return ctx.String(v0, "%v", args[1])
 		}
 	}
 	return ctx.NoContent(http.StatusInternalServerError)
@@ -498,10 +369,10 @@ func Responder := func(ctx ship.Context, args ...interface{}) error {
 func main() {
 	router := ship.New()
 	router.Use(middleware.SetCtxHandler(Responder))
-	router.Route("/path1").GET(func(c ship.Context) error { return c.Handle() })
-	router.Route("/path2").GET(func(c ship.Context) error { return c.Handle(200) })
-	router.Route("/path3").GET(func(c ship.Context) error { return c.Handle("Hello, World") })
-	router.Route("/path4").GET(func(c ship.Context) error { return c.Handle(200, "Hello, World") })
+	router.Route("/path1").GET(func(c *ship.Context) error { return c.Handle() })
+	router.Route("/path2").GET(func(c *ship.Context) error { return c.Handle(200) })
+	router.Route("/path3").GET(func(c *ship.Context) error { return c.Handle("Hello, World") })
+	router.Route("/path4").GET(func(c *ship.Context) error { return c.Handle(200, "Hello, World") })
 
 	router.Start(":8080")
 }
@@ -526,7 +397,7 @@ type Login struct {
 func main() {
     router := ship.New()
 
-    router.Route("/login").POST(func(ctx ship.Context) error {
+    router.Route("/login").POST(func(ctx *ship.Context) error {
         var login Login
         if err := ctx.Bind(&login); err != nil {
             return err
@@ -547,21 +418,19 @@ import (
 	"net/http"
 
 	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/render"
-	"github.com/xgfone/ship/render/django"
+	"github.com/xgfone/ship/renderers/django"
 )
 
 var filename = "test_django_engine.html"
 
 func main() {
-	tm := render.NewHTMLTemplateManager()
-	tm.Register(django.New(".", ".html"))
+	engine := django.New(".", ".html")
 
 	router := ship.New()
-	router.MuxRender().Add(".html", tm)
+	router.MuxRenderer().Add(engine.Ext(), engine)
 
 	// For JSON
-	router.Route("/json").GET(func(ctx ship.Context) error {
+	router.Route("/json").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.JSONPretty(200, map[string]interface{}{"msg": "json"}, "    ")
 			// Or
@@ -573,7 +442,7 @@ func main() {
 	})
 
 	// For XML
-	router.Route("/xml").GET(func(ctx ship.Context) error {
+	router.Route("/xml").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.XMLPretty(200, []string{"msg", "xml"}, "    ")
 			// Or
@@ -585,7 +454,7 @@ func main() {
 	})
 
 	// For HTML
-	router.Route("/html").GET(func(ctx ship.Context) error {
+	router.Route("/html").GET(func(ctx *ship.Context) error {
 		return ctx.Render(filename, 200, map[string]interface{}{"name": "django"})
 		// Or
 		// return ctx.HTML(200, `<html>...</html>`)
@@ -624,7 +493,7 @@ type Router interface {
 	// Notice: for keeping consistent, the parameter should start with ":"
 	// or "*". ":" stands for a single parameter, and "*" stands for
 	// a wildcard parameter.
-	Add(name string, path string, method string, handler Handler) (paramNum int)
+	Add(name string, path string, method string, handler interface{}) (paramNum int)
 
 	// Find a route handler by the method and path of the request.
 	//
@@ -632,7 +501,7 @@ type Router interface {
 	//
 	// If the route has more than one parameter, the name and value
 	// of the parameters should be stored `pnames` and `pvalues` respectively.
-	Find(method string, path string, pnames []string, pvalues []string) (handler Handler)
+	Find(method string, path string, pnames []string, pvalues []string) (handler interface{})
 
 	// Traverse each route.
 	Each(func(name string, method string, path string))

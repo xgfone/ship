@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,25 +18,20 @@ import (
 	"fmt"
 	"io"
 	"log"
-
-	"github.com/xgfone/ship/core"
 )
 
-// Logger is the alias of core.Logger.
-//
-// Methods:
-//   Writer() io.Writer // Return the underlying writer
-//   Trace(format string, args ...interface{}) error
-//   Debug(foramt string, args ...interface{}) error
-//   Info(foramt string, args ...interface{}) error
-//   Warn(foramt string, args ...interface{}) error
-//   Error(foramt string, args ...interface{}) error
-type Logger = core.Logger
+// Logger stands for a logger.
+type Logger interface {
+	Writer() io.Writer
+	Trace(format string, args ...interface{}) error
+	Debug(foramt string, args ...interface{}) error
+	Info(foramt string, args ...interface{}) error
+	Warn(foramt string, args ...interface{}) error
+	Error(foramt string, args ...interface{}) error
+}
 
-// NewNoLevelLogger returns a new Logger, which has no level,
-// that's, its level is always DEBUG.
-//
-// Notice: the logger implementation uses the standard library, log.
+// NewNoLevelLogger returns a new Logger based on the std library log.Logger,
+// which has no level, that's, its level is always DEBUG.
 func NewNoLevelLogger(w io.Writer, flag ...int) Logger {
 	_flag := log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
 	if len(flag) > 0 {

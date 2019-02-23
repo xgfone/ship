@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/xgfone/ship/core"
+	"github.com/xgfone/ship"
 )
 
 // LockedRouter returns a Router with the sync.RWMutex.
-func LockedRouter(router core.Router) core.Router {
+func LockedRouter(router ship.Router) ship.Router {
 	if router == nil {
 		panic(errors.New("the router is nil"))
 	}
@@ -33,7 +33,7 @@ func LockedRouter(router core.Router) core.Router {
 
 type lockedRouter struct {
 	sync.RWMutex
-	router core.Router
+	router ship.Router
 }
 
 func (lr *lockedRouter) URL(name string, params ...interface{}) (url string) {
@@ -44,7 +44,7 @@ func (lr *lockedRouter) URL(name string, params ...interface{}) (url string) {
 }
 
 func (lr *lockedRouter) Add(name string, path string, method string,
-	handler core.Handler) (paramNum int) {
+	handler interface{}) (paramNum int) {
 	lr.Lock()
 	paramNum = lr.router.Add(name, path, method, handler)
 	lr.Unlock()
@@ -52,7 +52,7 @@ func (lr *lockedRouter) Add(name string, path string, method string,
 }
 
 func (lr *lockedRouter) Find(method string, path string,
-	pnames []string, pvalues []string) (handler core.Handler) {
+	pnames []string, pvalues []string) (handler interface{}) {
 	lr.RLock()
 	handler = lr.router.Find(method, path, pnames, pvalues)
 	lr.RUnlock()

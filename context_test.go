@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,12 +36,12 @@ func TestSetContext(t *testing.T) {
 }
 
 func ExampleContext_SetHandler() {
-	responder := func(ctx Context, args ...interface{}) error {
+	responder := func(ctx *Context, args ...interface{}) error {
 		return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
 	}
 
 	sethandler := func(next Handler) Handler {
-		return func(ctx Context) error {
+		return func(ctx *Context) error {
 			ctx.SetHandler(responder)
 			return next(ctx)
 		}
@@ -49,7 +49,7 @@ func ExampleContext_SetHandler() {
 
 	router := New()
 	router.Use(sethandler)
-	router.Route("/path/to").GET(func(c Context) error { return c.Handle("Hello", "World") })
+	router.Route("/path/to").GET(func(c *Context) error { return c.Handle("Hello", "World") })
 
 	// For test
 	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
@@ -64,12 +64,12 @@ func ExampleContext_SetHandler() {
 }
 
 func ExampleContext_Handle() {
-	responder := func(ctx Context, args ...interface{}) error {
+	responder := func(ctx *Context, args ...interface{}) error {
 		return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
 	}
 
 	sethandler := func(next Handler) Handler {
-		return func(ctx Context) error {
+		return func(ctx *Context) error {
 			ctx.SetHandler(responder)
 			return next(ctx)
 		}
@@ -77,7 +77,7 @@ func ExampleContext_Handle() {
 
 	router := New()
 	router.Use(sethandler)
-	router.Route("/path/to").GET(func(c Context) error { return c.Handle("Hello", "World") })
+	router.Route("/path/to").GET(func(c *Context) error { return c.Handle("Hello", "World") })
 
 	// For test
 	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
@@ -113,14 +113,14 @@ func TestContextSession(t *testing.T) {
 	session := sessionT{stores: make(map[string]interface{})}
 	buf := bytes.NewBuffer(nil)
 
-	s := New(Config{Session: session})
-	s.R("/").GET(func(ctx Context) error {
+	s := New(SetSession(session))
+	s.R("/").GET(func(ctx *Context) error {
 		v, _ := ctx.GetSession("id")
 		fmt.Fprintf(buf, "%v\n", v)
 		return nil
-	}).POST(func(ctx Context) error {
+	}).POST(func(ctx *Context) error {
 		return ctx.SetSession("id", "abc")
-	}).PUT(func(ctx Context) error {
+	}).PUT(func(ctx *Context) error {
 		ctx.SetSession("id", "xyz")
 		v, _ := ctx.GetSession("id")
 		fmt.Fprintf(buf, "%v\n", v)

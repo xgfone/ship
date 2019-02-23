@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"github.com/xgfone/ship"
 )
 
-func handlePanic(ctx ship.Context, err interface{}) {
+func handlePanic(ctx *ship.Context, err interface{}) {
 	if logger := ctx.Logger(); logger != nil {
 		logger.Error("%v", err)
 	}
@@ -27,14 +27,14 @@ func handlePanic(ctx ship.Context, err interface{}) {
 // Recover returns a middleware to wrap the panic.
 //
 // If missing handle, it will use the default, which logs the panic.
-func Recover(handle ...func(ship.Context, interface{})) Middleware {
+func Recover(handle ...func(*ship.Context, interface{})) Middleware {
 	handlePanic := handlePanic
 	if len(handle) > 0 && handle[0] != nil {
 		handlePanic = handle[0]
 	}
 
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) error {
+		return func(ctx *ship.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
 					handlePanic(ctx, err)

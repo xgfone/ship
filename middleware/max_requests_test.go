@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ func TestMaxRequests(t *testing.T) {
 	wg.Add(3)
 
 	s := ship.New()
-	s.Use(MaxRequests(2, func(c ship.Context) error {
+	s.Use(MaxRequests(2, func(c *ship.Context) error {
 		c.NoContent(http.StatusTooManyRequests)
 		wg.Done()
 		return nil
 	}))
-	s.R("/").GET(func(ctx ship.Context) error {
+	s.R("/").GET(func(ctx *ship.Context) error {
 		time.Sleep(sleep)
 		wg.Done()
 		return nil

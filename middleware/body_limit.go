@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func BodyLimit(maxBodySize int64) Middleware {
 	}
 
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) error {
+		return func(ctx *ship.Context) error {
 			if maxBodySize < 1 {
 				return next(ctx)
 			}

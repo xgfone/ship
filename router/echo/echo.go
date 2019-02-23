@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 xgfone <xgfone@126.com>
+// Copyright (c) 2018 xgfone
 // Copyright (c) 2017 LabStack
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,8 +31,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/xgfone/ship/core"
 )
 
 // PROPFIND stands for a PROPFIND HTTP method.
@@ -45,17 +43,17 @@ type (
 		Path   string `json:"path"`
 		Name   string `json:"name"`
 	}
-	// router is the registry of all registered routes for an `Echo` instance
+	// Router is the registry of all registered routes for an `Echo` instance
 	// for request matching and URL path parameter parsing.
-	router struct {
+	Router struct {
 		tree       *node
 		routes     map[string]*route
 		allroutes  []*route
-		options    core.Handler
-		notAllowed core.Handler
+		options    func(methods []string) interface{}
+		notAllowed func(methods []string) interface{}
 	}
 	node struct {
-		router        *router
+		router        *Router
 		kind          kind
 		label         byte
 		prefix        string
@@ -68,16 +66,16 @@ type (
 	kind          uint8
 	children      []*node
 	methodHandler struct {
-		connect  core.Handler
-		delete   core.Handler
-		get      core.Handler
-		head     core.Handler
-		options  core.Handler
-		patch    core.Handler
-		post     core.Handler
-		put      core.Handler
-		trace    core.Handler
-		propfind core.Handler
+		connect  interface{}
+		delete   interface{}
+		get      interface{}
+		head     interface{}
+		options  interface{}
+		patch    interface{}
+		post     interface{}
+		put      interface{}
+		trace    interface{}
+		propfind interface{}
 	}
 )
 
@@ -101,27 +99,27 @@ var methods = [...]string{
 }
 
 // NewRouter returns a new Router instance.
-func NewRouter(methodNotAllowedHandler, optionsHandler core.Handler) core.Router {
-	r := &router{
+func NewRouter(handleMethodNotAllowed, handleOptions func(methods []string) (handler interface{})) *Router {
+	r := &Router{
 		tree:       &node{methodHandler: new(methodHandler)},
 		routes:     map[string]*route{},
 		allroutes:  []*route{},
-		options:    optionsHandler,
-		notAllowed: methodNotAllowedHandler,
+		options:    handleOptions,
+		notAllowed: handleMethodNotAllowed,
 	}
 	r.tree.router = r
 	return r
 }
 
 // Each implements github.com/xgfone/ship:Router#Each.
-func (r *router) Each(f func(name, method, path string)) {
+func (r *Router) Each(f func(name, method, path string)) {
 	for _, route := range r.allroutes {
 		f(route.Name, route.Method, route.Path)
 	}
 }
 
 // URL implements github.com/xgfone/ship:Router#URL.
-func (r *router) URL(name string, params ...interface{}) string {
+func (r *Router) URL(name string, params ...interface{}) string {
 	route := r.routes[name]
 	if route == nil {
 		return ""
@@ -147,7 +145,7 @@ func (r *router) URL(name string, params ...interface{}) string {
 
 // Add implements github.com/xgfone/ship:Router#Add, which will register
 // a new route for method and path with matching handler.
-func (r *router) Add(name, path string, method string, handler core.Handler) int {
+func (r *Router) Add(name, path string, method string, handler interface{}) int {
 	for _, _r := range r.allroutes {
 		if _r.Method == method && _r.Path == path {
 			panic(fmt.Errorf("the route('%s', '%s') has been registered", method, path))
@@ -167,7 +165,7 @@ func (r *router) Add(name, path string, method string, handler core.Handler) int
 	return r.add(path, method, handler)
 }
 
-func (r *router) add(path string, method string, h core.Handler) int {
+func (r *Router) add(path string, method string, h interface{}) int {
 	// Validate path
 	if path == "" {
 		panic(errors.New("echo: path cannot be empty"))
@@ -222,7 +220,7 @@ func (r *router) add(path string, method string, h core.Handler) int {
 	return len(pnames)
 }
 
-func (r *router) insert(method, path string, h core.Handler, t kind,
+func (r *Router) insert(method, path string, h interface{}, t kind,
 	ppath string, pnames []string) {
 
 	cn := r.tree // Current node as root
@@ -308,7 +306,7 @@ func (r *router) insert(method, path string, h core.Handler, t kind,
 	}
 }
 
-func newNode(r *router, t kind, pre string, p *node, c children,
+func newNode(r *Router, t kind, pre string, p *node, c children,
 	mh *methodHandler, ppath string, pnames []string) *node {
 	return &node{
 		router:        r,
@@ -354,7 +352,7 @@ func (n *node) findChildByKind(t kind) *node {
 	return nil
 }
 
-func (n *node) addHandler(method string, h core.Handler) {
+func (n *node) addHandler(method string, h interface{}) {
 	switch method {
 	case http.MethodConnect:
 		n.methodHandler.connect = h
@@ -381,7 +379,7 @@ func (n *node) addHandler(method string, h core.Handler) {
 	}
 }
 
-func (n *node) findHandler(method string) core.Handler {
+func (n *node) findHandler(method string) interface{} {
 	switch method {
 	case http.MethodConnect:
 		return n.methodHandler.connect
@@ -408,7 +406,7 @@ func (n *node) findHandler(method string) core.Handler {
 	}
 }
 
-func (n *node) checkMethodNotAllowed(method string) core.Handler {
+func (n *node) checkMethodNotAllowed(method string) interface{} {
 	if n.router.notAllowed == nil || method == http.MethodConnect {
 		return nil
 	}
@@ -423,14 +421,10 @@ func (n *node) checkMethodNotAllowed(method string) core.Handler {
 	if len(ms) == 0 {
 		return nil
 	}
-
-	return func(ctx core.Context) error {
-		ctx.Response().Header().Set("Allow", strings.Join(ms, ", "))
-		return n.router.notAllowed(ctx)
-	}
+	return n.router.notAllowed(ms)
 }
 
-func (n *node) checkOptions(method string) core.Handler {
+func (n *node) checkOptions(method string) interface{} {
 	if n.router.options == nil || method != http.MethodOptions {
 		return nil
 	}
@@ -468,15 +462,11 @@ func (n *node) checkOptions(method string) core.Handler {
 	if len(ms) == 0 {
 		return nil
 	}
-
-	return func(ctx core.Context) error {
-		ctx.Response().Header().Set("Allow", strings.Join(ms, ", "))
-		return n.router.options(ctx)
-	}
+	return n.router.options(ms)
 }
 
 // Find implements github.com/xgfone/ship:Router#Find.
-func (r *router) Find(method, path string, pnames, pvalues []string) (handler core.Handler) {
+func (r *Router) Find(method, path string, pnames, pvalues []string) (handler interface{}) {
 	cn := r.tree // Current node as root
 
 	var (
@@ -617,12 +607,8 @@ func (r *router) Find(method, path string, pnames, pvalues []string) (handler co
 var kindtypes = map[kind]string{skind: "static", pkind: "param", akind: "any"}
 
 // PrintRouterTree prints the tree structure of the router.
-func PrintRouterTree(w io.Writer, r core.Router) {
-	if _r, ok := r.(*router); ok {
-		_r.tree.printTree(w, "", true)
-		return
-	}
-	panic(errors.New("the router is not a ECHO implementation"))
+func (r *Router) PrintRouterTree(w io.Writer) {
+	r.tree.printTree(w, "", true)
 }
 
 func (n *node) printTree(w io.Writer, pfx string, tail bool) {

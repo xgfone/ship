@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,14 +32,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xgfone/ship/core"
 	"github.com/xgfone/ship/utils"
 )
 
 var (
-	indexPage = "index.html"
-	emptyStrS = [256]string{}
-
+	indexPage  = "index.html"
+	emptyStrS  = [256]string{}
 	emptyValue = emptyType(0)
 )
 
@@ -48,219 +46,34 @@ type emptyType uint8
 // MaxMemoryLimit is the maximum memory.
 var MaxMemoryLimit int64 = 32 << 20 // 32MB
 
-// Context is the alias of core.Context, which stands for a context.
-//
-// Methods:
-//
-//    // Report whether the response has been sent.
-//    IsResponse() bool
-//
-//    // Find the registered router handler by the method and path of the request.
-//    //
-//    // Return nil if not found.
-//    FindHandler(method string, path string) Handler
-//
-//    NotFoundHandler() Handler
-//
-//    AcquireBuffer() *bytes.Buffer
-//    ReleaseBuffer(*bytes.Buffer)
-//
-//    Request() *http.Request
-//    Response() http.ResponseWriter
-//    SetResponse(http.ResponseWriter)
-//    SetResponded(bool)
-//    SetConnectionClose() // Tell the server to close the connection.
-//
-//    // These may be passed the error between the handlers.
-//    Error() error
-//    HasError() bool
-//    SetError(err error)
-//
-//    IsTLS() bool
-//    IsDebug() bool
-//    IsAjax() bool
-//    IsWebSocket() bool
-//
-//    Header(name string) (value string)
-//    SetHeader(name string, value string)
-//
-//    // URL Parameter. We remove the URL prefix for the convenience.
-//    Param(name string) (value string)
-//    Params() map[string]string // Return the key-value map of the url parameters
-//    ParamNames() []string      // Return the list of the url parameter names
-//    ParamValues() []string     // Return the list of the url parameter values
-//
-//    // Accept returns the content of the header Accept.
-//    //
-//    // If there is no the header Accept , it return nil.
-//    //
-//    // Notice:
-//    //
-//    //   1. It will sort the content by the q-factor weighting.
-//    //   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
-//    //      So you can use it to match the prefix.
-//    //   3. If the value is "*/*", it will be amended as "".
-//    //
-//    Accept() []string
-//    Host() string
-//    Method() string
-//    Scheme() string
-//    RealIP() string
-//    Charset() string
-//    RemoteAddr() string
-//    RequestURI() string
-//    ContentType() string // It should not contain the charset.
-//    ContentLength() int64
-//    GetBody() (string, error)
-//    // You should call Context.ReleaseBuffer(buf) to release the buffer at last.
-//    GetBodyReader() (*bytes.Buffer, error)
-//    SetContentType(string)
-//
-//    QueryParam(name string) (value string)
-//    QueryParams() url.Values
-//    QueryRawString() string
-//
-//    FormParams() (url.Values, error)
-//    FormValue(name string) (value string)
-//    FormFile(name string) (*multipart.FileHeader, error)
-//    MultipartForm() (*multipart.Form, error)
-//
-//    Cookies() []*http.Cookie
-//    Cookie(name string) (*http.Cookie, error)
-//    SetCookie(cookie *http.Cookie)
-//
-//    // If the session id does not exist, it maybe return (nil, nil).
-//    //
-//    // Notice: for the same session id, the context maybe optimize GetSession
-//    // by the cache, which will call the backend store only once.
-//    GetSession(id string) (interface{}, error)
-//    // id must not be "".
-//    //
-//    // value should not be nil. If nil, however, it will tell the context
-//    // that the session id is missing, and the context should not forward
-//    // the request to the underlying session store when calling GetSession.
-//    SetSession(id string, value interface{}) error
-//    // id must not be "".
-//    DelSession(id string) error
-//
-//    // The user-defined data to be associated with the context.
-//    Data() interface{}
-//
-//    // Get and Set are used to store the key-value information about the context.
-//    Store() map[string]interface{}
-//    Clear() // Clear the store.
-//    Get(key string) (value interface{})
-//    Set(key string, value interface{})
-//    Del(key string)
-//
-//    // Store maybe use a map to store the key-value, so it asks the system
-//    // to allocate the memory. If the interim context value is too few and
-//    // you don't want the system to allocate the memory for the map,
-//    // the context supplies three context variables for you and you can consider
-//    // them as the context register to use.
-//    Key1() (value interface{})
-//    Key2() (value interface{})
-//    Key3() (value interface{})
-//    SetKey1(value interface{})
-//    SetKey2(value interface{})
-//    SetKey3(value interface{})
-//
-//    // You can set a handler then call it across the functions, which is used to
-//    // handle the various arguments. For example,
-//    //
-//    //    responder := func(ctx Context, args ...interface{}) error {
-//    //        switch len(args) {
-//    //        case 0:
-//    //            return ctx.NoContent(http.StatusOK)
-//    //        case 1:
-//    //            switch v := args[0].(type) {
-//    //            case int:
-//    //                return ctx.NoContent(v)
-//    //            case string:
-//    //                return ctx.String(http.StatusOK, v)
-//    //            }
-//    //        case 2:
-//    //            switch v0 := args[0].(type) {
-//    //            case int:
-//    //                return ctx.String(v0, fmt.Sprintf("%v", args[1]))
-//    //            }
-//    //        }
-//    //        return ctx.NoContent(http.StatusInternalServerError)
-//    //    }
-//    //
-//    //    sethandler := func(next Handler) Handler {
-//    //        return func(ctx Context) error {
-//    //            ctx.SetHandler(responder)
-//    //            return next(ctx)
-//    //        }
-//    //    }
-//    //
-//    //    router := New()
-//    //    router.Use(sethandler)
-//    //    router.Route("/path1").GET(func(c Context) error { return c.Handle() })
-//    //    router.Route("/path2").GET(func(c Context) error { return c.Handle(200) })
-//    //    router.Route("/path3").GET(func(c Context) error { return c.Handle("Hello, World") })
-//    //    router.Route("/path4").GET(func(c Context) error { return c.Handle(200, "Hello, World") })
-//    //
-//    SetHandler(func(ctx Context, args ...interface{}) error)
-//    Handle(args ...interface{}) error
-//
-//    Logger() Logger
-//    URL(name string, params ...interface{}) string
-//
-//    Bind(v interface{}) error
-//    BindQuery(v interface{}) error
-//
-//    Write([]byte) (int, error)
-//    Render(name string, code int, data interface{}) error
-//
-//    NoContent(code int) error
-//    Redirect(code int, toURL string) error
-//    String(code int, data string) error
-//    Blob(code int, contentType string, b []byte) error
-//
-//    HTML(code int, html string) error
-//    HTMLBlob(code int, b []byte) error
-//
-//    JSON(code int, i interface{}) error
-//    JSONBlob(code int, b []byte) error
-//    JSONPretty(code int, i interface{}, indent string) error
-//
-//    JSONP(code int, callback string, i interface{}) error
-//    JSONPBlob(code int, callback string, b []byte) error
-//
-//    XML(code int, i interface{}) error
-//    XMLBlob(code int, b []byte) error
-//    XMLPretty(code int, i interface{}, indent string) error
-//
-//    File(file string) error
-//    Inline(file string, name string) error
-//    Attachment(file string, name string) error
-//    Stream(code int, contentType string, r io.Reader) error
-//
-type Context = core.Context
-
 type contextKeyT int
 
 var contextKey contextKeyT
 
-func setContext(ctx *contextT) {
+func setContext(ctx *Context) {
 	if ctx.req != nil {
 		ctx.req = ctx.req.WithContext(context.WithValue(context.TODO(), contextKey, ctx))
 	}
 }
 
 // GetContext gets the Context from the http Request.
-func GetContext(req *http.Request) Context {
+func GetContext(req *http.Request) *Context {
 	if v := req.Context().Value(contextKey); v != nil {
-		return v.(Context)
+		return v.(*Context)
 	}
 	return nil
 }
 
 type responder struct {
 	http.ResponseWriter
-	ctx *contextT
+	ctx *Context
+}
+
+func (r responder) Write(p []byte) (int, error) {
+	if !r.ctx.wrote {
+		r.ctx.wrote = true
+	}
+	return r.ResponseWriter.Write(p)
 }
 
 // WriteHeader implements http.ResponseWriter#WriteHeader().
@@ -284,149 +97,260 @@ func (r responder) CloseNotify() <-chan bool {
 	return r.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
-// Context stands for a request and response context.
-type contextT struct {
+// Context represetns a request and response context.
+type Context struct {
+	// you can use it to pass the error between the handlers or the middlewares.
+	//
+	// Notice: when the new request is coming, it will be reset to nil.
+	Err error
+
+	// ReqCtxData is the data what each request has, the lifecycle of which is
+	// the same as this context, that's, when creating this context, it will
+	// call `newCtxData()`, which is set by `SetNewCtxData()` as the option of
+	// the ship router, to creating ReqCtxData. When finishing the request,
+	// it will be reset by the context and put into the pool with this context.
+	ReqCtxData Resetter
+
+	// Data is used to store many the key-value pairs about the context.
+	//
+	// Data maybe asks the system to allocate many memories.
+	// If the interim context value is too few and you don't want the system
+	// to allocate many memories, the three context variables is for you
+	// and you can consider them as the context register to use.
+	//
+	// Notice: when the new request is coming, they will be reset to nil.
+	Key1 interface{}
+	Key2 interface{}
+	Key3 interface{}
+	Data map[string]interface{}
+
+	ship  *Ship
 	wrote bool
 
-	err   error
-	req   *http.Request
-	resp  responder
-	query url.Values
+	req    *http.Request
+	resp   responder
+	query  url.Values
+	router Router
 
-	handler func(Context, ...interface{}) error
+	handler func(*Context, ...interface{}) error
 	pnames  []string
 	pvalues []string
 
-	ship     *Ship
-	debug    bool
-	logger   Logger
-	binder   Binder
-	renderer Renderer
-	binderQ  func(url.Values, interface{}) error
-	router   Router
-	session  Session
-	ctxdata  Resetter
-
 	sessionK string
 	sessionV interface{}
-
-	key1  interface{}
-	key2  interface{}
-	key3  interface{}
-	store map[string]interface{}
 }
 
 // NewContext returns a new context.
-func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam int) *contextT {
+func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam int) *Context {
 	var pnames, pvalues []string
 	if maxParam > 0 {
 		pnames = make([]string, maxParam)
 		pvalues = make([]string, maxParam)
 	}
 
-	var store map[string]interface{}
-	if s.config.ContextStoreSize > 0 {
-		store = make(map[string]interface{}, s.config.ContextStoreSize)
+	ctx := &Context{
+		ship:    s,
+		pnames:  pnames,
+		pvalues: pvalues,
+		Data:    make(map[string]interface{}, s.ctxDataSize),
+	}
+	ctx.setReqResp(req, resp)
+
+	if s.newCtxData != nil {
+		ctx.ReqCtxData = s.newCtxData(ctx)
 	}
 
-	ctx := &contextT{pnames: pnames, pvalues: pvalues, store: store}
-	ctx.setShip(s)
-	ctx.setReqResp(req, resp)
 	return ctx
 }
 
-func (c *contextT) reset() {
-	c.err = nil
+func (c *Context) reset() {
+	c.Err = nil
+	c.Key1 = nil
+	c.Key2 = nil
+	c.Key3 = nil
+	c.ClearData()
+
+	if c.ReqCtxData != nil {
+		c.ReqCtxData.Reset()
+	}
+
+	c.wrote = false
+
 	c.req = nil
 	c.resp.ResponseWriter = nil
 	c.resp.ctx = nil
 	c.query = nil
-	c.wrote = false
+	c.router = nil
+
 	c.handler = nil
+	c.resetURLParam()
+
 	c.sessionK = ""
 	c.sessionV = nil
-	c.key1 = nil
-	c.key2 = nil
-	c.key3 = nil
-
-	c.resetURLParam()
-	c.Clear()
-
-	if c.ctxdata != nil {
-		c.ctxdata.Reset()
-	}
 }
 
-func (c *contextT) resetURLParam() {
+func (c *Context) resetURLParam() {
 	copy(c.pnames, emptyStrS[:len(c.pnames)])
 	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
 }
 
-func (c *contextT) setShip(s *Ship) {
-	c.ship = s
-	c.debug = s.config.Debug
-	c.logger = s.config.Logger
-	c.binder = s.config.Binder
-	c.renderer = s.config.Renderer
-	c.binderQ = s.config.BindQuery
-	c.session = s.config.Session
-	c.router = s.router
-	if s.config.NewCtxData != nil {
-		c.ctxdata = s.config.NewCtxData(c)
-	}
-}
-
-func (c *contextT) setReqResp(r *http.Request, w http.ResponseWriter) {
+func (c *Context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.resp.ResponseWriter = w
 	c.resp.ctx = c
 	setContext(c)
 }
 
-func (c *contextT) AcquireBuffer() *bytes.Buffer {
-	return c.ship.AcquireBuffer()
+// ClearData clears the data.
+func (c *Context) ClearData() {
+	for key := range c.Data {
+		delete(c.Data, key)
+	}
 }
 
-func (c *contextT) ReleaseBuffer(buf *bytes.Buffer) {
-	c.ship.ReleaseBuffer(buf)
+// FindHandler finds the registered router handler by the method and
+// path of the request.
+//
+// Return nil if not found.
+func (c *Context) FindHandler(method, path string) Handler {
+	c.resetURLParam()
+	return c.findHandler(method, path)
 }
 
-// URL generates an URL from route name and provided parameters.
-func (c *contextT) URL(name string, params ...interface{}) string {
+func (c *Context) findHandler(method, path string) Handler {
+	switch h := c.router.Find(method, path, c.pnames, c.pvalues).(type) {
+	case Handler:
+		return h
+	case func(ctx *Context) error:
+		return Handler(h)
+	case nil:
+		return nil
+	default:
+		panic(fmt.Errorf("unknown handler type '%T'", h))
+	}
+}
+
+// NotFoundHandler returns the configured NotFound handler.
+func (c *Context) NotFoundHandler() Handler {
+	return c.ship.notFoundHandler
+}
+
+// URL generates an URL by route name and provided parameters.
+func (c *Context) URL(name string, params ...interface{}) string {
 	return c.ship.URL(name, params...)
 }
 
-func (c *contextT) FindHandler(method, path string) Handler {
-	c.resetURLParam()
-	return c.router.Find(method, path, c.pnames, c.pvalues)
+// Logger returns the logger implementation.
+func (c *Context) Logger() Logger {
+	return c.ship.logger
 }
 
-func (c *contextT) NotFoundHandler() Handler {
-	return c.ship.config.NotFoundHandler
+// Router returns the router.
+func (c *Context) Router() Router {
+	return c.router
 }
 
-func (c *contextT) IsResponse() bool {
+// AcquireBuffer acquires a buffer.
+//
+// Notice: you should call ReleaseBuffer() to release it.
+func (c *Context) AcquireBuffer() *bytes.Buffer {
+	return c.ship.AcquireBuffer()
+}
+
+// ReleaseBuffer releases a buffer into the pool.
+func (c *Context) ReleaseBuffer(buf *bytes.Buffer) {
+	c.ship.ReleaseBuffer(buf)
+}
+
+// SetHandler sets a context handler in order to call it across the functions
+// by the method Handle(), which is used to handle the various arguments.
+//
+// For example,
+//
+//    responder := func(ctx *Context, args ...interface{}) error {
+//        switch len(args) {
+//        case 0:
+//            return ctx.NoContent(http.StatusOK)
+//        case 1:
+//            switch v := args[0].(type) {
+//            case int:
+//                return ctx.NoContent(v)
+//            case string:
+//                return ctx.String(http.StatusOK, v)
+//            }
+//        case 2:
+//            switch v0 := args[0].(type) {
+//            case int:
+//                return ctx.String(v0, "%v", args[1])
+//            }
+//        }
+//        return ctx.NoContent(http.StatusInternalServerError)
+//    }
+//
+//    sethandler := func(next Handler) Handler {
+//        return func(ctx *Context) error {
+//            ctx.SetHandler(responder)
+//            return next(ctx)
+//        }
+//    }
+//
+//    router := New()
+//    router.Use(sethandler)
+//    router.Route("/path1").GET(func(c *Context) error { return c.Handle() })
+//    router.Route("/path2").GET(func(c *Context) error { return c.Handle(200) })
+//    router.Route("/path3").GET(func(c *Context) error { return c.Handle("Hello, World") })
+//    router.Route("/path4").GET(func(c *Context) error { return c.Handle(200, "Hello, World") })
+//
+func (c *Context) SetHandler(h func(*Context, ...interface{}) error) {
+	c.handler = h
+}
+
+// Handle calls the context handler.
+//
+// Return ErrNoHandler if the context handler or the global handler is not set.
+func (c *Context) Handle(args ...interface{}) error {
+	if c.handler != nil {
+		return c.handler(c, args...)
+	} else if c.ship.ctxHandler != nil {
+		return c.ship.ctxHandler(c, args...)
+	}
+	return ErrNoHandler
+}
+
+// Request returns the inner Request.
+func (c *Context) Request() *http.Request {
+	return c.req
+}
+
+// Response returns the inner http.ResponseWriter.
+func (c *Context) Response() http.ResponseWriter {
+	return responder{ResponseWriter: c.resp.ResponseWriter, ctx: c}
+}
+
+// IsResponded reports whether the response is sent.
+func (c *Context) IsResponded() bool {
 	return c.wrote
 }
 
-func (c *contextT) SetResponded(yes bool) {
+// SetResponded sets the response to be sent or not.
+func (c *Context) SetResponded(yes bool) {
 	c.wrote = yes
 }
 
-func (c *contextT) Error() error {
-	return c.err
+// SetResponse resets the response to resp, which will ignore nil.
+func (c *Context) SetResponse(resp http.ResponseWriter) {
+	if resp != nil {
+		c.resp.ResponseWriter = resp
+	}
 }
 
-func (c *contextT) SetError(err error) {
-	c.err = err
-}
-
-func (c *contextT) HasError() bool {
-	return c.err != nil
+// SetConnectionClose tell the server to close the connection.
+func (c *Context) SetConnectionClose() {
+	c.resp.Header().Set(HeaderConnection, "close")
 }
 
 // Param returns the parameter value in the url path by name.
-func (c *contextT) Param(name string) string {
+func (c *Context) Param(name string) string {
 	_len := len(c.pnames)
 	for i := 0; i < _len; i++ {
 		if len(c.pnames[i]) == 0 {
@@ -439,7 +363,7 @@ func (c *contextT) Param(name string) string {
 }
 
 // Params returns all the parameters as the key-value map in the url path.
-func (c *contextT) Params() map[string]string {
+func (c *Context) Params() map[string]string {
 	_len := len(c.pnames)
 	ms := make(map[string]string, _len)
 	for i := 0; i < _len; i++ {
@@ -451,7 +375,8 @@ func (c *contextT) Params() map[string]string {
 	return ms
 }
 
-func (c *contextT) ParamNames() []string {
+// ParamNames returns all the names of the URL parameters.
+func (c *Context) ParamNames() []string {
 	_len := len(c.pnames)
 	for i := 0; i < _len; i++ {
 		if c.pnames[i] == "" {
@@ -461,7 +386,8 @@ func (c *contextT) ParamNames() []string {
 	return nil
 }
 
-func (c *contextT) ParamValues() []string {
+// ParamValues returns all the names of the URL parameters.
+func (c *Context) ParamValues() []string {
 	_len := len(c.pnames)
 	for i := 0; i < _len; i++ {
 		if c.pnames[i] == "" {
@@ -471,87 +397,30 @@ func (c *contextT) ParamValues() []string {
 	return nil
 }
 
-func (c *contextT) Data() interface{} {
-	return c.ctxdata
+// Header returns the first value of the header named name.
+//
+// Return "" if the header does not exist.
+func (c *Context) Header(name string) string {
+	return c.req.Header.Get(name)
 }
 
-func (c *contextT) Key1() (value interface{}) {
-	return c.key1
-}
-
-func (c *contextT) Key2() (value interface{}) {
-	return c.key2
-}
-
-func (c *contextT) Key3() (value interface{}) {
-	return c.key3
-}
-
-func (c *contextT) SetKey1(value interface{}) {
-	c.key1 = value
-}
-
-func (c *contextT) SetKey2(value interface{}) {
-	c.key2 = value
-}
-
-func (c *contextT) SetKey3(value interface{}) {
-	c.key3 = value
-}
-
-func (c *contextT) Store() map[string]interface{} {
-	if c.store == nil {
-		c.store = make(map[string]interface{})
-	}
-	return c.store
-}
-
-func (c *contextT) Clear() {
-	for key := range c.store {
-		delete(c.store, key)
-	}
-}
-
-// Get retrieves data from the context.
-func (c *contextT) Get(key string) interface{} {
-	if c.store == nil {
-		return nil
-	}
-	return c.store[key]
-}
-
-// Set saves data in the context.
-func (c *contextT) Set(key string, value interface{}) {
-	if c.store == nil {
-		c.store = map[string]interface{}{key: value}
-	} else {
-		c.store[key] = value
-	}
-}
-
-func (c *contextT) Del(key string) {
-	if c.store != nil {
-		delete(c.store, key)
-	}
-}
-
-// Logger returns the logger implementation.
-func (c *contextT) Logger() Logger {
-	return c.logger
+// SetHeader sets the header name to value.
+func (c *Context) SetHeader(name, value string) {
+	c.resp.Header().Set(name, value)
 }
 
 // IsDebug reports whether to enable the debug mode.
-func (c *contextT) IsDebug() bool {
-	return c.debug
+func (c *Context) IsDebug() bool {
+	return c.ship.debug
 }
 
-// IsTLS returns true if HTTP connection is TLS otherwise false.
-func (c *contextT) IsTLS() bool {
+// IsTLS reports whether HTTP connection is TLS or not.
+func (c *Context) IsTLS() bool {
 	return c.req.TLS != nil
 }
 
-// IsWebSocket returns true if HTTP connection is WebSocket otherwise false.
-func (c *contextT) IsWebSocket() bool {
+// IsWebSocket reports whether HTTP connection is WebSocket or not.
+func (c *Context) IsWebSocket() bool {
 	if c.req.Method == http.MethodGet &&
 		c.req.Header.Get(HeaderConnection) == "Upgrade" &&
 		c.req.Header.Get(HeaderUpgrade) == "websocket" {
@@ -560,55 +429,29 @@ func (c *contextT) IsWebSocket() bool {
 	return false
 }
 
-func (c *contextT) IsAjax() bool {
+// IsAjax reports whether the request is ajax or not.
+func (c *Context) IsAjax() bool {
 	return c.req.Header.Get(HeaderXRequestedWith) == "XMLHttpRequest"
 }
 
-// Request returns the inner Request.
-func (c *contextT) Request() *http.Request {
-	return c.req
-}
+// Accept returns the content of the header Accept.
+//
+// If there is no the header Accept , it return nil.
+//
+// Notice:
+//
+//   1. It will sort the content by the q-factor weighting.
+//   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
+//      So you can use it to match the prefix.
+//   3. If the value is "*/*", it will be amended as "".
+//
+func (c *Context) Accept() []string {
 
-// Response returns the inner http.ResponseWriter.
-func (c *contextT) Response() http.ResponseWriter {
-	return responder{ResponseWriter: c.resp.ResponseWriter, ctx: c}
-}
-
-// SetResponse resets the response to resp, which will ignore nil.
-func (c *contextT) SetResponse(resp http.ResponseWriter) {
-	if resp != nil {
-		c.resp.ResponseWriter = resp
+	type acceptT struct {
+		ct string
+		q  float64
 	}
-}
 
-func (c *contextT) SetConnectionClose() {
-	c.resp.Header().Set(HeaderConnection, "close")
-}
-
-func (c *contextT) GetBody() (string, error) {
-	buf := c.AcquireBuffer()
-	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
-	body := buf.String()
-	c.ReleaseBuffer(buf)
-	return body, err
-}
-
-func (c *contextT) GetBodyReader() (*bytes.Buffer, error) {
-	buf := c.AcquireBuffer()
-	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
-	if err != nil {
-		c.ReleaseBuffer(buf)
-		return nil, err
-	}
-	return buf, err
-}
-
-type acceptT struct {
-	ct string
-	q  float64
-}
-
-func (c *contextT) Accept() []string {
 	accept := c.req.Header.Get(HeaderAccept)
 	if accept == "" {
 		return nil
@@ -655,16 +498,18 @@ func (c *contextT) Accept() []string {
 	return results
 }
 
-func (c *contextT) Host() string {
+// Host returns the host of the request.
+func (c *Context) Host() string {
 	return c.req.Host
 }
 
-func (c *contextT) Method() string {
+// Method returns the method of the request.
+func (c *Context) Method() string {
 	return c.req.Method
 }
 
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
-func (c *contextT) Scheme() (scheme string) {
+func (c *Context) Scheme() (scheme string) {
 	// Can't use `r.Request.URL.Scheme`
 	// See: https://groups.google.com/forum/#!topic/golang-nuts/pMUkBlQBDF0
 	if c.IsTLS() {
@@ -689,7 +534,7 @@ func (c *contextT) Scheme() (scheme string) {
 
 // RealIP returns the client's network address based on `X-Forwarded-For`
 // or `X-Real-IP` request header.
-func (c *contextT) RealIP() string {
+func (c *Context) RealIP() string {
 	if ip := c.req.Header.Get(HeaderXForwardedFor); ip != "" {
 		return strings.TrimSpace(strings.Split(ip, ",")[0])
 	}
@@ -700,15 +545,20 @@ func (c *contextT) RealIP() string {
 	return ra
 }
 
-func (c *contextT) RemoteAddr() string {
+// RemoteAddr returns the remote address of the http connection.
+func (c *Context) RemoteAddr() string {
 	return c.req.RemoteAddr
 }
 
-func (c *contextT) RequestURI() string {
+// RequestURI returns the URI of the request.
+func (c *Context) RequestURI() string {
 	return c.req.RequestURI
 }
 
-func (c *contextT) Charset() string {
+// Charset returns the charset of the request content.
+//
+// Return "" if there is no charset.
+func (c *Context) Charset() string {
 	ct := c.req.Header.Get(HeaderContentType)
 	if index := strings.IndexByte(ct, ';'); index > 0 {
 		ct = ct[index:]
@@ -719,7 +569,8 @@ func (c *contextT) Charset() string {
 	return ""
 }
 
-func (c *contextT) ContentType() (ct string) {
+// ContentType returns the Content-Type of the request without the charset.
+func (c *Context) ContentType() (ct string) {
 	ct = c.req.Header.Get(HeaderContentType)
 	if index := strings.IndexAny(ct, " ;"); index > 0 {
 		ct = ct[:index]
@@ -727,26 +578,42 @@ func (c *contextT) ContentType() (ct string) {
 	return
 }
 
-func (c *contextT) SetContentType(contentType string) {
+// ContentLength return the length of the request body.
+func (c *Context) ContentLength() int64 {
+	return c.req.ContentLength
+}
+
+// SetContentType the Content-Type of the response body.
+func (c *Context) SetContentType(contentType string) {
 	if contentType != "" {
 		c.SetHeader(HeaderContentType, contentType)
 	}
 }
 
-func (c *contextT) ContentLength() int64 {
-	return c.req.ContentLength
+// GetBody reads all the contents from the body and returns it as string.
+func (c *Context) GetBody() (string, error) {
+	buf := c.AcquireBuffer()
+	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	body := buf.String()
+	c.ReleaseBuffer(buf)
+	return body, err
 }
 
-func (c *contextT) Header(name string) string {
-	return c.req.Header.Get(name)
-}
-
-func (c *contextT) SetHeader(name, value string) {
-	c.resp.Header().Set(name, value)
+// GetBodyReader reads all the contents from the body to buffer and returns it.
+//
+// Notice: You should call ReleaseBuffer(buf) to release the buffer at last.
+func (c *Context) GetBodyReader() (buf *bytes.Buffer, err error) {
+	buf = c.AcquireBuffer()
+	err = utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	if err != nil {
+		c.ReleaseBuffer(buf)
+		return nil, err
+	}
+	return
 }
 
 // QueryParam returns the query param for the provided name.
-func (c *contextT) QueryParam(name string) string {
+func (c *Context) QueryParam(name string) string {
 	if c.query == nil {
 		c.query = c.req.URL.Query()
 	}
@@ -754,7 +621,7 @@ func (c *contextT) QueryParam(name string) string {
 }
 
 // QueryParams returns the query parameters as `url.Values`.
-func (c *contextT) QueryParams() url.Values {
+func (c *Context) QueryParams() url.Values {
 	if c.query == nil {
 		c.query = c.req.URL.Query()
 	}
@@ -762,17 +629,17 @@ func (c *contextT) QueryParams() url.Values {
 }
 
 // QueryRawString returns the URL query string.
-func (c *contextT) QueryRawString() string {
+func (c *Context) QueryRawString() string {
 	return c.req.URL.RawQuery
 }
 
 // FormValue returns the form field value for the provided name.
-func (c *contextT) FormValue(name string) string {
+func (c *Context) FormValue(name string) string {
 	return c.req.FormValue(name)
 }
 
 // FormParams returns the form parameters as `url.Values`.
-func (c *contextT) FormParams() (url.Values, error) {
+func (c *Context) FormParams() (url.Values, error) {
 	if strings.HasPrefix(c.req.Header.Get(HeaderContentType), MIMEMultipartForm) {
 		if err := c.req.ParseMultipartForm(MaxMemoryLimit); err != nil {
 			return nil, err
@@ -786,33 +653,39 @@ func (c *contextT) FormParams() (url.Values, error) {
 }
 
 // FormFile returns the multipart form file for the provided name.
-func (c *contextT) FormFile(name string) (*multipart.FileHeader, error) {
+func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
 	_, fh, err := c.req.FormFile(name)
 	return fh, err
 }
 
 // MultipartForm returns the multipart form.
-func (c *contextT) MultipartForm() (*multipart.Form, error) {
+func (c *Context) MultipartForm() (*multipart.Form, error) {
 	err := c.req.ParseMultipartForm(MaxMemoryLimit)
 	return c.req.MultipartForm, err
 }
 
 // Cookie returns the named cookie provided in the request.
-func (c *contextT) Cookie(name string) (*http.Cookie, error) {
+func (c *Context) Cookie(name string) (*http.Cookie, error) {
 	return c.req.Cookie(name)
 }
 
 // Cookies returns the HTTP cookies sent with the request.
-func (c *contextT) Cookies() []*http.Cookie {
+func (c *Context) Cookies() []*http.Cookie {
 	return c.req.Cookies()
 }
 
 // SetCookie adds a `Set-Cookie` header in HTTP response.
-func (c *contextT) SetCookie(cookie *http.Cookie) {
+func (c *Context) SetCookie(cookie *http.Cookie) {
 	http.SetCookie(c.resp, cookie)
 }
 
-func (c *contextT) GetSession(id string) (v interface{}, err error) {
+// GetSession returns the session content by id from the backend store.
+//
+// If the session id does not exist, it maybe return (nil, nil).
+//
+// Notice: for the same session id, the context maybe optimize GetSession
+// by the cache, which will call the backend store only once.
+func (c *Context) GetSession(id string) (v interface{}, err error) {
 	if id == "" {
 		return nil, ErrInvalidSession
 	}
@@ -824,10 +697,10 @@ func (c *contextT) GetSession(id string) (v interface{}, err error) {
 		return c.sessionV, nil
 	}
 
-	if c.session == nil {
+	if c.ship.session == nil {
 		return nil, ErrNoSessionSupport
 	}
-	if v, err = c.session.GetSession(id); err == nil {
+	if v, err = c.ship.session.GetSession(id); err == nil {
 		c.sessionK = id
 		if v == nil {
 			err = ErrSessionNotExist
@@ -840,8 +713,15 @@ func (c *contextT) GetSession(id string) (v interface{}, err error) {
 	return
 }
 
-func (c *contextT) SetSession(id string, value interface{}) (err error) {
-	if c.session == nil {
+// SetSession sets the session to the backend store.
+//
+// id must not be "".
+//
+// value should not be nil. If nil, however, it will tell the context
+// that the session id is missing, and the context should not forward
+// the request to the underlying session store when calling GetSession.
+func (c *Context) SetSession(id string, value interface{}) (err error) {
+	if c.ship.session == nil {
 		return ErrNoSessionSupport
 	}
 	if id == "" {
@@ -852,7 +732,7 @@ func (c *contextT) SetSession(id string, value interface{}) (err error) {
 		c.sessionV = emptyValue
 		return nil
 	}
-	if err = c.session.SetSession(id, value); err != nil {
+	if err = c.ship.session.SetSession(id, value); err != nil {
 		return err
 	}
 	c.sessionK = id
@@ -860,14 +740,17 @@ func (c *contextT) SetSession(id string, value interface{}) (err error) {
 	return nil
 }
 
-func (c *contextT) DelSession(id string) (err error) {
+// DelSession deletes the session from the backend store.
+//
+// id must not be "".
+func (c *Context) DelSession(id string) (err error) {
 	if id == "" {
 		return ErrInvalidSession
 	}
-	if c.session == nil {
+	if c.ship.session == nil {
 		return ErrNoSessionSupport
 	}
-	if err = c.session.DelSession(id); err != nil {
+	if err = c.ship.session.DelSession(id); err != nil {
 		return
 	}
 	if c.sessionK == id {
@@ -876,48 +759,76 @@ func (c *contextT) DelSession(id string) (err error) {
 	return nil
 }
 
-func (c *contextT) SetHandler(h func(Context, ...interface{}) error) {
-	c.handler = h
-}
-
-func (c *contextT) Handle(args ...interface{}) error {
-	if c.handler != nil {
-		return c.handler(c, args...)
-	} else if c.ship.config.CtxHandler != nil {
-		return c.ship.config.CtxHandler(c, args...)
-	}
-	return ErrNoHandler
-}
-
-// Bind binds the request information into provided type v.
+// Bind binds the request information into the provided value v.
 //
 // The default binder does it based on Content-Type header.
-func (c *contextT) Bind(v interface{}) error {
-	return c.binder.Bind(c, v)
+func (c *Context) Bind(v interface{}) error {
+	return c.ship.binder.Bind(c, v)
 }
 
-func (c *contextT) BindQuery(v interface{}) error {
-	return c.binderQ(c.QueryParams(), v)
+// BindQuery binds the request URL query into the provided value v.
+func (c *Context) BindQuery(v interface{}) error {
+	return c.ship.bindQuery(v, c.QueryParams())
 }
 
-func (c *contextT) Write(b []byte) (int, error) {
-	if !c.wrote {
-		c.resp.WriteHeader(http.StatusOK)
+// Render renders a template named name with data and sends a text/html response
+// with status code.
+func (c *Context) Render(name string, code int, data interface{}) error {
+	if c.ship.renderer == nil {
+		return ErrRendererNotRegistered
 	}
+	return c.ship.renderer.Render(c, name, code, data)
+}
+
+// Write writes the content to the peer.
+//
+// it will write the header firstly if the header is not sent.
+func (c *Context) Write(b []byte) (int, error) {
 	return c.resp.Write(b)
 }
 
-// Render renders a template with data and sends a text/html response with status
-// code. Renderer must be registered using `Echo.Renderer`.
-func (c *contextT) Render(name string, code int, data interface{}) error {
-	if c.renderer == nil {
-		return ErrRendererNotRegistered
+// NoContent sends a response with no body and a status code.
+func (c *Context) NoContent(code int) error {
+	c.resp.WriteHeader(code)
+	return nil
+}
+
+// Redirect redirects the request to a provided URL with status code.
+func (c *Context) Redirect(code int, toURL string) error {
+	if code < 300 || code > 308 {
+		return ErrInvalidRedirectCode
 	}
-	return c.renderer.Render(c, name, code, data)
+	c.resp.Header().Set(HeaderLocation, toURL)
+	c.resp.WriteHeader(code)
+	return nil
+}
+
+// Stream sends a streaming response with status code and content type.
+func (c *Context) Stream(code int, contentType string, r io.Reader) (err error) {
+	c.SetContentType(contentType)
+	c.resp.WriteHeader(code)
+	_, err = io.Copy(c.resp, r)
+	return
+}
+
+// Blob sends a blob response with status code and content type.
+func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
+	c.SetContentType(contentType)
+	c.resp.WriteHeader(code)
+	_, err = c.resp.Write(b)
+	return
+}
+
+// String sends a string response with status code.
+func (c *Context) String(code int, format string, args ...interface{}) error {
+	if len(args) == 0 {
+		format = fmt.Sprintf(format, args...)
+	}
+	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(format))
 }
 
 // JSON sends a JSON response with status code.
-func (c *contextT) JSON(code int, i interface{}) error {
+func (c *Context) JSON(code int, i interface{}) error {
 	b, err := json.Marshal(i)
 	if err != nil {
 		return err
@@ -926,7 +837,7 @@ func (c *contextT) JSON(code int, i interface{}) error {
 }
 
 // JSONPretty sends a pretty-print JSON with status code.
-func (c *contextT) JSONPretty(code int, i interface{}, indent string) error {
+func (c *Context) JSONPretty(code int, i interface{}, indent string) error {
 	b, err := json.MarshalIndent(i, "", indent)
 	if err != nil {
 		return err
@@ -935,13 +846,13 @@ func (c *contextT) JSONPretty(code int, i interface{}, indent string) error {
 }
 
 // JSONBlob sends a JSON blob response with status code.
-func (c *contextT) JSONBlob(code int, b []byte) error {
+func (c *Context) JSONBlob(code int, b []byte) error {
 	return c.Blob(code, MIMEApplicationJSONCharsetUTF8, b)
 }
 
 // JSONP sends a JSONP response with status code. It uses `callback` to construct
 // the JSONP payload.
-func (c *contextT) JSONP(code int, callback string, i interface{}) error {
+func (c *Context) JSONP(code int, callback string, i interface{}) error {
 	b, err := json.Marshal(i)
 	if err != nil {
 		return err
@@ -951,8 +862,8 @@ func (c *contextT) JSONP(code int, callback string, i interface{}) error {
 
 // JSONPBlob sends a JSONP blob response with status code. It uses `callback`
 // to construct the JSONP payload.
-func (c *contextT) JSONPBlob(code int, callback string, b []byte) (err error) {
-	c.writeContentType(MIMEApplicationJavaScriptCharsetUTF8)
+func (c *Context) JSONPBlob(code int, callback string, b []byte) (err error) {
+	c.SetContentType(MIMEApplicationJavaScriptCharsetUTF8)
 	c.resp.WriteHeader(code)
 	if _, err = c.resp.Write([]byte(callback + "(")); err != nil {
 		return
@@ -965,7 +876,7 @@ func (c *contextT) JSONPBlob(code int, callback string, b []byte) (err error) {
 }
 
 // XML sends an XML response with status code.
-func (c *contextT) XML(code int, i interface{}) error {
+func (c *Context) XML(code int, i interface{}) error {
 	b, err := xml.Marshal(i)
 	if err != nil {
 		return err
@@ -974,7 +885,7 @@ func (c *contextT) XML(code int, i interface{}) error {
 }
 
 // XMLPretty sends a pretty-print XML with status code.
-func (c *contextT) XMLPretty(code int, i interface{}, indent string) error {
+func (c *Context) XMLPretty(code int, i interface{}, indent string) error {
 	b, err := xml.MarshalIndent(i, "", indent)
 	if err != nil {
 		return err
@@ -983,8 +894,8 @@ func (c *contextT) XMLPretty(code int, i interface{}, indent string) error {
 }
 
 // XMLBlob sends an XML blob response with status code.
-func (c *contextT) XMLBlob(code int, b []byte) (err error) {
-	c.writeContentType(MIMEApplicationXMLCharsetUTF8)
+func (c *Context) XMLBlob(code int, b []byte) (err error) {
+	c.SetContentType(MIMEApplicationXMLCharsetUTF8)
 	c.resp.WriteHeader(code)
 	if _, err = c.resp.Write([]byte(xml.Header)); err != nil {
 		return
@@ -994,48 +905,19 @@ func (c *contextT) XMLBlob(code int, b []byte) (err error) {
 }
 
 // HTML sends an HTTP response with status code.
-func (c *contextT) HTML(code int, html string) error {
+func (c *Context) HTML(code int, html string) error {
 	return c.HTMLBlob(code, []byte(html))
 }
 
 // HTMLBlob sends an HTTP blob response with status code.
-func (c *contextT) HTMLBlob(code int, b []byte) error {
+func (c *Context) HTMLBlob(code int, b []byte) error {
 	return c.Blob(code, MIMETextHTMLCharsetUTF8, b)
 }
 
-// String sends a string response with status code.
-func (c *contextT) String(code int, s string) error {
-	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(s))
-}
-
-func (c *contextT) writeContentType(value string) {
-	if value == "" {
-		return
-	}
-	header := c.resp.Header()
-	if header.Get(HeaderContentType) == "" {
-		header.Set(HeaderContentType, value)
-	}
-}
-
-// Blob sends a blob response with status code and content type.
-func (c *contextT) Blob(code int, contentType string, b []byte) (err error) {
-	c.writeContentType(contentType)
-	c.resp.WriteHeader(code)
-	_, err = c.resp.Write(b)
-	return
-}
-
-// Stream sends a streaming response with status code and content type.
-func (c *contextT) Stream(code int, contentType string, r io.Reader) (err error) {
-	c.writeContentType(contentType)
-	c.resp.WriteHeader(code)
-	_, err = io.Copy(c.resp, r)
-	return
-}
-
 // File sends a response with the content of the file.
-func (c *contextT) File(file string) (err error) {
+//
+// If the file does not exist, it returns ErrNotFound.
+func (c *Context) File(file string) (err error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return ErrNotFound
@@ -1059,7 +941,7 @@ func (c *contextT) File(file string) (err error) {
 	return
 }
 
-func (c *contextT) contentDisposition(file, name, dispositionType string) error {
+func (c *Context) contentDisposition(file, name, dispositionType string) error {
 	c.resp.Header().Set(HeaderContentDisposition,
 		fmt.Sprintf("%s; filename=%q", dispositionType, name))
 	return c.File(file)
@@ -1067,27 +949,15 @@ func (c *contextT) contentDisposition(file, name, dispositionType string) error 
 
 // Attachment sends a response as attachment, prompting client to save the
 // file.
-func (c *contextT) Attachment(file string, name string) error {
+//
+// If the file does not exist, it returns ErrNotFound.
+func (c *Context) Attachment(file string, name string) error {
 	return c.contentDisposition(file, name, "attachment")
 }
 
 // Inline sends a response as inline, opening the file in the browser.
-func (c *contextT) Inline(file string, name string) error {
+//
+// If the file does not exist, it returns ErrNotFound.
+func (c *Context) Inline(file string, name string) error {
 	return c.contentDisposition(file, name, "inline")
-}
-
-// NoContent sends a response with no body and a status code.
-func (c *contextT) NoContent(code int) error {
-	c.resp.WriteHeader(code)
-	return nil
-}
-
-// Redirect redirects the request to a provided URL with status code.
-func (c *contextT) Redirect(code int, toURL string) error {
-	if code < 300 || code > 308 {
-		return ErrInvalidRedirectCode
-	}
-	c.resp.Header().Set(HeaderLocation, toURL)
-	c.resp.WriteHeader(code)
-	return nil
 }

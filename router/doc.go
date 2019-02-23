@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package router supplies some the builtin implementation about core.Router.
+// Package router supplies some the builtin implementation about Router.
 package router

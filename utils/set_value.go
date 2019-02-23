@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone <xgfone@126.com>
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package binder
+package utils
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
-
-	"github.com/xgfone/ship/utils"
 )
 
 // SetValuer is used to set the itself value to v.
@@ -63,7 +61,13 @@ type SetValuer interface {
 //     SetValue(&t2, "2019-01-16T15:39:40+08:00")
 //
 // If v support the interface SetValuer, it will call its SetValue method.
-func SetValue(v interface{}, data interface{}) (err error) {
+//
+// Notice: if data is nil and ignoreNil is true, it will do nothing and return nil.
+func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
+	if data == nil && len(ignoreNil) > 0 && ignoreNil[0] {
+		return nil
+	}
+
 	var u64 uint64
 	var i64 int64
 
@@ -77,12 +81,12 @@ func SetValue(v interface{}, data interface{}) (err error) {
 		case string, float32, float64,
 			int, int8, int16, int32, int64,
 			uint, uint8, uint16, uint32, uint64:
-			*p, err = utils.ToBool(data)
+			*p, err = ToBool(data)
 		default:
 			return fmt.Errorf("the unknown type '%T'", data)
 		}
 	case *string:
-		*p, err = utils.ToString(data)
+		*p, err = ToString(data)
 	case *[]byte:
 		switch d := data.(type) {
 		case string:
@@ -90,44 +94,44 @@ func SetValue(v interface{}, data interface{}) (err error) {
 		case []byte:
 			*p = d
 		default:
-			s, e := utils.ToString(data)
+			s, e := ToString(data)
 			*p = []byte(s)
 			err = e
 		}
 	case *float32:
-		f64, e := utils.ToFloat64(data)
+		f64, e := ToFloat64(data)
 		*p = float32(f64)
 		err = e
 	case *float64:
-		*p, err = utils.ToFloat64(data)
+		*p, err = ToFloat64(data)
 	case *int:
-		i64, err = utils.ToInt64(data)
+		i64, err = ToInt64(data)
 		*p = int(i64)
 	case *int8:
-		i64, err = utils.ToInt64(data)
+		i64, err = ToInt64(data)
 		*p = int8(i64)
 	case *int16:
-		i64, err = utils.ToInt64(data)
+		i64, err = ToInt64(data)
 		*p = int16(i64)
 	case *int32:
-		i64, err = utils.ToInt64(data)
+		i64, err = ToInt64(data)
 		*p = int32(i64)
 	case *int64:
-		*p, err = utils.ToInt64(data)
+		*p, err = ToInt64(data)
 	case *uint:
-		u64, err = utils.ToUint64(data)
+		u64, err = ToUint64(data)
 		*p = uint(u64)
 	case *uint8:
-		u64, err = utils.ToUint64(data)
+		u64, err = ToUint64(data)
 		*p = uint8(u64)
 	case *uint16:
-		u64, err = utils.ToUint64(data)
+		u64, err = ToUint64(data)
 		*p = uint16(u64)
 	case *uint32:
-		u64, err = utils.ToUint64(data)
+		u64, err = ToUint64(data)
 		*p = uint32(u64)
 	case *uint64:
-		*p, err = utils.ToUint64(data)
+		*p, err = ToUint64(data)
 	case *time.Time:
 
 		switch d := data.(type) {
@@ -147,7 +151,7 @@ func SetValue(v interface{}, data interface{}) (err error) {
 			return fmt.Errorf("the unknown type '%T'", data)
 		}
 	default:
-		return fmt.Errorf("the unknown type '%T'", data)
+		return fmt.Errorf("the unknown type '%T'", v)
 	}
 	return
 }

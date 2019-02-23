@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,19 +26,19 @@ import (
 )
 
 func TestFlat(t *testing.T) {
-	beforeLog := func(ctx ship.Context) error {
+	beforeLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("before handling the request")
 		return nil
 	}
-	afterLog := func(ctx ship.Context) error {
+	afterLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("after handling the request")
 		return nil
 	}
 
 	buf := bytes.NewBuffer(nil)
-	router := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
+	router := ship.New(ship.SetLogger(ship.NewNoLevelLogger(buf, 0)))
 	router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
-	router.R("/").GET(func(ctx ship.Context) error {
+	router.R("/").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Info("handling the request")
 		return nil
 	})
@@ -53,19 +53,19 @@ func TestFlat(t *testing.T) {
 }
 
 func TestFlatFail(t *testing.T) {
-	beforeLog := func(ctx ship.Context) error {
+	beforeLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("before handling the request")
 		return fmt.Errorf("before error")
 	}
-	afterLog := func(ctx ship.Context) error {
+	afterLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("after handling the request")
 		return nil
 	}
 
 	buf := bytes.NewBuffer(nil)
-	router := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
+	router := ship.New(ship.SetLogger(ship.NewNoLevelLogger(buf, 0)))
 	router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
-	router.R("/").GET(func(ctx ship.Context) error {
+	router.R("/").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Info("handling the request")
 		return nil
 	})
@@ -80,21 +80,21 @@ func TestFlatFail(t *testing.T) {
 }
 
 func TestFlatError(t *testing.T) {
-	beforeLog := func(ctx ship.Context) error {
+	beforeLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("before handling the request")
 		return nil
 	}
-	afterLog := func(ctx ship.Context) error {
+	afterLog := func(ctx *ship.Context) error {
 		ctx.Logger().Info("after handling the request")
 		return nil
 	}
 
 	buf := bytes.NewBuffer(nil)
-	router := ship.New(ship.Config{Logger: ship.NewNoLevelLogger(buf, 0)})
+	router := ship.New(ship.SetLogger(ship.NewNoLevelLogger(buf, 0)))
 	router.Use(Flat([]ship.Handler{beforeLog}, []ship.Handler{afterLog}))
-	router.R("/").GET(func(ctx ship.Context) error {
+	router.R("/").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Info("handling the request")
-		ctx.SetError(fmt.Errorf("handler error"))
+		ctx.Err = fmt.Errorf("handler error")
 		return nil
 	})
 

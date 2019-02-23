@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,9 @@ import (
 	"strings"
 )
 
+// Matcher is used to check whether the request match some conditions.
+type Matcher func(*http.Request) error
+
 // Route represents a route information.
 type Route struct {
 	ship    *Ship
@@ -42,7 +45,7 @@ type Route struct {
 }
 
 func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
-	if !s.config.KeepTrailingSlashPath {
+	if !s.keepTrailingSlashPath {
 		path = strings.TrimSuffix(path, "/")
 	}
 
@@ -214,11 +217,11 @@ func (r *Route) buildMatcherMiddleware() Middleware {
 	}
 
 	return func(next Handler) Handler {
-		return func(ctx Context) (err error) {
+		return func(ctx *Context) (err error) {
 			req := ctx.Request()
 			for _, matcher := range matchers {
 				if err = matcher(req); err != nil {
-					return ErrNotFound.SetInnerError(err)
+					return ErrNotFound.NewError(err)
 				}
 			}
 			return next(ctx)
@@ -252,9 +255,9 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 	}
 
 	middlewaresLen := len(middlewares)
-	if middlewaresLen > r.ship.config.MiddlewareMaxNum {
+	if middlewaresLen > r.ship.middlewareMaxNum {
 		panic(fmt.Errorf("the number of middlewares '%d' has exceeded the maximum '%d'",
-			middlewaresLen, r.ship.config.MiddlewareMaxNum))
+			middlewaresLen, r.ship.middlewareMaxNum))
 	}
 
 	for i := middlewaresLen - 1; i >= 0; i-- {
@@ -351,11 +354,11 @@ func (r *Route) Map(method2handlers map[string]Handler) *Route {
 // Example
 //
 //    type TestType struct{}
-//    func (t TestType) Create(ctx ship.Context) error { return nil }
-//    func (t TestType) Delete(ctx ship.Context) error { return nil }
-//    func (t TestType) Update(ctx ship.Context) error { return nil }
-//    func (t TestType) Get(ctx ship.Context) error    { return nil }
-//    func (t TestType) Has(ctx ship.Context) error    { return nil }
+//    func (t TestType) Create(ctx *ship.Context) error { return nil }
+//    func (t TestType) Delete(ctx *ship.Context) error { return nil }
+//    func (t TestType) Update(ctx *ship.Context) error { return nil }
+//    func (t TestType) Get(ctx *ship.Context) error    { return nil }
+//    func (t TestType) Has(ctx *ship.Context) error    { return nil }
 //    func (t TestType) NotHandler()                   {}
 //
 //    router := ship.New()
@@ -373,7 +376,7 @@ func (r *Route) Map(method2handlers map[string]Handler) *Route {
 // of the type, and the value of that is the request method, such as GET, POST,
 // etc. Notice that the method type must be compatible with
 //
-//    func (Context) error
+//    func (*Context) error
 //
 // Notice: the name of type and method will be converted to the lower.
 func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
@@ -382,7 +385,7 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 	}
 
 	value := reflect.ValueOf(tv)
-	methodMaps := r.ship.config.DefaultMethodMapping
+	methodMaps := r.ship.defaultMethodMapping
 	if len(mapping) > 0 {
 		methodMaps = mapping[0]
 	}
@@ -400,7 +403,7 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 		method := _type.Method(i)
 		mtype := method.Type
 
-		// func (s StructType) Handler(ctx Context) error
+		// func (s StructType) Handler(ctx *Context) error
 		if mtype.NumIn() != 2 || mtype.NumOut() != 1 {
 			continue
 		}
@@ -417,7 +420,7 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
 
 			name := fmt.Sprintf("%s_%s", typeName, methodName)
-			r.addRoute(name, path, func(ctx Context) error {
+			r.addRoute(name, path, func(ctx *Context) error {
 				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
 				return vs[0].Interface().(error)
 			}, reqMethod)
@@ -427,23 +430,23 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 	return r
 }
 
-func (r *Route) serveFileMetadata(ctx Context, filename string) error {
+func (r *Route) serveFileMetadata(ctx *Context, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
-		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+		return NewHTTPError(http.StatusInternalServerError).NewError(err)
 	}
 	defer f.Close()
 
 	fi, err := f.Stat()
 	if err != nil {
-		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+		return NewHTTPError(http.StatusInternalServerError).NewError(err)
 	} else if fi.IsDir() {
 		return ctx.NotFoundHandler()(ctx)
 	}
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return NewHTTPError(http.StatusInternalServerError).SetInnerError(err)
+		return NewHTTPError(http.StatusInternalServerError).NewError(err)
 	}
 
 	ctx.SetHeader(HeaderEtag, fmt.Sprintf("%x", h.Sum(nil)))
@@ -458,8 +461,8 @@ func (r *Route) StaticFile(filePath string) *Route {
 		panic(errors.New("URL parameters cannot be used when serving a static file"))
 	}
 
-	r.addRoute("", r.path, func(ctx Context) error { return ctx.File(filePath) }, http.MethodGet)
-	r.addRoute("", r.path, func(ctx Context) error { return r.serveFileMetadata(ctx, filePath) }, http.MethodHead)
+	r.addRoute("", r.path, func(ctx *Context) error { return ctx.File(filePath) }, http.MethodGet)
+	r.addRoute("", r.path, func(ctx *Context) error { return r.serveFileMetadata(ctx, filePath) }, http.MethodHead)
 	return r
 }
 
@@ -472,7 +475,7 @@ func (r *Route) StaticFS(fs http.FileSystem) *Route {
 	fileServer := http.StripPrefix(r.path, http.FileServer(fs))
 	rpath := path.Join(r.path, "/*filepath")
 
-	r.addRoute("", rpath, func(ctx Context) error {
+	r.addRoute("", rpath, func(ctx *Context) error {
 		filepath := ctx.Param("filepath")
 		if _, err := fs.Open(filepath); err != nil {
 			return ctx.NotFoundHandler()(ctx)

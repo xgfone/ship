@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import (
 )
 
 func TestGroup(t *testing.T) {
-	s := New(Config{Prefix: "/v1"})
+	s := New(SetPrefix("/v1"))
 	group := s.Group("/group")
 	group.Route("/route1").GET(NothingHandler())
 	group.Route("/route2").POST(NothingHandler())

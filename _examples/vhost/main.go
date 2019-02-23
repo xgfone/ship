@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import (
 
 func setupRouter() *ship.Ship {
 	router := ship.New()
-	router.Route("/router").GET(func(c ship.Context) error { return c.String(200, "default") })
+	router.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "default") })
 
 	vhost1 := router.VHost("host1.example.com")
-	vhost1.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost1") })
+	vhost1.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost1") })
 
 	vhost2 := router.VHost("host2.example.com")
-	vhost2.Route("/router").GET(func(c ship.Context) error { return c.String(200, "vhost2") })
+	vhost2.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost2") })
 
 	return router
 }

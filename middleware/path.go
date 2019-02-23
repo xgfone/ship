@@ -14,7 +14,7 @@ import (
 // Notice: it should be used as the pre-middleware by ship#Pre().
 func CleanPath() Middleware {
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx ship.Context) (err error) {
+		return func(ctx *ship.Context) (err error) {
 			req := ctx.Request()
 			req.URL.Path = cleanPath(req.URL.Path)
 			return next(ctx)

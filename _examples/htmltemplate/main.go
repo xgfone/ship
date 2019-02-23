@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone <xgfone@126.com>
+// Copyright 2018 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,21 +18,19 @@ import (
 	"net/http"
 
 	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/render"
-	"github.com/xgfone/ship/render/django"
+	"github.com/xgfone/ship/renderers/django"
 )
 
 var filename = "test_django_engine.html"
 
 func main() {
-	tm := render.NewHTMLTemplateManager()
-	tm.Register(django.New(".", ".html"))
+	engine := django.New(".", ".html")
 
 	router := ship.New()
-	router.MuxRender().Add(".html", tm)
+	router.MuxRenderer().Add(engine.Ext(), ship.HTMLTemplateRenderer(engine))
 
 	// For JSON
-	router.Route("/json").GET(func(ctx ship.Context) error {
+	router.Route("/json").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.JSONPretty(200, map[string]interface{}{"msg": "json"}, "    ")
 			// Or
@@ -44,7 +42,7 @@ func main() {
 	})
 
 	// For XML
-	router.Route("/xml").GET(func(ctx ship.Context) error {
+	router.Route("/xml").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.XMLPretty(200, []string{"msg", "xml"}, "    ")
 			// Or
@@ -56,7 +54,7 @@ func main() {
 	})
 
 	// For HTML
-	router.Route("/html").GET(func(ctx ship.Context) error {
+	router.Route("/html").GET(func(ctx *ship.Context) error {
 		return ctx.Render(filename, 200, map[string]interface{}{"name": "django"})
 		// Or
 		// return ctx.HTML(200, `<html>...</html>`)

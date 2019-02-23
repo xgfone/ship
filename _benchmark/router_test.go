@@ -645,7 +645,7 @@ func loadShipRoutes(s *ship.Ship, routes []*Route) {
 }
 
 func shipHandler(method, path string) ship.Handler {
-	return func(c ship.Context) error {
+	return func(c *ship.Context) error {
 		return c.String(http.StatusOK, "OK")
 	}
 }
