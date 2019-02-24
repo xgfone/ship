@@ -43,23 +43,23 @@ const (
 
 // MIME slice types
 var (
-	MIMEApplicationJSONs                  = []string{"application/json"}
-	MIMEApplicationJSONCharsetUTF8s       = []string{MIMEApplicationJSON + "; " + CharsetUTF8}
-	MIMEApplicationJavaScripts            = []string{"application/javascript"}
-	MIMEApplicationJavaScriptCharsetUTF8s = []string{MIMEApplicationJavaScript + "; " + CharsetUTF8}
-	MIMEApplicationXMLs                   = []string{"application/xml"}
-	MIMEApplicationXMLCharsetUTF8s        = []string{MIMEApplicationXML + "; " + CharsetUTF8}
-	MIMETextXMLs                          = []string{"text/xml"}
-	MIMETextXMLCharsetUTF8s               = []string{MIMETextXML + "; " + CharsetUTF8}
-	MIMEApplicationForms                  = []string{"application/x-www-form-urlencoded"}
-	MIMEApplicationProtobufs              = []string{"application/protobuf"}
-	MIMEApplicationMsgpacks               = []string{"application/msgpack"}
-	MIMETextHTMLs                         = []string{"text/html"}
-	MIMETextHTMLCharsetUTF8s              = []string{MIMETextHTML + "; " + CharsetUTF8}
-	MIMETextPlains                        = []string{"text/plain"}
-	MIMETextPlainCharsetUTF8s             = []string{MIMETextPlain + "; " + CharsetUTF8}
-	MIMEMultipartForms                    = []string{"multipart/form-data"}
-	MIMEOctetStreams                      = []string{"application/octet-stream"}
+	MIMEApplicationJSONs                  = []string{MIMEApplicationJSON}
+	MIMEApplicationJSONCharsetUTF8s       = []string{MIMEApplicationJSONCharsetUTF8}
+	MIMEApplicationJavaScripts            = []string{MIMEApplicationJavaScript}
+	MIMEApplicationJavaScriptCharsetUTF8s = []string{MIMEApplicationJavaScriptCharsetUTF8}
+	MIMEApplicationXMLs                   = []string{MIMEApplicationXML}
+	MIMEApplicationXMLCharsetUTF8s        = []string{MIMEApplicationXMLCharsetUTF8}
+	MIMETextXMLs                          = []string{MIMETextXML}
+	MIMETextXMLCharsetUTF8s               = []string{MIMETextXMLCharsetUTF8}
+	MIMEApplicationForms                  = []string{MIMEApplicationForm}
+	MIMEApplicationProtobufs              = []string{MIMEApplicationProtobuf}
+	MIMEApplicationMsgpacks               = []string{MIMEApplicationMsgpack}
+	MIMETextHTMLs                         = []string{MIMETextHTML}
+	MIMETextHTMLCharsetUTF8s              = []string{MIMETextHTMLCharsetUTF8}
+	MIMETextPlains                        = []string{MIMETextPlain}
+	MIMETextPlainCharsetUTF8s             = []string{MIMETextPlainCharsetUTF8}
+	MIMEMultipartForms                    = []string{MIMEMultipartForm}
+	MIMEOctetStreams                      = []string{MIMEOctetStream}
 )
 
 // Headers
