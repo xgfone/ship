@@ -131,7 +131,7 @@ func JSONRenderer(marshal ...Marshaler) Renderer {
 		encode = marshal[0]
 	}
 
-	return SimpleRenderer("json", "application/json; charset=UTF-8", encode)
+	return SimpleRenderer("json", MIMEApplicationJSONCharsetUTF8, encode)
 }
 
 // JSONPrettyRenderer returns a pretty JSON renderer.
@@ -154,7 +154,7 @@ func JSONPrettyRenderer(indent string, marshal ...Marshaler) Renderer {
 		encode = marshal[0]
 	}
 
-	return SimpleRenderer("jsonpretty", "application/json; charset=UTF-8", encode)
+	return SimpleRenderer("jsonpretty", MIMEApplicationJSONCharsetUTF8, encode)
 }
 
 // XMLRenderer returns a XML renderer.
@@ -172,7 +172,7 @@ func XMLRenderer(marshal ...Marshaler) Renderer {
 		encode = marshal[0]
 	}
 
-	return SimpleRenderer("xml", "application/xml; charset=UTF-8", encode)
+	return SimpleRenderer("xml", MIMEApplicationXMLCharsetUTF8, encode)
 }
 
 // XMLPrettyRenderer returns a pretty XML renderer.
@@ -196,7 +196,7 @@ func XMLPrettyRenderer(indent string, marshal ...Marshaler) Renderer {
 		encode = marshal[0]
 	}
 
-	return SimpleRenderer("xmlpretty", "application/xml; charset=UTF-8", encode)
+	return SimpleRenderer("xmlpretty", MIMEApplicationXMLCharsetUTF8, encode)
 }
 
 // HTMLTemplateEngine is the interface which all html template engines should

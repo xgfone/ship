@@ -35,6 +35,48 @@ import (
 	"github.com/xgfone/ship/utils"
 )
 
+// toContentTypes converts the Content-Type to the Content-Type slice.
+func toContentTypes(contentType string) []string {
+	switch contentType {
+	case MIMEApplicationJSON:
+		return MIMEApplicationJSONs
+	case MIMEApplicationJSONCharsetUTF8:
+		return MIMEApplicationJSONCharsetUTF8s
+	case MIMEApplicationJavaScript:
+		return MIMEApplicationJavaScripts
+	case MIMEApplicationJavaScriptCharsetUTF8:
+		return MIMEApplicationJavaScriptCharsetUTF8s
+	case MIMEApplicationXML:
+		return MIMEApplicationXMLs
+	case MIMEApplicationXMLCharsetUTF8:
+		return MIMEApplicationXMLCharsetUTF8s
+	case MIMETextXML:
+		return MIMETextXMLs
+	case MIMETextXMLCharsetUTF8:
+		return MIMETextXMLCharsetUTF8s
+	case MIMEApplicationForm:
+		return MIMEApplicationForms
+	case MIMEApplicationProtobuf:
+		return MIMEApplicationProtobufs
+	case MIMEApplicationMsgpack:
+		return MIMEApplicationMsgpacks
+	case MIMETextHTML:
+		return MIMETextHTMLs
+	case MIMETextHTMLCharsetUTF8:
+		return MIMETextHTMLCharsetUTF8s
+	case MIMETextPlain:
+		return MIMETextPlains
+	case MIMETextPlainCharsetUTF8:
+		return MIMETextPlainCharsetUTF8s
+	case MIMEMultipartForm:
+		return MIMEMultipartForms
+	case MIMEOctetStream:
+		return MIMEOctetStreams
+	default:
+		return []string{contentType}
+	}
+}
+
 var (
 	indexPage  = "index.html"
 	emptyStrS  = [256]string{}
@@ -65,36 +107,52 @@ func GetContext(req *http.Request) *Context {
 }
 
 type responder struct {
-	http.ResponseWriter
-	ctx *Context
+	resp http.ResponseWriter
+	ctx  *Context
+}
+
+func newResponder(ctx *Context, resp http.ResponseWriter) responder {
+	return responder{ctx: ctx, resp: resp}
+}
+
+func (r *responder) reset(resp http.ResponseWriter) {
+	r.resp = resp
+}
+
+func (r responder) Header() http.Header {
+	return r.resp.Header()
 }
 
 func (r responder) Write(p []byte) (int, error) {
 	if !r.ctx.wrote {
 		r.ctx.wrote = true
 	}
-	return r.ResponseWriter.Write(p)
+	return r.resp.Write(p)
+}
+
+func (r responder) WriteString(s string) (int, error) {
+	return io.WriteString(r.resp, s)
 }
 
 // WriteHeader implements http.ResponseWriter#WriteHeader().
 func (r responder) WriteHeader(code int) {
-	r.ResponseWriter.WriteHeader(code)
+	r.resp.WriteHeader(code)
 	r.ctx.wrote = true
 }
 
 // See [http.Flusher](https://golang.org/pkg/net/http/#Flusher)
 func (r responder) Flush() {
-	r.ResponseWriter.(http.Flusher).Flush()
+	r.resp.(http.Flusher).Flush()
 }
 
 // See [http.Hijacker](https://golang.org/pkg/net/http/#Hijacker)
 func (r responder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return r.ResponseWriter.(http.Hijacker).Hijack()
+	return r.resp.(http.Hijacker).Hijack()
 }
 
 // See [http.CloseNotifier](https://golang.org/pkg/net/http/#CloseNotifier)
 func (r responder) CloseNotify() <-chan bool {
-	return r.ResponseWriter.(http.CloseNotifier).CloseNotify()
+	return r.resp.(http.CloseNotifier).CloseNotify()
 }
 
 // Context represetns a request and response context.
@@ -177,8 +235,7 @@ func (c *Context) reset() {
 	c.wrote = false
 
 	c.req = nil
-	c.resp.ResponseWriter = nil
-	c.resp.ctx = nil
+	c.resp.reset(nil)
 	c.query = nil
 	c.router = nil
 
@@ -196,9 +253,10 @@ func (c *Context) resetURLParam() {
 
 func (c *Context) setReqResp(r *http.Request, w http.ResponseWriter) {
 	c.req = r
-	c.resp.ResponseWriter = w
-	c.resp.ctx = c
-	setContext(c)
+	c.resp = newResponder(c, w)
+	if c.ship.enableCtxHTTPContext {
+		setContext(c)
+	}
 }
 
 // ClearData clears the data.
@@ -324,7 +382,7 @@ func (c *Context) Request() *http.Request {
 
 // Response returns the inner http.ResponseWriter.
 func (c *Context) Response() http.ResponseWriter {
-	return responder{ResponseWriter: c.resp.ResponseWriter, ctx: c}
+	return newResponder(c, c.resp.resp)
 }
 
 // IsResponded reports whether the response is sent.
@@ -340,7 +398,7 @@ func (c *Context) SetResponded(yes bool) {
 // SetResponse resets the response to resp, which will ignore nil.
 func (c *Context) SetResponse(resp http.ResponseWriter) {
 	if resp != nil {
-		c.resp.ResponseWriter = resp
+		c.resp.reset(resp)
 	}
 }
 
@@ -397,14 +455,19 @@ func (c *Context) ParamValues() []string {
 	return nil
 }
 
-// Header returns the first value of the header named name.
+// Header is the alias of GetHeader.
+func (c *Context) Header(name string) string {
+	return c.GetHeader(name)
+}
+
+// GetHeader returns the first value of the request header named name.
 //
 // Return "" if the header does not exist.
-func (c *Context) Header(name string) string {
+func (c *Context) GetHeader(name string) string {
 	return c.req.Header.Get(name)
 }
 
-// SetHeader sets the header name to value.
+// SetHeader sets the response header name to value.
 func (c *Context) SetHeader(name, value string) {
 	c.resp.Header().Set(name, value)
 }
@@ -583,10 +646,26 @@ func (c *Context) ContentLength() int64 {
 	return c.req.ContentLength
 }
 
-// SetContentType the Content-Type of the response body.
+// SetContentTypes sets the Content-Type of the response body to more than one.
+func (c *Context) SetContentTypes(contentTypes []string) {
+	c.resp.Header()[HeaderContentType] = contentTypes
+}
+
+// SetContentType sets the Content-Type of the response body to contentType,
+// but does nothing if contentType is "".
+//
+// Notice: In order to avoid the memory allocation to improve performance,
+// it will look up the corresponding Content-Type slice constant firstly,
+// or generate one by the argument contentType, then set the response header
+// Content-Type to the Content-Type slice. Howevre, you can call
+// SetContentTypes() to set it to avoid the memory allocation, and pass ""
+// to the response function, for example, JSON(), String(), Blob(), etc.
+//
+// For the pre-defined Content-Type slices, please see
+// https://godoc.org/github.com/xgfone/ship/#pkg-variables.
 func (c *Context) SetContentType(contentType string) {
 	if contentType != "" {
-		c.SetHeader(HeaderContentType, contentType)
+		c.SetContentTypes(toContentTypes(contentType))
 	}
 }
 
@@ -819,12 +898,21 @@ func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
 	return
 }
 
-// String sends a string response with status code.
-func (c *Context) String(code int, format string, args ...interface{}) error {
+// BlobString sends a string blob response with status code and content type.
+func (c *Context) BlobString(code int, contentType string, format string, args ...interface{}) (err error) {
+	c.SetContentType(contentType)
+	c.resp.WriteHeader(code)
 	if len(args) > 0 {
-		format = fmt.Sprintf(format, args...)
+		_, err = fmt.Fprintf(c.resp, format, args...)
+	} else {
+		_, err = io.WriteString(c.resp, format)
 	}
-	return c.Blob(code, MIMETextPlainCharsetUTF8, []byte(format))
+	return err
+}
+
+// String sends a string response with status code.
+func (c *Context) String(code int, format string, args ...interface{}) (err error) {
+	return c.BlobString(code, MIMETextPlainCharsetUTF8, format, args...)
 }
 
 // JSON sends a JSON response with status code.
@@ -906,7 +994,7 @@ func (c *Context) XMLBlob(code int, b []byte) (err error) {
 
 // HTML sends an HTTP response with status code.
 func (c *Context) HTML(code int, html string) error {
-	return c.HTMLBlob(code, []byte(html))
+	return c.BlobString(code, MIMETextHTMLCharsetUTF8, html)
 }
 
 // HTMLBlob sends an HTTP blob response with status code.

@@ -184,6 +184,15 @@ func SetMaxMiddlewareNum(num int) Option {
 	}
 }
 
+// SetEnableCtxHTTPContext sets whether to inject the Context into
+// the HTTP request as the http context, then you can use `GetContext(httpReq)`
+// to get the Context.
+func SetEnableCtxHTTPContext(enable bool) Option {
+	return func(s *Ship) {
+		s.enableCtxHTTPContext = enable
+	}
+}
+
 // SetKeepTrailingSlashPath sets whether to remove the trailing slash
 // from the registered url path.
 func SetKeepTrailingSlashPath(keep bool) Option {
@@ -224,6 +233,9 @@ func SetOptionsHandler(h Handler) Option {
 	return func(s *Ship) {
 		if h != nil {
 			s.optionsHandler = h
+			if s.isDefaultRouter {
+				s.router = s.newRouter()
+			}
 		}
 	}
 }
@@ -235,16 +247,26 @@ func SetMethodNotAllowedHandler(h Handler) Option {
 	return func(s *Ship) {
 		if h != nil {
 			s.methodNotAllowedHandler = h
+			if s.isDefaultRouter {
+				s.router = s.newRouter()
+			}
 		}
 	}
 }
 
 // SetNewRouter sets the NewRouter to generate the new router.
+//
+// if newRouter is nil, it will be reset to the default.
 func SetNewRouter(newRouter func() Router) Option {
 	return func(s *Ship) {
 		if newRouter != nil {
 			s.newRouter = newRouter
+			s.isDefaultRouter = false
+		} else {
+			s.newRouter = s.defaultNewRouter
+			s.isDefaultRouter = true
 		}
+		s.router = s.newRouter()
 	}
 }
 

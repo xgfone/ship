@@ -107,12 +107,15 @@ type Ship struct {
 	bufferSize            int
 	ctxDataSize           int
 	middlewareMaxNum      int
+	enableCtxHTTPContext  bool
 	keepTrailingSlashPath bool
 	defaultMethodMapping  map[string]string
 
 	notFoundHandler         Handler
 	optionsHandler          Handler
 	methodNotAllowedHandler Handler
+
+	isDefaultRouter bool
 
 	newRouter   func() Router
 	newCtxData  func(*Context) Resetter
@@ -176,9 +179,8 @@ func New(options ...Option) *Ship {
 	s.bindQuery = func(v interface{}, d url.Values) error {
 		return BindURLValues(v, d, "query")
 	}
-	s.newRouter = func() Router {
-		return echo.NewRouter(routerMethodNotAllowedHandler, routerOptionsHandler)
-	}
+	s.newRouter = s.defaultNewRouter
+	s.isDefaultRouter = true
 
 	/// Initialize the inner variables.
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
@@ -189,6 +191,17 @@ func New(options ...Option) *Ship {
 	s.done = make(chan struct{}, 1)
 
 	return s.Configure(options...)
+}
+
+func (s *Ship) defaultNewRouter() Router {
+	var handleMethodNotAllowed, handleOptions func([]string) interface{}
+	if s.methodNotAllowedHandler != nil {
+		handleMethodNotAllowed = toRouterHandler(s.methodNotAllowedHandler)
+	}
+	if s.optionsHandler != nil {
+		handleOptions = toRouterHandler(s.optionsHandler)
+	}
+	return echo.NewRouter(handleMethodNotAllowed, handleOptions)
 }
 
 func (s *Ship) clone() *Ship {
@@ -213,6 +226,8 @@ func (s *Ship) clone() *Ship {
 		notFoundHandler:         s.notFoundHandler,
 		optionsHandler:          s.optionsHandler,
 		methodNotAllowedHandler: s.methodNotAllowedHandler,
+
+		isDefaultRouter: s.isDefaultRouter,
 
 		newRouter:   s.newRouter,
 		newCtxData:  s.newCtxData,
@@ -442,11 +457,11 @@ func (s *Ship) Traverse(f func(name string, method string, path string)) {
 func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.vhosts != nil {
 		if vhost := s.vhosts[r.Host]; vhost != nil {
-			vhost.handleRequest(vhost.router, w, r)
+			vhost.serveHTTP(w, r)
 			return
 		}
 	}
-	s.handleRequest(s.router, w, r)
+	s.serveHTTP(w, r)
 }
 
 func (s *Ship) handleRequestRoute(c *Context) error {
@@ -456,9 +471,9 @@ func (s *Ship) handleRequestRoute(c *Context) error {
 	return c.NotFoundHandler()(c)
 }
 
-func (s *Ship) handleRequest(router Router, w http.ResponseWriter, r *http.Request) {
+func (s *Ship) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := s.AcquireContext(r, w)
-	ctx.router = router
+	ctx.router = s.router
 	err := s.handler(ctx)
 
 	if err == nil {

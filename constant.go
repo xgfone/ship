@@ -41,6 +41,27 @@ const (
 	MIMEOctetStream                      = "application/octet-stream"
 )
 
+// MIME slice types
+var (
+	MIMEApplicationJSONs                  = []string{"application/json"}
+	MIMEApplicationJSONCharsetUTF8s       = []string{MIMEApplicationJSON + "; " + CharsetUTF8}
+	MIMEApplicationJavaScripts            = []string{"application/javascript"}
+	MIMEApplicationJavaScriptCharsetUTF8s = []string{MIMEApplicationJavaScript + "; " + CharsetUTF8}
+	MIMEApplicationXMLs                   = []string{"application/xml"}
+	MIMEApplicationXMLCharsetUTF8s        = []string{MIMEApplicationXML + "; " + CharsetUTF8}
+	MIMETextXMLs                          = []string{"text/xml"}
+	MIMETextXMLCharsetUTF8s               = []string{MIMETextXML + "; " + CharsetUTF8}
+	MIMEApplicationForms                  = []string{"application/x-www-form-urlencoded"}
+	MIMEApplicationProtobufs              = []string{"application/protobuf"}
+	MIMEApplicationMsgpacks               = []string{"application/msgpack"}
+	MIMETextHTMLs                         = []string{"text/html"}
+	MIMETextHTMLCharsetUTF8s              = []string{MIMETextHTML + "; " + CharsetUTF8}
+	MIMETextPlains                        = []string{"text/plain"}
+	MIMETextPlainCharsetUTF8s             = []string{MIMETextPlain + "; " + CharsetUTF8}
+	MIMEMultipartForms                    = []string{"multipart/form-data"}
+	MIMEOctetStreams                      = []string{"application/octet-stream"}
+)
+
 // Headers
 const (
 	HeaderAccept              = "Accept"

@@ -651,25 +651,25 @@ func shipHandler(method, path string) ship.Handler {
 }
 
 func BenchmarkShipEchoStatic(b *testing.B) {
-	r := ship.New()
+	r := ship.New(ship.SetKeepTrailingSlashPath(true))
 	loadShipRoutes(r, static)
 	benchmarkRoutes(b, r, static)
 }
 
 func BenchmarkShipEchoGitHubAPI(b *testing.B) {
-	r := ship.New()
+	r := ship.New(ship.SetKeepTrailingSlashPath(true))
 	loadShipRoutes(r, githubAPI)
 	benchmarkRoutes(b, r, githubAPI)
 }
 
 func BenchmarkShipEchoGplusAPI(b *testing.B) {
-	r := ship.New()
+	r := ship.New(ship.SetKeepTrailingSlashPath(true))
 	loadShipRoutes(r, gplusAPI)
 	benchmarkRoutes(b, r, gplusAPI)
 }
 
 func BenchmarkShipEchoParseAPI(b *testing.B) {
-	r := ship.New()
+	r := ship.New(ship.SetKeepTrailingSlashPath(true))
 	loadShipRoutes(r, parseAPI)
 	benchmarkRoutes(b, r, parseAPI)
 }

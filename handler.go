@@ -113,16 +113,11 @@ func OptionsHandler() Handler {
 	return optionsHandler
 }
 
-func routerOptionsHandler(methods []string) interface{} {
-	return func(ctx *Context) error {
-		ctx.SetHeader("Allow", strings.Join(methods, ", "))
-		return ctx.ship.optionsHandler(ctx)
-	}
-}
-
-func routerMethodNotAllowedHandler(methods []string) interface{} {
-	return func(ctx *Context) error {
-		ctx.SetHeader("Allow", strings.Join(methods, ", "))
-		return ctx.ship.methodNotAllowedHandler(ctx)
+func toRouterHandler(handler Handler) func([]string) interface{} {
+	return func(methods []string) interface{} {
+		return func(ctx *Context) error {
+			ctx.SetHeader("Allow", strings.Join(methods, ", "))
+			return handler(ctx)
+		}
 	}
 }

@@ -6,10 +6,10 @@
 
 ## Installation
 
-- `go get github.com/xgfone/ship/benchmark`
+- `go get github.com/xgfone/ship/_benchmark`
 
 ## Running Benchmark
 
 ```sh
-go test -bench=. github.com/xgfone/ship/benchmark
+go test -bench=. github.com/xgfone/ship/_benchmark
 ```
