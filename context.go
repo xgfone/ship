@@ -35,6 +35,22 @@ import (
 	"github.com/xgfone/ship/utils"
 )
 
+var contenttypes = map[string][]string{}
+
+// AddContentTypeToSlice add a rule to convert contentType to contentTypeSlice.
+//
+// When you call Context#SetContentType(contentType) to set the response header
+// Content-Type, it will use contentTypeSlice to avoid to allocate the memory.
+func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
+	if contentType == "" {
+		panic(fmt.Errorf("the Content-Type is empty"))
+	}
+	if len(contentTypeSlice) == 0 {
+		panic(fmt.Errorf("the Content-Type slice is empty"))
+	}
+	contenttypes[contentType] = contentTypeSlice
+}
+
 // toContentTypes converts the Content-Type to the Content-Type slice.
 func toContentTypes(contentType string) []string {
 	switch contentType {
@@ -73,6 +89,9 @@ func toContentTypes(contentType string) []string {
 	case MIMEOctetStream:
 		return MIMEOctetStreams
 	default:
+		if ss := contenttypes[contentType]; ss != nil {
+			return ss
+		}
 		return []string{contentType}
 	}
 }
