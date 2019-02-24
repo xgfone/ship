@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package django supplies a html template similar to django in Python.
+//
+// It uses the third-party package, github.com/flosch/pongo2, to implement it.
 package django
 
 import (
