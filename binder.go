@@ -22,6 +22,9 @@ import (
 
 // Binder is the interface to bind the value to v from ctx.
 type Binder interface {
+	// Bind parses the data from ctx and assigns to v.
+	//
+	// Notice: v must be a non-nil pointer.
 	Bind(ctx *Context, v interface{}) error
 }
 

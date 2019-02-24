@@ -119,7 +119,7 @@ func main() {
     router := ship.New()
 
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.ParamValues()...))
+        fmt.Println(ctx.URL("get_url", ctx.Param("id)))
     })
 
     // Start the HTTP server.

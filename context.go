@@ -39,7 +39,7 @@ var contenttypes = map[string][]string{}
 
 // AddContentTypeToSlice add a rule to convert contentType to contentTypeSlice.
 //
-// When you call Context#SetContentType(contentType) to set the response header
+// When calling `Context#SetContentType(contentType)` to set the response header
 // Content-Type, it will use contentTypeSlice to avoid to allocate the memory.
 func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
@@ -118,6 +118,8 @@ func setContext(ctx *Context) {
 }
 
 // GetContext gets the Context from the http Request.
+//
+// Notice: you must enable it by SetEnableCtxHTTPContext(true).
 func GetContext(req *http.Request) *Context {
 	if v := req.Context().Value(contextKey); v != nil {
 		return v.(*Context)

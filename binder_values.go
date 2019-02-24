@@ -32,31 +32,9 @@ import (
 
 // BindUnmarshaler is the interface used to wrap the UnmarshalParam method.
 type BindUnmarshaler interface {
-	// Unmarshal decodes and assigns a value from the
+	// Unmarshal decodes the argument param and assigns to itself.
 	UnmarshalBind(param string) error
 }
-
-// // Bind implements the `Binder#Bind` function.
-// func (b *FormBinder) Bind(v interface{}, req *http.Request) (err error) {
-// 	if req.ContentLength == 0 {
-// 		return errors.New("request body can't be empty")
-// 	}
-// 	ctype := req.Header.Get("Content-Type")
-// 	switch {
-// 	case strings.HasPrefix(ctype, "application/x-www-form-urlencoded"):
-// 		if err = req.ParseMultipartForm(b.maxMemory); err != nil {
-// 			return
-// 		}
-// 		return b.bindData(v, req.Form, "form")
-// 	case strings.HasPrefix(ctype, "multipart/form-data"):
-// 		if err = req.ParseForm(); err != nil {
-// 			return err
-// 		}
-// 		return b.bindData(v, req.Form, "form")
-// 	default:
-// 		return fmt.Errorf("not support content-type '%s'", ctype)
-// 	}
-// }
 
 // BindURLValues parses the data and assign to the pointer ptr to a struct.
 //
