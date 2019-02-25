@@ -214,17 +214,17 @@ func bindMapToStruct(v reflect.Value, m map[string]interface{}) (err error) {
 		fieldv := v.Field(i)
 		fieldt := vtype.Field(i)
 
-		// Check whether the field can be set.
-		if !fieldv.CanSet() {
-			return fmt.Errorf("the field '%s' can't be set", fieldt.Name)
-		}
-
 		name := fieldt.Name
 		if n := fieldt.Tag.Get("json"); n != "" {
 			if n == "-" {
 				continue
 			}
 			name = n
+		}
+
+		// Check whether the field can be set.
+		if !fieldv.CanSet() {
+			continue
 		}
 
 		if fieldv.Kind() == reflect.Ptr {
