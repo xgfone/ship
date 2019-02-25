@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -28,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -430,11 +432,11 @@ func (c *Context) SetConnectionClose() {
 
 // Param returns the parameter value in the url path by name.
 func (c *Context) Param(name string) string {
-	_len := len(c.pnames)
-	for i := 0; i < _len; i++ {
-		if len(c.pnames[i]) == 0 {
+	for i, _len := 0, len(c.pnames); i < _len; i++ {
+		switch v := c.pnames[i]; v {
+		case "":
 			return ""
-		} else if c.pnames[i] == name {
+		case name:
 			return c.pvalues[i]
 		}
 	}
@@ -446,7 +448,7 @@ func (c *Context) Params() map[string]string {
 	_len := len(c.pnames)
 	ms := make(map[string]string, _len)
 	for i := 0; i < _len; i++ {
-		if len(c.pnames[i]) == 0 {
+		if c.pnames[i] == "" {
 			break
 		}
 		ms[c.pnames[i]] = c.pvalues[i]
@@ -456,23 +458,78 @@ func (c *Context) Params() map[string]string {
 
 // ParamNames returns all the names of the URL parameters.
 func (c *Context) ParamNames() []string {
-	_len := len(c.pnames)
-	for i := 0; i < _len; i++ {
+	i, _len := 0, len(c.pnames)
+	for ; i < _len; i++ {
 		if c.pnames[i] == "" {
 			return c.pnames[:i]
 		}
 	}
-	return nil
+	if i == 0 {
+		return []string{}
+	}
+	return c.pnames
 }
 
 // ParamValues returns all the names of the URL parameters.
 func (c *Context) ParamValues() []string {
-	_len := len(c.pnames)
-	for i := 0; i < _len; i++ {
+	i, _len := 0, len(c.pnames)
+	for ; i < _len; i++ {
 		if c.pnames[i] == "" {
 			return c.pvalues[:i]
 		}
 	}
+	if i == 0 {
+		return []string{}
+	}
+	return c.pvalues
+}
+
+// ParamToStruct scans the url parameters to a pointer v to the struct.
+//
+// For the struct, the argument name is the field name by default. But you can
+// change it by the tag "url", such as `url:"name"`. The tag `url:"-"`, however,
+// will ignore this field.
+func (c *Context) ParamToStruct(v interface{}) error {
+	if v == nil {
+		return errors.New("the argument is nil")
+	}
+
+	value := reflect.ValueOf(v)
+	if value.Kind() != reflect.Ptr {
+		return errors.New("the argument is not a pointer")
+	} else if value = value.Elem(); value.Kind() != reflect.Struct {
+		return errors.New("the argument is not a pointer to struct")
+	}
+
+	vtype := value.Type()
+	for i, num := 0, value.NumField(); i < num; i++ {
+		fieldv := value.Field(i)
+		fieldt := vtype.Field(i)
+
+		// Check whether the field can be set.
+		if !fieldv.CanSet() {
+			return fmt.Errorf("the field '%s' can't be set", fieldt.Name)
+		}
+
+		name := fieldt.Name
+		if n := fieldt.Tag.Get("url"); n != "" {
+			if n == "-" {
+				continue
+			}
+			name = n
+		}
+
+		if fieldv.Kind() != reflect.Ptr {
+			fieldv = fieldv.Addr()
+		}
+
+		if v := c.Param(name); v != "" {
+			if err := utils.SetValue(fieldv.Interface(), v); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -148,3 +148,60 @@ func TestContextSession(t *testing.T) {
 
 	assert.Equal(t, "abc\nxyz\n<nil>\nxyz\n", buf.String())
 }
+
+func TestContextURLParam(t *testing.T) {
+	var maxParam int
+	var name string
+	var age string
+	var names = make([]string, 5)
+	var values = make([]string, 5)
+	var maps map[string]string
+
+	s := New()
+	s.R("/hello/:name/:age").GET(func(c *Context) error {
+		copy(names, c.ParamNames())
+		copy(values, c.ParamValues())
+		name = c.Param("name")
+		age = c.Param("age")
+		maps = c.Params()
+		return nil
+	})
+	maxParam = s.maxNum
+
+	req := httptest.NewRequest(http.MethodGet, "/hello/aaron/123", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 2, maxParam)
+	assert.Equal(t, "aaron", name)
+	assert.Equal(t, "123", age)
+	assert.Equal(t, []string{"name", "age"}, names[:maxParam])
+	assert.Equal(t, []string{"aaron", "123"}, values[:maxParam])
+	assert.Equal(t, 2, len(maps))
+	assert.Equal(t, "aaron", maps["name"])
+	assert.Equal(t, "123", maps["age"])
+}
+
+func TestContext_ParamToStruct(t *testing.T) {
+	type S struct {
+		Name    string `url:"name"`
+		Age     int    `url:"-"`
+		Address string
+	}
+	var v S
+
+	s := New()
+	s.R("/hello/:name/:Age").GET(func(c *Context) error {
+		return c.ParamToStruct(&v)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/hello/aaron/123", nil)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "", rec.Body.String())
+	assert.Equal(t, "aaron", v.Name)
+	assert.Equal(t, 0, v.Age)
+	assert.Equal(t, "", v.Address)
+}
