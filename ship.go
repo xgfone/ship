@@ -116,6 +116,7 @@ type Ship struct {
 	methodNotAllowedHandler Handler
 
 	isDefaultRouter bool
+	disableErrorLog bool
 
 	newRouter   func() Router
 	newCtxData  func(*Context) Resetter
@@ -516,7 +517,9 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 	}
 
 END:
-	s.logger.Error("%s", err)
+	if !s.disableErrorLog {
+		s.logger.Error("%s", err)
+	}
 }
 
 // Shutdown stops the HTTP server.

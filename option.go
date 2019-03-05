@@ -303,6 +303,13 @@ func SetErrorHandler(handler func(*Context, error)) Option {
 	}
 }
 
+// DisableErrorLog disables the default error handler to log the error.
+func DisableErrorLog() Option {
+	return func(s *Ship) {
+		s.disableErrorLog = true
+	}
+}
+
 // SetBindQuery sets the query binder to bind the query to a value,
 // which is `BindURLValues(v, d, "query")` by default.
 func SetBindQuery(bind func(interface{}, url.Values) error) Option {
