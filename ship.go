@@ -653,16 +653,18 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	s.lock.Unlock()
 
 	var err error
+	s.RegisterOnShutdown(func() {
+		if err == nil || err == http.ErrServerClosed {
+			s.logger.Info(format)
+		} else {
+			s.logger.Error(format+": %s", err)
+		}
+	})
+
 	if certFile != "" && keyFile != "" {
 		err = server.ListenAndServeTLS(certFile, keyFile)
 	} else {
 		err = server.ListenAndServe()
-	}
-
-	if err == http.ErrServerClosed {
-		s.logger.Info(format)
-	} else {
-		s.logger.Error(format+": %s", err)
 	}
 }
 
