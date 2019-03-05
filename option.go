@@ -319,9 +319,9 @@ func SetErrorHandler(handler func(*Context, error)) Option {
 }
 
 // DisableErrorLog disables the default error handler to log the error.
-func DisableErrorLog() Option {
+func DisableErrorLog(disabled bool) Option {
 	return func(s *Ship) {
-		s.disableErrorLog = true
+		s.disableErrorLog = disabled
 	}
 }
 
