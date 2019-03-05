@@ -590,8 +590,10 @@ func (s *Ship) runStop() {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	defer close(s.done)
-	for _, r := range s.stopfs {
-		r.run()
+	for _len := len(s.stopfs) - 1; _len >= 0; _len-- {
+		if r := s.stopfs[_len]; r != nil {
+			r.run()
+		}
 	}
 }
 

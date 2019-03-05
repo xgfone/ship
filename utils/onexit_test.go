@@ -36,7 +36,7 @@ func TestCallOnExit(t *testing.T) {
 	}
 	wg.Wait()
 
-	if buf.String() != "call1\ncall2\n" {
+	if buf.String() != "call2\ncall1\n" {
 		t.Error(buf.String())
 	}
 }

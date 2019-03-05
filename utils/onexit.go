@@ -29,13 +29,15 @@ func OnExit(f ...func()) {
 	funcs = append(funcs, f...)
 }
 
-// CallOnExit calls the exit functions.
+// CallOnExit calls the exit functions by the reversed added order.
 //
 // This function can be called many times.
 func CallOnExit() {
 	if atomic.CompareAndSwapInt32(&exited, 0, 1) {
-		for _, f := range funcs {
-			f()
+		for _len := len(funcs) - 1; _len >= 0; _len-- {
+			if f := funcs[_len]; f != nil {
+				f()
+			}
 		}
 	}
 }
