@@ -15,6 +15,8 @@
 package middleware
 
 import (
+	"fmt"
+
 	"github.com/xgfone/ship"
 )
 
@@ -26,18 +28,20 @@ func handlePanic(ctx *ship.Context, err interface{}) {
 
 // Recover returns a middleware to wrap the panic.
 //
-// If missing handle, it will use the default, which logs the panic.
+// Change:
+//    1. Ignore the argument handle. In order to keep the backward compatibility,
+//       we don't remove it until the next major version.
+//    2. This middleware only recovers the panic and returns it as an error.
 func Recover(handle ...func(*ship.Context, interface{})) Middleware {
-	handlePanic := handlePanic
-	if len(handle) > 0 && handle[0] != nil {
-		handlePanic = handle[0]
-	}
-
 	return func(next ship.Handler) ship.Handler {
-		return func(ctx *ship.Context) error {
+		return func(ctx *ship.Context) (err error) {
 			defer func() {
-				if err := recover(); err != nil {
-					handlePanic(ctx, err)
+				switch e := recover().(type) {
+				case nil:
+				case error:
+					err = e
+				default:
+					err = fmt.Errorf("%v", e)
 				}
 			}()
 			return next(ctx)
