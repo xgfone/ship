@@ -25,10 +25,9 @@ import (
 
 func TestRecover(t *testing.T) {
 	bs := bytes.NewBuffer(nil)
-	router := ship.New()
-	router.Use(Recover(func(ctx *ship.Context, err interface{}) {
-		bs.WriteString(err.(string))
-	}))
+	router := ship.New(ship.SetErrorHandler(func(ctx *ship.Context, err error) {
+		bs.WriteString(err.Error())
+	})).Use(Recover())
 
 	router.Route("/panic").GET(func(ctx *ship.Context) error {
 		panic("test panic")
