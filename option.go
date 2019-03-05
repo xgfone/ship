@@ -193,12 +193,20 @@ func SetEnableCtxHTTPContext(enable bool) Option {
 	}
 }
 
-// SetKeepTrailingSlashPath sets whether to remove the trailing slash
+// KeepTrailingSlashPath sets whether to remove the trailing slash
 // from the registered url path.
-func SetKeepTrailingSlashPath(keep bool) Option {
+func KeepTrailingSlashPath(keep bool) Option {
 	return func(s *Ship) {
 		s.keepTrailingSlashPath = keep
 	}
+}
+
+// SetKeepTrailingSlashPath is the alias of KeepTrailingSlashPath.
+//
+// DEPRECATED! In order to keep the backward compatibility, it does not removed
+// until the next major version.
+func SetKeepTrailingSlashPath(keep bool) Option {
+	return KeepTrailingSlashPath(keep)
 }
 
 // SetDefaultMethodMapping sets the default mapping when registering the struct route.

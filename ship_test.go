@@ -314,7 +314,7 @@ func TestRouterAPI(t *testing.T) {
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	p := New(SetKeepTrailingSlashPath(true),
+	p := New(KeepTrailingSlashPath(true),
 		SetMethodNotAllowedHandler(MethodNotAllowedHandler()))
 
 	p.Route("/home/").PUT(defaultHandler)
@@ -353,7 +353,7 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestMethodNotAllowed2(t *testing.T) {
-	p := New(SetKeepTrailingSlashPath(true),
+	p := New(KeepTrailingSlashPath(true),
 		SetMethodNotAllowedHandler(MethodNotAllowedHandler()))
 
 	p.Route("/home/").GET(defaultHandler)
