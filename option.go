@@ -184,13 +184,20 @@ func SetMaxMiddlewareNum(num int) Option {
 	}
 }
 
-// SetEnableCtxHTTPContext sets whether to inject the Context into
-// the HTTP request as the http context, then you can use `GetContext(httpReq)`
-// to get the Context.
-func SetEnableCtxHTTPContext(enable bool) Option {
+// EnableCtxHTTPContext sets whether to inject the Context into the HTTP request
+// as the http context, then you can use `GetContext(httpReq)` to get the Context.
+func EnableCtxHTTPContext(enable bool) Option {
 	return func(s *Ship) {
 		s.enableCtxHTTPContext = enable
 	}
+}
+
+// SetEnableCtxHTTPContext is the alias of EnableCtxHTTPContext.
+//
+// DEPRECATED! In order to keep the backward compatibility, it does not removed
+// until the next major version.
+func SetEnableCtxHTTPContext(enable bool) Option {
+	return EnableCtxHTTPContext(enable)
 }
 
 // KeepTrailingSlashPath sets whether to remove the trailing slash

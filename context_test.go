@@ -25,7 +25,7 @@ import (
 )
 
 func TestSetContext(t *testing.T) {
-	s := New(SetEnableCtxHTTPContext(true))
+	s := New(EnableCtxHTTPContext(true))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	ctx := s.NewContext(req, rec)
