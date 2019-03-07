@@ -86,7 +86,7 @@ func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
 			uint, uint8, uint16, uint32, uint64:
 			*p, err = ToBool(data)
 		default:
-			return fmt.Errorf("the unknown type '%T'", data)
+			return fmt.Errorf("SetValue(): the unknown type '%T'", data)
 		}
 	case *string:
 		*p, err = ToString(data)
@@ -142,7 +142,7 @@ func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
 				(*p)[k] = v
 			}
 		default:
-			return fmt.Errorf("the unknown type '%T'", data)
+			return fmt.Errorf("SetValue(): the unknown type '%T'", data)
 		}
 	case *map[string]interface{}:
 		switch d := data.(type) {
@@ -155,7 +155,7 @@ func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
 				(*p)[k] = v
 			}
 		default:
-			return fmt.Errorf("the unknown type '%T'", data)
+			return fmt.Errorf("SetValue(): the unknown type '%T'", data)
 		}
 	case *time.Time:
 
@@ -173,10 +173,10 @@ func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
 				*p, err = time.Parse(time.RFC3339, d)
 			}
 		default:
-			return fmt.Errorf("the unknown type '%T'", data)
+			return fmt.Errorf("SetValue(): the unknown type '%T'", data)
 		}
 	default:
-		return fmt.Errorf("the unknown type '%T'", v)
+		return fmt.Errorf("SetValue(): the unknown type '%T'", v)
 	}
 	return
 }
