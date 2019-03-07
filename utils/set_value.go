@@ -252,7 +252,7 @@ func bindMapToStruct(v reflect.Value, m map[string]interface{}) (err error) {
 			fieldv = fieldv.Addr()
 		}
 
-		if err = SetValue(fieldv.Interface(), m[name]); err != nil {
+		if err = SetValue(fieldv.Interface(), m[name], true); err != nil {
 			return err
 		}
 	}
