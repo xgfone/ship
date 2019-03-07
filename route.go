@@ -335,6 +335,20 @@ func (r *Route) DELETE(handler Handler) *Route {
 	return r.Method(handler, http.MethodDelete)
 }
 
+// Redirect is used to redirect the path to toURL.
+//
+// method is GET by default.
+func (r *Route) Redirect(code int, toURL string, method ...string) *Route {
+	rmethod := http.MethodGet
+	if len(method) > 0 && method[0] != "" {
+		rmethod = method[0]
+	}
+
+	return r.Method(func(ctx *Context) error {
+		return ctx.Redirect(code, toURL)
+	}, rmethod)
+}
+
 // Map registers a group of methods with handlers, which is equal to
 //
 //     for method, handler := range method2handlers {
