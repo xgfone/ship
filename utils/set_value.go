@@ -31,8 +31,8 @@ type SetValuer interface {
 // The converting rule between the types of data and v:
 //
 //    bool, string, number           ->  *bool
-//    bool, string, number, []byte,  ->  *string
-//    bool, string, number, []byte,  ->  *[]byte
+//    bool, string, number, []byte   ->  *string
+//    bool, string, number, []byte   ->  *[]byte
 //    bool, string, number           ->  *float32
 //    bool, string, number           ->  *float64
 //    bool, string, number           ->  *int
@@ -46,6 +46,9 @@ type SetValuer interface {
 //    bool, string, number           ->  *uint32
 //    bool, string, number           ->  *uint64
 //    string, time.Time              ->  *time.Time
+//    map[string]string              ->  *map[string]string
+//    map[string]string              ->  *map[string]interface{}
+//    map[string]interface{}         ->  *map[string]interface{}
 //
 // Notice: number stands for all the integer and float types.
 //
@@ -132,6 +135,28 @@ func SetValue(v interface{}, data interface{}, ignoreNil ...bool) (err error) {
 		*p = uint32(u64)
 	case *uint64:
 		*p, err = ToUint64(data)
+	case *map[string]string:
+		switch d := data.(type) {
+		case map[string]string:
+			for k, v := range d {
+				(*p)[k] = v
+			}
+		default:
+			return fmt.Errorf("the unknown type '%T'", data)
+		}
+	case *map[string]interface{}:
+		switch d := data.(type) {
+		case map[string]string:
+			for k, v := range d {
+				(*p)[k] = v
+			}
+		case map[string]interface{}:
+			for k, v := range d {
+				(*p)[k] = v
+			}
+		default:
+			return fmt.Errorf("the unknown type '%T'", data)
+		}
 	case *time.Time:
 
 		switch d := data.(type) {
@@ -193,7 +218,7 @@ func SetStructValueOf(s reflect.Value, attr string, v interface{}) error {
 
 // BindMapToStruct binds a map to struct.
 //
-// Notice: it supports the json tag.
+// Notice: it uses SetValue to update the field and supports the json tag.
 func BindMapToStruct(value interface{}, m map[string]interface{}) (err error) {
 	if value == nil {
 		return errors.New("the value is nil")
