@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,49 @@ package utils
 import (
 	"bytes"
 	"sync"
+
+	"github.com/xgfone/go-tools/function"
+	"github.com/xgfone/go-tools/io2"
+	"github.com/xgfone/go-tools/lifecycle"
+	"github.com/xgfone/go-tools/types"
 )
 
-// BufferPool is the bytes.Buffer wrapper of sync.Pool
+// Some function aliases.
+//
+// DEPRECATED!!! They won't be removed until the next major version.
+var (
+	// Converting functions
+	ToBool    = types.ToBool
+	ToInt64   = types.ToInt64
+	ToUint64  = types.ToUint64
+	ToFloat64 = types.ToFloat64
+	ToString  = types.ToString
+
+	// IO functions
+	ReadN       = io2.ReadN
+	ReadNWriter = io2.ReadNWriter
+
+	// Setter functions
+	SetValue        = function.SetValue
+	SetStructValue  = function.SetStructValue
+	BindMapToStruct = function.BindMapToStruct
+
+	// OnExit functions
+	CallOnExit = lifecycle.Stop
+	OnExit     = func(f ...func()) { lifecycle.Register(f...) }
+	Exit       = lifecycle.Exit
+)
+
+// SetValuer is the interface alias of function.SetValuer.
+//
+// DEPRECATED!!! It won't be removed until the next major version.
+type SetValuer function.SetValuer
+
+//////////////////////////////////////////////////////////////////////////////
+
+// BufferPool is the bytes.Buffer wrapper of sync.Pool.
+//
+// DEPRECATED!!! It won't be removed until the next major version.
 type BufferPool struct {
 	pool *sync.Pool
 	size int
@@ -35,6 +75,8 @@ func makeBuffer(size int) (b *bytes.Buffer) {
 //
 // bufSize is the initializing size of the buffer. If the size is equal to
 // or less than 0, it will be ignored, and use the default size, 1024.
+//
+// DEPRECATED!!! It won't be removed until the next major version.
 func NewBufferPool(bufSize ...int) BufferPool {
 	size := 1024
 	if len(bufSize) > 0 && bufSize[0] > 0 {

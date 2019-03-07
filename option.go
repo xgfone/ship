@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/xgfone/ship/utils"
+	"github.com/xgfone/go-tools/pools"
 )
 
 // Option is used to configure Ship.
@@ -160,7 +160,7 @@ func SetBufferSize(size int) Option {
 	return func(s *Ship) {
 		if size > 0 {
 			s.bufferSize = size
-			s.bufpool = utils.NewBufferPool(size)
+			s.bufpool = pools.NewBufferPool(size)
 		}
 	}
 }

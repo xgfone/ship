@@ -11,7 +11,7 @@
 go get -u github.com/xgfone/ship
 ```
 
-For the core functions, **it has no any third-party dependencies.**
+For the core functions, **it has no any third-party dependencies**, except for `github.com/xgfone/go-tools`.
 
 
 ## Prerequisite

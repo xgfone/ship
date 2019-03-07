@@ -27,8 +27,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/xgfone/go-tools/lifecycle"
+	"github.com/xgfone/go-tools/pools"
 	"github.com/xgfone/ship/router/echo"
-	"github.com/xgfone/ship/utils"
 )
 
 // Router stands for a router management.
@@ -126,7 +127,7 @@ type Ship struct {
 
 	/// Inner settings
 	ctxpool sync.Pool
-	bufpool utils.BufferPool
+	bufpool pools.BufferPool
 
 	maxNum int
 	router Router
@@ -185,7 +186,7 @@ func New(options ...Option) *Ship {
 
 	/// Initialize the inner variables.
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
-	s.bufpool = utils.NewBufferPool(s.bufferSize)
+	s.bufpool = pools.NewBufferPool(s.bufferSize)
 	s.router = s.newRouter()
 	s.handler = s.handleRequestRoute
 	s.vhosts = make(map[string]*Ship)
@@ -237,7 +238,7 @@ func (s *Ship) clone() *Ship {
 		bindQuery:   s.bindQuery,
 
 		// Inner variables
-		bufpool: utils.NewBufferPool(s.bufferSize),
+		bufpool: pools.NewBufferPool(s.bufferSize),
 		router:  s.newRouter(),
 		handler: s.handleRequestRoute,
 		vhosts:  make(map[string]*Ship),
@@ -653,7 +654,8 @@ func (s *Ship) startServer(server *http.Server, certFile, keyFile string) {
 	s.lock.Unlock()
 
 	var err error
-	s.RegisterOnShutdown(func() {
+	lifecycle.Register(func() { server.Shutdown(context.Background()) })
+	s.RegisterOnShutdown(lifecycle.Stop, func() {
 		if err == nil || err == http.ErrServerClosed {
 			s.logger.Info(format)
 		} else {

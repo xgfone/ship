@@ -32,7 +32,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/utils"
+	"github.com/xgfone/go-tools/types"
 )
 
 // PROPFIND stands for a PROPFIND HTTP method.
@@ -134,7 +134,7 @@ func (r *Router) URL(name string, params ...interface{}) string {
 		if route.Path[i] == ':' && n < ln {
 			for ; i < l && route.Path[i] != '/'; i++ {
 			}
-			if s, err := utils.ToString(params[n]); err == nil {
+			if s, err := types.ToString(params[n]); err == nil {
 				uri.WriteString(s)
 			} else {
 				fmt.Fprintf(uri, "%v", params[n])

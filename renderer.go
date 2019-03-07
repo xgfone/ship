@@ -22,7 +22,7 @@ import (
 	"io"
 	"path"
 
-	"github.com/xgfone/ship/utils"
+	"github.com/xgfone/go-tools/pools"
 )
 
 // Renderer is the interface to render the response.
@@ -213,7 +213,7 @@ type HTMLTemplateEngine interface {
 	Execute(w io.Writer, filename string, data interface{}, metadata map[string]interface{}) error
 }
 
-var htmlTemplatePool = utils.NewBufferPool(1024 * 32)
+var htmlTemplatePool = pools.NewBufferPool(1024 * 32)
 
 // HTMLTemplateRenderer returns HTML template renderer.
 func HTMLTemplateRenderer(engine HTMLTemplateEngine) Renderer {

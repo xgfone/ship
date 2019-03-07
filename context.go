@@ -34,7 +34,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xgfone/ship/utils"
+	"github.com/xgfone/go-tools/function"
+	"github.com/xgfone/go-tools/io2"
 )
 
 var contenttypes = map[string][]string{}
@@ -524,7 +525,7 @@ func (c *Context) ParamToStruct(v interface{}) error {
 		}
 
 		if v := c.Param(name); v != "" {
-			if err := utils.SetValue(fieldv.Interface(), v); err != nil {
+			if err := function.SetValue(fieldv.Interface(), v); err != nil {
 				return err
 			}
 		}
@@ -750,7 +751,7 @@ func (c *Context) SetContentType(contentType string) {
 // GetBody reads all the contents from the body and returns it as string.
 func (c *Context) GetBody() (string, error) {
 	buf := c.AcquireBuffer()
-	err := utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	err := io2.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
 	body := buf.String()
 	c.ReleaseBuffer(buf)
 	return body, err
@@ -761,7 +762,7 @@ func (c *Context) GetBody() (string, error) {
 // Notice: You should call ReleaseBuffer(buf) to release the buffer at last.
 func (c *Context) GetBodyReader() (buf *bytes.Buffer, err error) {
 	buf = c.AcquireBuffer()
-	err = utils.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	err = io2.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
 	if err != nil {
 		c.ReleaseBuffer(buf)
 		return nil, err
@@ -844,7 +845,7 @@ func (c *Context) SetCookie(cookie *http.Cookie) {
 // by the cache, which will call the backend store only once.
 func (c *Context) GetSession(id string) (v interface{}, err error) {
 	if id == "" {
-		return nil, ErrInvalidSession
+		return nil, ErrSessionNotExist
 	}
 	if c.sessionK == id {
 		switch c.sessionV {
