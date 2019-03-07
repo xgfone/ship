@@ -1,0 +1,3 @@
+[[constraint]]
+    name = "github.com/xgfone/go-tools"
+    version = "v5.2.0"
