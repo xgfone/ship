@@ -369,7 +369,7 @@ When you keys `Ctrl+C`, the two servers will exit and output like this.
 ```
 
 **Notice:**
-1. The router app returned by `ship.New()` will listen the signals.
+1. The router app returned by `ship.New()` will listen on the signals.
 2. For `Clone()`, `app2` will also exit when `app1` exits.
 3. For `Link()`, both `app1` and `app2` will exit when either exits.
 
