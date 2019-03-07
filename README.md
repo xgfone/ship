@@ -16,7 +16,7 @@ For the core functions, **it has no any third-party dependencies**, except for `
 
 ## Prerequisite
 
-Now `ship` requires Go `1.9+`.
+Now `ship` requires Go `1.7+`.
 
 
 ## Quick Start
