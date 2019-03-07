@@ -333,6 +333,46 @@ $ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
 vhost2
 ```
 
+#### Many HTTP Server
+
+```go
+package main
+
+import (
+	"github.com/xgfone/ship"
+)
+
+func main() {
+	app1 := ship.New(ship.SetName("app1"))
+	app1.Route("/").GET(func(ctx *ship.Context) error { return ctx.String(200, "app1") })
+
+	app2 := app1.Clone("app2").Link(app1)
+	app2.Route("/").GET(func(ctx *ship.Context) error { return ctx.String(200, "app2") })
+
+	go app2.Start(":8001")
+	app1.Start(":8000").Wait()
+}
+```
+
+When you runs it, the console will output like this:
+```shell
+2019/03/07 22:25:41.701704 ship.go:571: [I] The HTTP Server [app1] is running on :8000
+2019/03/07 22:25:41.702308 ship.go:571: [I] The HTTP Server [app2] is running on :8001
+```
+
+Then you can access `http://127.0.0.1:8000` and `http://127.0.0.1:8001`. The servers returns `app1` and `app2`.
+
+When you keys `Ctrl+C`, the two servers will exit and output like this.
+```shell
+2019/03/07 22:26:16.243693 once.go:44: [I] The HTTP Server [app1] is shutdown
+2019/03/07 22:26:16.243998 once.go:44: [I] The HTTP Server [app2] is shutdown
+```
+
+**Notice:**
+1. The router app returned by `ship.New()` will listen the signals.
+2. For `Clone()`, `app2` will also exit when `app1` exits.
+3. For `Link()`, both `app1` and `app2` will exit when either exits.
+
 #### Handle the complex response
 
 ```go
@@ -377,11 +417,6 @@ func main() {
 	router.Start(":8080")
 }
 ```
-
-
-## `Context`
-
-See [the interface doc](https://godoc.org/github.com/xgfone/ship/core#Context).
 
 
 ## Bind JSON, XML or Form data form payload
@@ -466,7 +501,6 @@ func main() {
 	// Start the HTTP server.
 	router.Start(":8080")
 }
-
 ```
 
 
@@ -520,10 +554,8 @@ func main() {
 
 - [x] Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host). _We use the **Virtual Host** instead._
 - [x] Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries). _We use `Matcher` to operate it._
+- [x] Add the serialization and deserialization middleware. _We use `Binder` and `Renderer`._
+- [x] Add HTML template render.
+- [ ] Add CORS middlware.
 - [ ] Add JWT middleware.
 - [ ] Add OAuth 2.0 middleware.
-- [ ] Add CORS middlware.
-- [x] Add HTML template render.
-- [x] Add the serialization and deserialization middleware. _We use `Binder` and `Renderer`._
-- [x] Give the more capacity to the default binder.
-- [ ] Add the `httprouter` router implementation.
