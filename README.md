@@ -1,6 +1,6 @@
 # ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](http://godoc.org/github.com/xgfone/ship) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
-`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework, which is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
+`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
 `ship` has been stable, and the current version is `1.x`.
 
@@ -79,9 +79,9 @@ func main() {
 }
 ```
 
-Notice: you can regitser the same handler with more than one method by `Route(path string).Method(handler Handler, method ...string)`.
+Notice: you can register the same handler with more than one method by `Route(path string).Method(handler Handler, method ...string)`.
 
-`R` is the alias of `Route`, so you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
+`R` is the alias of `Route`, you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
 #### Cascade the registered routes
 
@@ -112,7 +112,7 @@ func main() {
 ```
 
 #### Naming route and building URL
-You can name the route a name when registering the route, then you can build a URL by the name.
+You can name the route when registering it, then you can build a URL by the name.
 
 ```go
 func main() {
@@ -195,7 +195,7 @@ router.Configure(opt)
 - The name of type and method will be converted to the lower.
 - The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
 - The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
-- The type of the method must be `func(*ship.Context) error`, or it will be ignored.
+- The type of the method must be `func(*ship.Context) error` or it will be ignored.
 
 #### Using `Middleware`
 
@@ -218,7 +218,7 @@ func main() {
 }
 ```
 
-You can register a middleware to run it before finding the router. So you maybe affect the router finding by registering **Before** middlewares. For example,
+You can register a middleware to run before finding the router. You may affect the router finding by registering **Before** middleware. For example,
 
 ```go
 func RemovePathPrefix(prefix string) ship.Middleware {
@@ -247,7 +247,7 @@ func main() {
 }
 ```
 
-The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middlewares as follow:
+The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middleware as follows:
 
 - [CSRF](https://godoc.org/github.com/xgfone/ship/middleware#CSRF)
 - [Flat](https://godoc.org/github.com/xgfone/ship/middleware#Flat)
@@ -474,7 +474,7 @@ func main() {
 
 `ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route, which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://godoc.org/github.com/xgfone/ship/router/echo#NewRouter).
 
-You can appoint yourself implementation by implementing the interface [`ship.Router`](https://godoc.org/github.com/xgfone/ship/core#Router).
+You can appoint your own implementation by implementing the interface [`ship.Router`](https://godoc.org/github.com/xgfone/ship/core#Router).
 
 ```go
 type Router interface {
