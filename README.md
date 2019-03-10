@@ -544,8 +544,8 @@ type Router interface {
 
 ```go
 func main() {
-    config := ship.Config{Router: NewMyRouter(...)}
-    router := ship.New(config)
+    NewMyRouter := func() ship.Router { return ... }
+    router := ship.New(ship.SetNewRouter(NewMyRouter))
     ...
 }
 ```
