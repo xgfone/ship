@@ -234,6 +234,7 @@ func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam i
 
 	ctx := &Context{
 		ship:    s,
+		code:    200,
 		pnames:  pnames,
 		pvalues: pvalues,
 		Data:    make(map[string]interface{}, s.ctxDataSize),
@@ -258,7 +259,7 @@ func (c *Context) reset() {
 		c.ReqCtxData.Reset()
 	}
 
-	c.code = 0
+	c.code = 200
 	c.wrote = false
 
 	c.req = nil
