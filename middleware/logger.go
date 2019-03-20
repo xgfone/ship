@@ -37,11 +37,11 @@ func Logger(now ...func() time.Time) Middleware {
 
 			req := ctx.Request()
 			if err == nil {
-				ctx.Logger().Info("method=%s, url=%s, starttime=%d, cost=%s",
-					req.Method, req.URL.RequestURI(), start.Unix(), end)
+				ctx.Logger().Info("code=%d, method=%s, url=%s, starttime=%d, cost=%s",
+					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), end)
 			} else {
-				ctx.Logger().Error("method=%s, url=%s, starttime=%d, cost=%s, err=%v",
-					req.Method, req.URL.RequestURI(), start.Unix(), end, err)
+				ctx.Logger().Error("code=%d, method=%s, url=%s, starttime=%d, cost=%s, err=%v",
+					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), end, err)
 			}
 
 			return
