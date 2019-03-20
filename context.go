@@ -162,6 +162,7 @@ func (r responder) WriteString(s string) (int, error) {
 func (r responder) WriteHeader(code int) {
 	r.resp.WriteHeader(code)
 	r.ctx.wrote = true
+	r.ctx.code = code
 }
 
 // See [http.Flusher](https://golang.org/pkg/net/http/#Flusher)
@@ -207,6 +208,7 @@ type Context struct {
 	Data map[string]interface{}
 
 	ship  *Ship
+	code  int
 	wrote bool
 
 	req    *http.Request
@@ -256,6 +258,7 @@ func (c *Context) reset() {
 		c.ReqCtxData.Reset()
 	}
 
+	c.code = 0
 	c.wrote = false
 
 	c.req = nil
@@ -407,6 +410,13 @@ func (c *Context) Request() *http.Request {
 // Response returns the inner http.ResponseWriter.
 func (c *Context) Response() http.ResponseWriter {
 	return newResponder(c, c.resp.resp)
+}
+
+// StatusCode returns the status code of the response.
+//
+// Notice: it's used by the middleware, such as Logger in general.
+func (c *Context) StatusCode() int {
+	return c.code
 }
 
 // IsResponded reports whether the response is sent.
