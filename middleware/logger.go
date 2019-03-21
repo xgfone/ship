@@ -33,15 +33,15 @@ func Logger(now ...func() time.Time) Middleware {
 		return func(ctx *ship.Context) (err error) {
 			start := _now()
 			err = next(ctx)
-			end := _now().Sub(start).String()
+			cost := _now().Sub(start).String()
 
 			req := ctx.Request()
 			if err == nil {
-				ctx.Logger().Info("code=%d, method=%s, url=%s, starttime=%d, cost=%s",
-					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), end)
+				ctx.Logger().Info("code=%d, method=%s, url=%s, starttime=%d, addr=%s, cost=%s",
+					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), req.RemoteAddr, cost)
 			} else {
-				ctx.Logger().Error("code=%d, method=%s, url=%s, starttime=%d, cost=%s, err=%v",
-					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), end, err)
+				ctx.Logger().Error("code=%d, method=%s, url=%s, starttime=%d, addr=%s, cost=%s, err=%v",
+					ctx.StatusCode(), req.Method, req.URL.RequestURI(), start.Unix(), req.RemoteAddr, cost, err)
 			}
 
 			return
