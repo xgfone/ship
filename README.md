@@ -2,7 +2,7 @@
 
 `ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
-`ship` has been stable, and the current version is `1.x`.
+`ship` has been stable, and the current version is `1.9+`.
 
 
 ## Install
