@@ -15,6 +15,7 @@
 package middleware
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/xgfone/ship"
@@ -36,14 +37,31 @@ func Logger(now ...func() time.Time) Middleware {
 			cost := _now().Sub(start).String()
 
 			req := ctx.Request()
-			if err == nil {
+			code := ctx.StatusCode()
+			errmsg := ""
+
+			switch e := err.(type) {
+			case nil:
+			case ship.HTTPError:
+				if !ctx.IsResponded() {
+					code = e.Code
+				}
+				if e.Code >= 500 {
+					errmsg = e.Error()
+				}
+			default:
+				errmsg = e.Error()
+				if !ctx.IsResponded() {
+					code = http.StatusInternalServerError
+				}
+			}
+
+			if errmsg == "" {
 				ctx.Logger().Info("code=%d, method=%s, url=%s, starttime=%d, cost=%s, addr=%s",
-					ctx.StatusCode(), req.Method, req.URL.RequestURI(),
-					start.Unix(), cost, req.RemoteAddr)
+					code, req.Method, req.URL.RequestURI(), start.Unix(), cost, req.RemoteAddr)
 			} else {
-				ctx.Logger().Error("code=%d, method=%s, url=%s, starttime=%d, cost=%s, addr=%s, err=%v",
-					ctx.StatusCode(), req.Method, req.URL.RequestURI(),
-					start.Unix(), cost, req.RemoteAddr, err)
+				ctx.Logger().Error("code=%d, method=%s, url=%s, starttime=%d, cost=%s, addr=%s, err=%s",
+					code, req.Method, req.URL.RequestURI(), start.Unix(), cost, req.RemoteAddr, errmsg)
 			}
 
 			return
