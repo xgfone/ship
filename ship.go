@@ -496,30 +496,18 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 	if !ctx.IsResponded() {
 		switch e := err.(type) {
 		case HTTPError:
+			ctx.BlobString(e.Code, e.CT, e.GetMsg())
 			if e.Code < 500 {
-				if e.Msg == "" {
-					if e.Err == nil {
-						ctx.Blob(e.Code, e.CT, nil)
-					} else {
-						ctx.Blob(e.Code, e.CT, []byte(e.Err.Error()))
-					}
-				} else if e.Err == nil {
-					ctx.Blob(e.Code, e.CT, []byte(e.Msg))
-				} else {
-					ctx.Blob(e.Code, e.CT, []byte(fmt.Sprintf("msg='%s', err='%s'", e.Msg, e.Err)))
-				}
 				return
 			}
-			ctx.Blob(e.Code, e.CT, []byte(e.Msg))
+			err = e.Err
 		default:
 			ctx.NoContent(http.StatusInternalServerError)
-			goto END
 		}
 	}
 
-END:
-	if !s.disableErrorLog {
-		s.logger.Error("%s", err)
+	if !s.disableErrorLog && err != nil {
+		s.logger.Error("%v", err)
 	}
 }
 

@@ -77,6 +77,16 @@ func (e HTTPError) Error() string {
 	return fmt.Sprintf("code=%d, msg='%s'", e.Code, e.Err)
 }
 
+// GetMsg returns a message.
+func (e HTTPError) GetMsg() string {
+	if e.Msg != "" {
+		return e.Msg
+	} else if e.Code < 500 && e.Err != nil {
+		return e.Err.Error()
+	}
+	return ""
+}
+
 // NewError returns a new HTTPError with the new error.
 func (e HTTPError) NewError(err error) HTTPError {
 	nerr := e
@@ -92,5 +102,12 @@ func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
 	} else {
 		nerr.Msg = fmt.Sprintf(msg, args...)
 	}
+	return nerr
+}
+
+// NewCT returns a new HTTPError with the new ContentType ct.
+func (e HTTPError) NewCT(ct string) HTTPError {
+	nerr := e
+	nerr.CT = ct
 	return nerr
 }
