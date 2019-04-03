@@ -74,7 +74,24 @@ func (e HTTPError) Error() string {
 	if e.Err != nil {
 		return e.Err.Error()
 	}
-	return fmt.Sprintf("code=%d, msg='%s'", e.Code, e.Err)
+	return e.Msg
+}
+
+// GetError returns the inner error.
+//
+// If Err is nil but Msg is not "", return `errors.New(e.Msg)` instead;
+// Or return nil.
+//
+//     HTTPError{Err: errors.New("")}.GetError() != nil
+//     HTTPError{Msg: "xxx"}.GetError() != nil
+//     HTTPError{Code: 200}.GetError() == nil
+func (e HTTPError) GetError() error {
+	if e.Err != nil {
+		return e.Err
+	} else if e.Msg != "" {
+		return errors.New(e.Msg)
+	}
+	return nil
 }
 
 // GetMsg returns a message.
