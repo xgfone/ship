@@ -32,6 +32,7 @@ type Matcher func(*http.Request) error
 // Route represents a route information.
 type Route struct {
 	ship    *Ship
+	group   *Group
 	path    string
 	name    string
 	router  Router
@@ -44,7 +45,7 @@ type Route struct {
 	matcherM func([]Matcher) Middleware
 }
 
-func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Route {
+func newRoute(s *Ship, g *Group, router Router, prefix, path string, m ...Middleware) *Route {
 	if !s.keepTrailingSlashPath {
 		path = strings.TrimSuffix(path, "/")
 	}
@@ -59,8 +60,9 @@ func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Rou
 
 	ms := make([]Middleware, 0, len(m))
 	return &Route{
-		ship: s,
-		path: prefix + path,
+		ship:  s,
+		group: g,
+		path:  prefix + path,
 
 		router:  router,
 		mdwares: append(ms, m...),
@@ -70,16 +72,28 @@ func newRoute(s *Ship, router Router, prefix, path string, m ...Middleware) *Rou
 // New clones a new Route based on the current route.
 func (r *Route) New() *Route {
 	return &Route{
-		ship:    r.ship,
-		path:    r.path,
-		name:    r.name,
-		router:  r.router,
-		mdwares: append([]Middleware{}, r.mdwares...),
+		ship:   r.ship,
+		path:   r.path,
+		name:   r.name,
+		router: r.router,
 
+		mdwares:  append([]Middleware{}, r.mdwares...),
 		matchers: append([]Matcher{}, r.matchers...),
 		headers:  append([]string{}, r.headers...),
 		schemes:  append([]string{}, r.schemes...),
 	}
+}
+
+// Ship returns the ship that the current route is associated with.
+func (r *Route) Ship() *Ship {
+	return r.ship
+}
+
+// Group returns the group that the current route belongs to.
+//
+// Notice: it will return nil if the route is from ship.Route.
+func (r *Route) Group() *Group {
+	return r.group
 }
 
 // Name sets the route name.

@@ -46,6 +46,11 @@ func newGroup(s *Ship, router Router, pprefix, prefix string, middlewares ...Mid
 	}
 }
 
+// Ship returns the ship that the current group belongs to.
+func (g *Group) Ship() *Ship {
+	return g.ship
+}
+
 // Use adds some middlwares for the group and returns the origin group to write
 // the chained router.
 func (g *Group) Use(middlewares ...Middleware) *Group {
@@ -65,14 +70,14 @@ func (g *Group) GroupWithoutMiddleware(prefix string, middlewares ...Middleware)
 
 // RouteWithoutMiddleware is the same as Group, but not inherit the middlewares of the group.
 func (g *Group) RouteWithoutMiddleware(path string) *Route {
-	return newRoute(g.ship, g.router, g.prefix, path)
+	return newRoute(g.ship, g, g.router, g.prefix, path)
 }
 
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (g *Group) Route(path string) *Route {
-	return newRoute(g.ship, g.router, g.prefix, path, g.mdwares...)
+	return newRoute(g.ship, g, g.router, g.prefix, path, g.mdwares...)
 }
 
 // R is short for Group#Route(path).
