@@ -44,6 +44,7 @@ var contenttypes = map[string][]string{}
 //
 // When calling `Context#SetContentType(contentType)` to set the response header
 // Content-Type, it will use contentTypeSlice to avoid to allocate the memory.
+// See the function `ToContentTypes(contentType)`.
 func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
 		panic(fmt.Errorf("the Content-Type is empty"))
@@ -54,7 +55,11 @@ func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	contenttypes[contentType] = contentTypeSlice
 }
 
-// toContentTypes converts the Content-Type to the Content-Type slice.
+// ToContentTypes converts the Content-Type to the Content-Type slice.
+func ToContentTypes(contentType string) []string {
+	return ToContentTypes(contentType)
+}
+
 func toContentTypes(contentType string) []string {
 	switch contentType {
 	case MIMEApplicationJSON:
