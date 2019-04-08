@@ -718,10 +718,14 @@ func (c *Context) RequestURI() string {
 // Return "" if there is no charset.
 func (c *Context) Charset() string {
 	ct := c.req.Header.Get(HeaderContentType)
-	if index := strings.IndexByte(ct, ';'); index > 0 {
+	index := strings.IndexByte(ct, ';')
+	for ; index > 0; index = strings.IndexByte(ct, ';') {
 		ct = ct[index:]
 		if index = strings.IndexByte(ct, '='); index > 0 {
-			return ct[index+1:]
+			if strings.HasSuffix(ct[:index], "charset") {
+				return ct[index+1:]
+			}
+			ct = ct[index+1:]
 		}
 	}
 	return ""
