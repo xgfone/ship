@@ -54,8 +54,8 @@ func TestLogger(t *testing.T) {
 	if ss[0] != "[I] handler" {
 		t.Fail()
 	}
-	if strings.Join(strings.Split(ss[1], ",")[:4], ",") !=
-		"[I] code=200, method=GET, url=/test, starttime=1543846200" {
+	if strings.Join(strings.Split(ss[1], ", ")[1:5], ", ") !=
+		"code=200, method=GET, url=/test, starttime=1543846200" {
 		t.Error(ss[1])
 	}
 }
