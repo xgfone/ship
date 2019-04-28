@@ -57,7 +57,7 @@ func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 
 // ToContentTypes converts the Content-Type to the Content-Type slice.
 func ToContentTypes(contentType string) []string {
-	return ToContentTypes(contentType)
+	return toContentTypes(contentType)
 }
 
 func toContentTypes(contentType string) []string {

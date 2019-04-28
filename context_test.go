@@ -54,6 +54,13 @@ func TestContext_ContentType_Charset(t *testing.T) {
 	assert.Equal(t, "utf-8", ctx.Charset())
 }
 
+func TestToContentTypes(t *testing.T) {
+	ct := ToContentTypes(MIMEApplicationJSON)
+	if len(ct) != 1 && ct[0] != MIMEApplicationJSONs[0] {
+		t.Error(ct)
+	}
+}
+
 func ExampleContext_SetHandler() {
 	responder := func(ctx *Context, args ...interface{}) error {
 		return ctx.String(http.StatusOK, fmt.Sprintf("%s, %s", args...))
