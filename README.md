@@ -249,6 +249,7 @@ func main() {
 
 The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middleware as follows:
 
+- [CORS](https://godoc.org/github.com/xgfone/ship/middleware#CORS)
 - [CSRF](https://godoc.org/github.com/xgfone/ship/middleware#CSRF)
 - [Flat](https://godoc.org/github.com/xgfone/ship/middleware#Flat)
 - [Gzip](https://godoc.org/github.com/xgfone/ship/middleware#Gzip)
@@ -257,6 +258,7 @@ The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middlew
 - [Matchers](https://godoc.org/github.com/xgfone/ship/middleware#Matchers)
 - [CleanPath](https://godoc.org/github.com/xgfone/ship/middleware#CleanPath)
 - [BodyLimit](https://godoc.org/github.com/xgfone/ship/middleware#BodyLimit)
+- [RequestID](https://godoc.org/github.com/xgfone/ship/middleware#RequestID)
 - [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)
 - [MaxRequests](https://godoc.org/github.com/xgfone/ship/middleware#MaxRequests)
 - [ResetResponse](https://godoc.org/github.com/xgfone/ship/middleware#ResetResponse)
@@ -556,6 +558,6 @@ func main() {
 - [x] Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries). _We use `Matcher` to operate it._
 - [x] Add the serialization and deserialization middleware. _We use `Binder` and `Renderer`._
 - [x] Add HTML template render.
-- [ ] Add CORS middlware.
+- [x] Add CORS middlware.
 - [ ] Add JWT middleware.
 - [ ] Add OAuth 2.0 middleware.
