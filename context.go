@@ -567,6 +567,11 @@ func (c *Context) SetHeader(name, value string) {
 	c.resp.Header().Set(name, value)
 }
 
+// AddHeader appends the value for the response header name.
+func (c *Context) AddHeader(name, value string) {
+	c.resp.Header().Add(name, value)
+}
+
 // IsDebug reports whether to enable the debug mode.
 func (c *Context) IsDebug() bool {
 	return c.ship.debug
