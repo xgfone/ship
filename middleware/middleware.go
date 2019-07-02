@@ -51,6 +51,15 @@ type TokenFunc func(ctx *ship.Context) (token string, err error)
 // TokenValidator stands for a validator to validate whether a token is valid.
 type TokenValidator func(token string) (ok bool, err error)
 
+// FromFunc converts a function to a middleware.
+func FromFunc(f func(ctx *ship.Context, next ship.Handler) error) Middleware {
+	return func(n ship.Handler) ship.Handler {
+		return func(c *ship.Context) error {
+			return f(c, n)
+		}
+	}
+}
+
 // GenerateToken returns a token generator which will generate
 // a n-length token string.
 func GenerateToken(n int, charsets ...string) func() string {
