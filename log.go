@@ -50,7 +50,7 @@ func (l *loggerT) Writer() io.Writer {
 }
 
 func (l *loggerT) output(level, format string, args ...interface{}) error {
-	return l.logger.Output(4, fmt.Sprintf(level+format, args...))
+	return l.logger.Output(3, fmt.Sprintf(level+format, args...))
 }
 
 func (l *loggerT) Trace(format string, args ...interface{}) error {
