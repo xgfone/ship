@@ -420,7 +420,6 @@ func main() {
 }
 ```
 
-
 ### Bind JSON, XML or Form data form payload
 
 `ship` supply a default data binding to bind the JSON, XML or Form data from payload.
@@ -502,6 +501,102 @@ func main() {
 
 	// Start the HTTP server.
 	router.Start(":8080")
+}
+```
+
+### Prometheus Metric
+```go
+package main
+
+import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/xgfone/ship"
+)
+
+func main() {
+	app := ship.New()
+	app.R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
+	app.Start(":8080")
+	app.Wait()
+
+	// You can write it like this:
+	//
+	// ship.New().R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler())).Ship().Start(":8080").Wait()
+}
+```
+
+You can disable or remove the default collectors like this.
+```go
+package main
+
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/xgfone/ship"
+)
+
+// DisableBuiltinCollector removes the collectors that the default prometheus
+// register registers
+func DisableBuiltinCollector() {
+	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	prometheus.Unregister(prometheus.NewGoCollector())
+}
+
+func main() {
+	DisableBuiltinCollector()
+	ship.New().R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler())).Ship().Start(":8080").Wait()
+}
+```
+
+The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metric: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, you can rewrite it like this.
+```go
+package main
+
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
+	"github.com/xgfone/ship"
+)
+
+// DisableBuiltinCollector removes the collectors that the default prometheus
+// register registers
+func DisableBuiltinCollector() {
+	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	prometheus.Unregister(prometheus.NewGoCollector())
+}
+
+// Prometheus returns a prometheus handler.
+//
+// if missing gatherer, it is prometheus.DefaultGatherer.
+func Prometheus(gatherer ...prometheus.Gatherer) ship.Handler {
+	gather := prometheus.DefaultGatherer
+	if len(gatherer) > 0 && gatherer[0] != nil {
+		gather = gatherer[0]
+	}
+
+	return func(ctx *ship.Context) error {
+		mfs, err := gather.Gather()
+		if err != nil {
+			return err
+		}
+
+		ct := expfmt.Negotiate(ctx.Request().Header)
+		ctx.SetContentType(string(ct))
+		enc := expfmt.NewEncoder(ctx, ct)
+
+		for _, mf := range mfs {
+			if err = enc.Encode(mf); err != nil {
+				ctx.Logger().Error("failed to encode prometheus metric: %s", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+func main() {
+	DisableBuiltinCollector()
+	ship.New().R("/metrics").GET(Prometheus()).Ship().Start(":8080").Wait()
 }
 ```
 
