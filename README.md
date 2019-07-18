@@ -536,7 +536,7 @@ import (
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
-// register registers
+// register registered.
 func DisableBuiltinCollector() {
 	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	prometheus.Unregister(prometheus.NewGoCollector())
@@ -548,7 +548,7 @@ func main() {
 }
 ```
 
-The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metric: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, you can rewrite it like this.
+The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metrics: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, you can rewrite it like this.
 ```go
 package main
 
@@ -559,7 +559,7 @@ import (
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
-// register registers
+// register registered.
 func DisableBuiltinCollector() {
 	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	prometheus.Unregister(prometheus.NewGoCollector())
@@ -567,7 +567,7 @@ func DisableBuiltinCollector() {
 
 // Prometheus returns a prometheus handler.
 //
-// if missing gatherer, it is prometheus.DefaultGatherer.
+// if missing gatherer, it is prometheus.DefaultGatherer by default.
 func Prometheus(gatherer ...prometheus.Gatherer) ship.Handler {
 	gather := prometheus.DefaultGatherer
 	if len(gatherer) > 0 && gatherer[0] != nil {
