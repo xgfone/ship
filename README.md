@@ -197,7 +197,49 @@ router.Configure(opt)
 - The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
 - The type of the method must be `func(*ship.Context) error` or it will be ignored.
 
-#### Using `Middleware`
+#### Using `SubRouter`
+
+```go
+func main() {
+    router := ship.New()
+
+    router.Use(middleware.Logger())
+    router.Use(middleware.Recover())
+
+    // v1 SubRouter, which will inherit the middlewares of the parent router.
+    v1 := router.Group("/v1")
+    v1.Route("/get/path").GET(getHandler)
+
+    // v2 SubRouter, which won't inherit the middlewares of the parent router.
+    v2 := router.GroupWithoutMiddleware("/v2")
+    v2.Use(MyAuthMiddleware())
+    v2.Route("/post/path").POST(postHandler)
+
+    router.Start(":8080")
+}
+```
+
+#### Traverse the registered route
+
+```go
+func main() {
+    router := ship.New()
+
+    router.Route("/get/path").Name("get_name").GET(getHandler)
+    router.Route("/post/path").Name("post_name").POST(posttHandler)
+
+    router.Traverse(func(name, method, path string) {
+        fmt.Println(name, method, path)
+        // Output:
+        // get_name GET /get/path
+        // post_name POST /post/path
+    })
+
+    router.Start(":8080")
+}
+```
+
+### Using `Middleware`
 
 ```go
 package main
@@ -265,49 +307,7 @@ The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middlew
 - [SetCtxHandler](https://godoc.org/github.com/xgfone/ship/middleware#SetCtxHandler)
 - [RemoveTrailingSlash](https://godoc.org/github.com/xgfone/ship/middleware#RemoveTrailingSlash)
 
-#### Using `SubRouter`
-
-```go
-func main() {
-    router := ship.New()
-
-    router.Use(middleware.Logger())
-    router.Use(middleware.Recover())
-
-    // v1 SubRouter, which will inherit the middlewares of the parent router.
-    v1 := router.Group("/v1")
-    v1.Route("/get/path").GET(getHandler)
-
-    // v2 SubRouter, which won't inherit the middlewares of the parent router.
-    v2 := router.GroupWithoutMiddleware("/v2")
-    v2.Use(MyAuthMiddleware())
-    v2.Route("/post/path").POST(postHandler)
-
-    router.Start(":8080")
-}
-```
-
-#### Traverse the registered route
-
-```go
-func main() {
-    router := ship.New()
-
-    router.Route("/get/path").Name("get_name").GET(getHandler)
-    router.Route("/post/path").Name("post_name").POST(posttHandler)
-
-    router.Traverse(func(name, method, path string) {
-        fmt.Println(name, method, path)
-        // Output:
-        // get_name GET /get/path
-        // post_name POST /post/path
-    })
-
-    router.Start(":8080")
-}
-```
-
-#### Add the Virtual Host
+### Add the Virtual Host
 
 ```go
 func main() {
@@ -335,7 +335,7 @@ $ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
 vhost2
 ```
 
-#### Many HTTP Server
+### Many HTTP Server
 
 ```go
 package main
@@ -375,7 +375,7 @@ When you keys `Ctrl+C`, the two servers will exit and output like this.
 2. For `Clone()`, `app2` will also exit when `app1` exits.
 3. For `Link()`, both `app1` and `app2` will exit when either exits.
 
-#### Handle the complex response
+### Handle the complex response
 
 ```go
 package main
@@ -421,7 +421,7 @@ func main() {
 ```
 
 
-## Bind JSON, XML or Form data form payload
+### Bind JSON, XML or Form data form payload
 
 `ship` supply a default data binding to bind the JSON, XML or Form data from payload.
 
@@ -446,7 +446,7 @@ func main() {
 }
 ```
 
-## Render JSON, XML, HTML or other format data
+### Render JSON, XML, HTML or other format data
 
 ```go
 package main
