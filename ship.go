@@ -543,7 +543,7 @@ func (s *Ship) SetConnStateHandler(h func(net.Conn, http.ConnState)) *Ship {
 	return s
 }
 
-// Start starts a HTTP server with addr.
+// Start starts a HTTP server with addr and ends when the server is closed.
 //
 // If tlsFile is not nil, it must be certFile and keyFile. That's,
 //
@@ -560,9 +560,10 @@ func (s *Ship) Start(addr string, tlsFiles ...string) *Ship {
 	return s
 }
 
-// StartServer starts a HTTP server.
-func (s *Ship) StartServer(server *http.Server) {
+// StartServer starts a HTTP server and ends when the server is closed.
+func (s *Ship) StartServer(server *http.Server) *Ship {
 	s.startServer(server, "", "")
+	return s
 }
 
 func (s *Ship) handleSignals(sigs ...os.Signal) {
