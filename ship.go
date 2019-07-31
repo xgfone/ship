@@ -440,6 +440,13 @@ func (s *Ship) R(path string) *Route {
 	return s.Route(path)
 }
 
+// MaxNumOfURLParams reports the maximum number of the parameters of all the URLs.
+//
+// Notice: it should be only called after adding all the urls.
+func (s *Ship) MaxNumOfURLParams() int {
+	return s.maxNum
+}
+
 // Router returns the inner Router.
 func (s *Ship) Router() Router {
 	return s.router
