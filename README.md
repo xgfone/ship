@@ -83,6 +83,8 @@ Notice: you can register the same handler with more than one method by `Route(pa
 
 `R` is the alias of `Route`, you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
+There is a default global ship, `DefaultShip`, and some its methods as the global functions, such as `Pre`, `Use`, `G`, `R`, `GroupWithoutMiddleware`, `RouteWithoutMiddleware`, `URL`, `Start`, `StartServer`, `Wait`, `Shutdown`. **Suggest:** You should use the default `DefaultShip` preferentially.
+
 #### Cascade the registered routes
 
 ```go
