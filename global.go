@@ -117,17 +117,3 @@ func URL(name string, params ...interface{}) string {
 func Traverse(f func(name string, method string, path string)) {
 	DefaultShip.Traverse(f)
 }
-
-// func (s *Ship) Binder() Binder
-// func (s *Ship) Logger() Logger
-// func (s *Ship) MuxBinder() *MuxBinder
-// func (s *Ship) MuxRenderer() *MuxRenderer
-// func (s *Ship) Renderer() Renderer
-// func (s *Ship) Router() Router
-
-// func (s *Ship) NewContext(r *http.Request, w http.ResponseWriter) *Context
-// func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request)
-// func (s *Ship) AcquireBuffer() *bytes.Buffer
-// func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) *Context
-// func (s *Ship) ReleaseBuffer(buf *bytes.Buffer)
-// func (s *Ship) ReleaseContext(c *Context)
