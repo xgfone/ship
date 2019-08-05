@@ -435,6 +435,13 @@ func (c *Context) SetResponded(yes bool) {
 	c.wrote = yes
 }
 
+// SetRequest resets the request to req, which will ignore nil.
+func (c *Context) SetRequest(req *http.Request) {
+	if req != nil {
+		c.req = req
+	}
+}
+
 // SetResponse resets the response to resp, which will ignore nil.
 func (c *Context) SetResponse(resp http.ResponseWriter) {
 	if resp != nil {
