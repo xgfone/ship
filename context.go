@@ -800,6 +800,11 @@ func (c *Context) SetContentType(contentType string) {
 	}
 }
 
+// Body returns the reader of the request body.
+func (c *Context) Body() io.ReadCloser {
+	return c.req.Body
+}
+
 // GetBody reads all the contents from the body and returns it as string.
 func (c *Context) GetBody() (string, error) {
 	buf := c.AcquireBuffer()
