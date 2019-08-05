@@ -683,6 +683,11 @@ func (c *Context) Host() string {
 	return c.req.Host
 }
 
+// Hostname returns the hostname of the request.
+func (c *Context) Hostname() string {
+	return c.req.URL.Hostname()
+}
+
 // Method returns the method of the request.
 func (c *Context) Method() string {
 	return c.req.Method
