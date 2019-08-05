@@ -693,6 +693,11 @@ func (c *Context) Method() string {
 	return c.req.Method
 }
 
+// Path returns the path of the request.
+func (c *Context) Path() string {
+	return c.req.URL.Path
+}
+
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
 func (c *Context) Scheme() (scheme string) {
 	// Can't use `r.Request.URL.Scheme`
