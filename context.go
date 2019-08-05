@@ -562,6 +562,16 @@ func (c *Context) Header(name string) string {
 	return c.GetHeader(name)
 }
 
+// ReqHeader returns the header of the request.
+func (c *Context) ReqHeader() http.Header {
+	return c.req.Header
+}
+
+// RespHeader returns the header of the response.
+func (c *Context) RespHeader() http.Header {
+	return c.resp.Header()
+}
+
 // GetHeader returns the first value of the request header named name.
 //
 // Return "" if the header does not exist.
