@@ -262,7 +262,7 @@ func main() {
 }
 ```
 
-#### Modify the registering route
+#### Modify the registered route
 ```go
 func modifier(name, path, method string) (string, string, string) {
 	return name, "/prefix"+path, method
