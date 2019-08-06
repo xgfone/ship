@@ -968,6 +968,35 @@ func TestContextAccept(t *testing.T) {
 	assert.Equal(t, expected, accepts)
 }
 
+func TestShip_SetRouteFilter(t *testing.T) {
+	app := New()
+
+	app.SetRouteFilter(func(name, path, method string) bool {
+		if name == "" {
+			return false
+		} else if !strings.HasPrefix(path, "/group/") {
+			return false
+		}
+		return true
+	})
+
+	handler := func(ctx *Context) error { return nil }
+	app.Group("/group").R("/name").Name("test").GET(handler)
+	app.R("/noname").GET(handler)
+
+	noRoute := true
+	app.Traverse(func(name, method, path string) {
+		noRoute = false
+		if name != "test" {
+			t.Error(name)
+		}
+	})
+
+	if noRoute {
+		t.Fail()
+	}
+}
+
 type safeBufferWriter struct {
 	buf  *bytes.Buffer
 	lock *sync.Mutex

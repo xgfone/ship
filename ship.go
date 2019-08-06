@@ -131,6 +131,7 @@ type Ship struct {
 
 	maxNum int
 	router Router
+	filter func(name, path, method string) bool // Filter the route
 
 	handler        Handler
 	premiddlewares []Middleware
@@ -183,6 +184,7 @@ func New(options ...Option) *Ship {
 	}
 	s.newRouter = s.defaultNewRouter
 	s.isDefaultRouter = true
+	s.filter = s.defaultFilter
 
 	/// Initialize the inner variables.
 	s.ctxpool.New = func() interface{} { return s.NewContext(nil, nil) }
@@ -193,6 +195,10 @@ func New(options ...Option) *Ship {
 	s.done = make(chan struct{}, 1)
 
 	return s.Configure(options...)
+}
+
+func (s *Ship) defaultFilter(name, path, method string) bool {
+	return true
 }
 
 func (s *Ship) defaultNewRouter() Router {
@@ -230,6 +236,7 @@ func (s *Ship) clone() *Ship {
 		methodNotAllowedHandler: s.methodNotAllowedHandler,
 
 		isDefaultRouter: s.isDefaultRouter,
+		filter:          s.filter,
 
 		newRouter:   s.newRouter,
 		newCtxData:  s.newCtxData,
@@ -438,6 +445,22 @@ func (s *Ship) Route(path string) *Route {
 // R is short for Ship#Route(path).
 func (s *Ship) R(path string) *Route {
 	return s.Route(path)
+}
+
+// SetRouteFilter sets the route filter, which will ignore the route and
+// not register it if the filter returns false.
+//
+// For matching the group, you maybe check whether the path has the prefix,
+// that's, the group name.
+func (s *Ship) SetRouteFilter(filter func(name, path, method string) bool) *Ship {
+	if filter == nil {
+		panic("the filter must not be nil")
+	}
+
+	s.lock.Lock()
+	s.filter = filter
+	s.lock.Unlock()
+	return s
 }
 
 // MaxNumOfURLParams reports the maximum number of the parameters of all the URLs.

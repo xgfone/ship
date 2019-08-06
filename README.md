@@ -241,6 +241,27 @@ func main() {
 }
 ```
 
+#### Filter the unacceptable route
+```go
+func main() {
+	app := ship.New()
+
+	// Don't register the router without name.
+	app.SetRouteFilter(func(name, path, method string) bool {
+		if name == "" {
+			return false
+		} else if !strings.HasPrefix(path, "/prefix/") {
+			return false
+		}
+		return true
+	})
+
+	app.Group("/prefix").R("/name").Name("test").GET(handler) // Register the route
+	app.Group("/prefix").R("/noname").GET(handler)            // Don't register the route
+	app.R("/no_group").GET(handler)                           // Don't register the route
+}
+```
+
 ### Using `Middleware`
 
 ```go

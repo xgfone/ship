@@ -278,9 +278,16 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 		handler = middlewares[i](handler)
 	}
 
+	r.ship.lock.RLock()
+	filter := r.ship.filter
+	r.ship.lock.RUnlock()
+
 	for i := range methods {
-		n := r.router.Add(name, path, strings.ToUpper(methods[i]), handler)
-		r.ship.setURLParamNum(n)
+		method := strings.ToUpper(methods[i])
+		if filter(name, path, method) {
+			n := r.router.Add(name, path, method, handler)
+			r.ship.setURLParamNum(n)
+		}
 	}
 
 	return r
