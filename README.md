@@ -269,7 +269,7 @@ func modifier(name, path, method string) (string, string, string) {
 }
 
 func main() {
-	app := ship.New(SetRouteFilter(modifier))
+	app := ship.New(SetRouteModifier(modifier))
 
 	// Register the path as "/prefix/path".
 	app.R("/path").Name("test").GET(handler)
