@@ -968,17 +968,15 @@ func TestContextAccept(t *testing.T) {
 	assert.Equal(t, expected, accepts)
 }
 
-func TestShip_SetRouteFilter(t *testing.T) {
-	app := New()
-
-	app.SetRouteFilter(func(name, path, method string) bool {
+func TestSetRouteFilter(t *testing.T) {
+	app := New(SetRouteFilter(func(name, path, method string) bool {
 		if name == "" {
 			return false
 		} else if !strings.HasPrefix(path, "/group/") {
 			return false
 		}
 		return true
-	})
+	}))
 
 	handler := func(ctx *Context) error { return nil }
 	app.Group("/group").R("/name").Name("test").GET(handler)
@@ -997,15 +995,13 @@ func TestShip_SetRouteFilter(t *testing.T) {
 	}
 }
 
-func TestShip_SetRouteModifier(t *testing.T) {
-	app := New()
-
-	app.SetRouteModifier(func(name, path, method string) (string, string, string) {
+func TestSetRouteModifier(t *testing.T) {
+	app := New(SetRouteModifier(func(name, path, method string) (string, string, string) {
 		if !strings.HasPrefix(path, "/prefix/") {
 			path = "/prefix" + path
 		}
 		return name, path, method
-	})
+	}))
 
 	handler := func(ctx *Context) error { return nil }
 	app.R("/path").GET(handler)

@@ -334,3 +334,30 @@ func SetBindQuery(bind func(interface{}, url.Values) error) Option {
 		}
 	}
 }
+
+// SetRouteFilter sets the route filter, which will ignore the route and
+// not register it if the filter returns false.
+//
+// For matching the group, you maybe check whether the path has the prefix,
+// that's, the group name.
+func SetRouteFilter(filter func(name, path, method string) bool) Option {
+	return func(s *Ship) {
+		if filter != nil {
+			s.filter = filter
+		}
+	}
+}
+
+// SetRouteModifier sets the route modifier, which will modify the route
+// before registering it.
+//
+// The modifier maybe return the new name, path and method.
+//
+// Notice: the modifier will be run before filter.
+func SetRouteModifier(modifier func(name, path, method string) (string, string, string)) Option {
+	return func(s *Ship) {
+		if modifier != nil {
+			s.modifier = modifier
+		}
+	}
+}

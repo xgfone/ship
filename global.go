@@ -58,16 +58,6 @@ func SetConnStateHandler(h func(net.Conn, http.ConnState)) *Ship {
 	return DefaultShip.SetConnStateHandler(h)
 }
 
-// SetRouteFilter is equal to DefaultShip.SetRouteFilter(filter).
-func SetRouteFilter(filter func(name, path, method string) bool) *Ship {
-	return DefaultShip.SetRouteFilter(filter)
-}
-
-// SetRouteModifier is equal to DefaultShip.SetRouteModifier(filter).
-func SetRouteModifier(modifier func(name, path, method string) (string, string, string)) *Ship {
-	return DefaultShip.SetRouteModifier(modifier)
-}
-
 // Pre is equal to DefaultShip.Pre(middlewares...).
 func Pre(middlewares ...Middleware) *Ship {
 	return DefaultShip.Pre(middlewares...)

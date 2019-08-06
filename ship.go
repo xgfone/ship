@@ -454,39 +454,6 @@ func (s *Ship) R(path string) *Route {
 	return s.Route(path)
 }
 
-// SetRouteFilter sets the route filter, which will ignore the route and
-// not register it if the filter returns false.
-//
-// For matching the group, you maybe check whether the path has the prefix,
-// that's, the group name.
-func (s *Ship) SetRouteFilter(filter func(name, path, method string) bool) *Ship {
-	if filter == nil {
-		panic("the filter must not be nil")
-	}
-
-	s.lock.Lock()
-	s.filter = filter
-	s.lock.Unlock()
-	return s
-}
-
-// SetRouteModifier sets the route modifier, which will modify the route
-// before registering it.
-//
-// The modifier maybe return the new name, path and method.
-//
-// Notice: the modifier will be run before filter.
-func (s *Ship) SetRouteModifier(modifier func(name, path, method string) (string, string, string)) *Ship {
-	if modifier == nil {
-		panic("the modifier must not be nil")
-	}
-
-	s.lock.Lock()
-	s.modifier = modifier
-	s.lock.Unlock()
-	return s
-}
-
 // MaxNumOfURLParams reports the maximum number of the parameters of all the URLs.
 //
 // Notice: it should be only called after adding all the urls.
