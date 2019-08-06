@@ -997,6 +997,32 @@ func TestShip_SetRouteFilter(t *testing.T) {
 	}
 }
 
+func TestShip_SetRouteModifier(t *testing.T) {
+	app := New()
+
+	app.SetRouteModifier(func(name, path, method string) (string, string, string) {
+		if !strings.HasPrefix(path, "/prefix/") {
+			path = "/prefix" + path
+		}
+		return name, path, method
+	})
+
+	handler := func(ctx *Context) error { return nil }
+	app.R("/path").GET(handler)
+
+	noRoute := true
+	app.Traverse(func(name, method, path string) {
+		noRoute = false
+		if path != "/prefix/path" {
+			t.Error(path)
+		}
+	})
+
+	if noRoute {
+		t.Fail()
+	}
+}
+
 type safeBufferWriter struct {
 	buf  *bytes.Buffer
 	lock *sync.Mutex

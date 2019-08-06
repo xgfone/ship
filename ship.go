@@ -129,9 +129,10 @@ type Ship struct {
 	ctxpool sync.Pool
 	bufpool pools.BufferPool
 
-	maxNum int
-	router Router
-	filter func(name, path, method string) bool // Filter the route
+	maxNum   int
+	router   Router
+	filter   func(name, path, method string) bool                     // Filter the route
+	modifier func(name, path, method string) (string, string, string) // Modify the route
 
 	handler        Handler
 	premiddlewares []Middleware
@@ -184,6 +185,7 @@ func New(options ...Option) *Ship {
 	}
 	s.newRouter = s.defaultNewRouter
 	s.isDefaultRouter = true
+	s.modifier = s.defaultModifier
 	s.filter = s.defaultFilter
 
 	/// Initialize the inner variables.
@@ -199,6 +201,10 @@ func New(options ...Option) *Ship {
 
 func (s *Ship) defaultFilter(name, path, method string) bool {
 	return true
+}
+
+func (s *Ship) defaultModifier(name, path, method string) (string, string, string) {
+	return name, path, method
 }
 
 func (s *Ship) defaultNewRouter() Router {
@@ -236,6 +242,7 @@ func (s *Ship) clone() *Ship {
 		methodNotAllowedHandler: s.methodNotAllowedHandler,
 
 		isDefaultRouter: s.isDefaultRouter,
+		modifier:        s.modifier,
 		filter:          s.filter,
 
 		newRouter:   s.newRouter,
@@ -459,6 +466,23 @@ func (s *Ship) SetRouteFilter(filter func(name, path, method string) bool) *Ship
 
 	s.lock.Lock()
 	s.filter = filter
+	s.lock.Unlock()
+	return s
+}
+
+// SetRouteModifier sets the route modifier, which will modify the route
+// before registering it.
+//
+// The modifier maybe return the new name, path and method.
+//
+// Notice: the modifier will be run before filter.
+func (s *Ship) SetRouteModifier(modifier func(name, path, method string) (string, string, string)) *Ship {
+	if modifier == nil {
+		panic("the modifier must not be nil")
+	}
+
+	s.lock.Lock()
+	s.modifier = modifier
 	s.lock.Unlock()
 	return s
 }

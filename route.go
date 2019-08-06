@@ -280,10 +280,12 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 
 	r.ship.lock.RLock()
 	filter := r.ship.filter
+	modifier := r.ship.modifier
 	r.ship.lock.RUnlock()
 
 	for i := range methods {
 		method := strings.ToUpper(methods[i])
+		name, path, method = modifier(name, path, method)
 		if filter(name, path, method) {
 			n := r.router.Add(name, path, method, handler)
 			r.ship.setURLParamNum(n)

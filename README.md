@@ -262,6 +262,19 @@ func main() {
 }
 ```
 
+#### Modify the registering route
+```go
+func main() {
+	app := ship.New()
+
+	app.SetRouteFilter(func(name, path, method string) (string, string, string) {
+		return name, "/prefix"+path, method
+	})
+
+	app.R("/path").Name("test").GET(handler) // Register the path as "/prefix/path".
+}
+```
+
 ### Using `Middleware`
 
 ```go
