@@ -243,18 +243,18 @@ func main() {
 
 #### Filter the unacceptable route
 ```go
-func main() {
-	app := ship.New()
+func filter(name, path, method string) bool {
+	if name == "" {
+		return false
+	} else if !strings.HasPrefix(path, "/prefix/") {
+		return false
+	}
+	return true
+}
 
+func main() {
 	// Don't register the router without name.
-	app.SetRouteFilter(func(name, path, method string) bool {
-		if name == "" {
-			return false
-		} else if !strings.HasPrefix(path, "/prefix/") {
-			return false
-		}
-		return true
-	})
+	app := ship.New(SetRouteFilter(filter))
 
 	app.Group("/prefix").R("/name").Name("test").GET(handler) // Register the route
 	app.Group("/prefix").R("/noname").GET(handler)            // Don't register the route
@@ -264,14 +264,15 @@ func main() {
 
 #### Modify the registering route
 ```go
+func modifier(name, path, method string) (string, string, string) {
+	return name, "/prefix"+path, method
+}
+
 func main() {
-	app := ship.New()
+	app := ship.New(SetRouteFilter(modifier))
 
-	app.SetRouteFilter(func(name, path, method string) (string, string, string) {
-		return name, "/prefix"+path, method
-	})
-
-	app.R("/path").Name("test").GET(handler) // Register the path as "/prefix/path".
+	// Register the path as "/prefix/path".
+	app.R("/path").Name("test").GET(handler)
 }
 ```
 
