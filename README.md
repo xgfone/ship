@@ -289,11 +289,12 @@ import (
 )
 
 func main() {
-    router := ship.New()
-    router.Use(middleware.Logger(), middleware.Recover())
-    router.Use(MyAuthMiddleware())
-    router.Route("/url/path").GET(handler)
-    router.Start(":8080")
+    // We disable the default error log because we have used the Logger middleware.
+    app := ship.New(ship.DisableErrorLog(true))
+    app.Use(middleware.Logger(), middleware.Recover())
+    app.Use(MyAuthMiddleware())
+    app.Route("/url/path").GET(handler)
+    app.Start(":8080").Wait()
 }
 ```
 
