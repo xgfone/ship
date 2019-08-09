@@ -1052,8 +1052,17 @@ func (c *Context) String(code int, format string, args ...interface{}) (err erro
 }
 
 // Error sends an error response with status code.
+//
+// If the error is the type of HTTPError, it will extract the fields of code
+// and ct from it as the status code and the content-type.
 func (c *Context) Error(code int, err error) error {
-	return c.String(code, "%s", err.Error())
+	if he, ok := err.(HTTPError); ok {
+		if he.CT == "" {
+			return c.BlobString(he.Code, he.CT, err.Error())
+		}
+		return c.String(he.Code, err.Error())
+	}
+	return c.String(code, err.Error())
 }
 
 // JSON sends a JSON response with status code.
