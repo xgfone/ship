@@ -751,6 +751,11 @@ func (c *Context) Referer() string {
 	return c.req.Referer()
 }
 
+// UserAgent returns the User-Agent header of the request.
+func (c *Context) UserAgent() string {
+	return c.req.UserAgent()
+}
+
 // RemoteAddr returns the remote address of the http connection.
 func (c *Context) RemoteAddr() string {
 	return c.req.RemoteAddr
