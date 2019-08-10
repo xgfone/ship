@@ -746,6 +746,11 @@ func (c *Context) RealIP() string {
 	return ra
 }
 
+// Referer returns the Referer header of the request.
+func (c *Context) Referer() string {
+	return c.req.Referer()
+}
+
 // RemoteAddr returns the remote address of the http connection.
 func (c *Context) RemoteAddr() string {
 	return c.req.RemoteAddr
