@@ -161,7 +161,11 @@ func (r responder) Write(p []byte) (int, error) {
 }
 
 func (r responder) WriteString(s string) (int, error) {
-	return io.WriteString(r.resp, s)
+	n, err := io.WriteString(r.resp, s)
+	if !r.ctx.wrote {
+		r.ctx.wrote = true
+	}
+	return n, err
 }
 
 // WriteHeader implements http.ResponseWriter#WriteHeader().
