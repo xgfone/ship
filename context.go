@@ -889,7 +889,10 @@ func (c *Context) FormParams() (url.Values, error) {
 
 // FormFile returns the multipart form file for the provided name.
 func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
-	_, fh, err := c.req.FormFile(name)
+	file, fh, err := c.req.FormFile(name)
+	if file != nil {
+		file.Close()
+	}
 	return fh, err
 }
 
