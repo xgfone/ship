@@ -199,7 +199,7 @@ type Context struct {
 	// it will be reset by the context and put into the pool with this context.
 	ReqCtxData Resetter
 
-	// Data is used to store many the key-value pairs about the context.
+	// Data is used to store many key-value pairs about the context.
 	//
 	// Data maybe asks the system to allocate many memories.
 	// If the interim context value is too few and you don't want the system
@@ -750,12 +750,11 @@ func (c *Context) RequestURI() string {
 // Return "" if there is no charset.
 func (c *Context) Charset() string {
 	ct := c.req.Header.Get(HeaderContentType)
-	index := strings.IndexByte(ct, ';')
-	for ; index > 0; index = strings.IndexByte(ct, ';') {
-		ct = ct[index:]
+	for index := strings.IndexByte(ct, ';'); index > 0; index = strings.IndexByte(ct, ';') {
+		ct = ct[index+1:]
 		if index = strings.IndexByte(ct, '='); index > 0 {
-			if strings.HasSuffix(ct[:index], "charset") {
-				return ct[index+1:]
+			if strings.TrimSpace(ct[:index]) == "charset" {
+				return strings.TrimSpace(ct[index+1:])
 			}
 			ct = ct[index+1:]
 		}
@@ -766,8 +765,8 @@ func (c *Context) Charset() string {
 // ContentType returns the Content-Type of the request without the charset.
 func (c *Context) ContentType() (ct string) {
 	ct = c.req.Header.Get(HeaderContentType)
-	if index := strings.IndexAny(ct, " ;"); index > 0 {
-		ct = ct[:index]
+	if index := strings.IndexAny(ct, ";"); index > 0 {
+		ct = strings.TrimSpace(ct[:index])
 	}
 	return
 }

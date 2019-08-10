@@ -38,7 +38,7 @@ func TestSetContext(t *testing.T) {
 func TestContext_ContentType_Charset(t *testing.T) {
 	app := New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(HeaderContentType, "application/json; version=1.0; charset=utf-8")
+	req.Header.Set(HeaderContentType, "application/json; version=1.0; charset = utf-8 ")
 	rec := httptest.NewRecorder()
 	ctx := app.NewContext(req, rec)
 
@@ -46,7 +46,7 @@ func TestContext_ContentType_Charset(t *testing.T) {
 	assert.Equal(t, "utf-8", ctx.Charset())
 
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(HeaderContentType, "application/json; charset=utf-8")
+	req.Header.Set(HeaderContentType, "application/json; charset = utf-8 ")
 	rec = httptest.NewRecorder()
 	ctx = app.NewContext(req, rec)
 
