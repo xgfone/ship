@@ -756,6 +756,11 @@ func (c *Context) RequestURI() string {
 	return c.req.RequestURI
 }
 
+// Context returns the Context from the request.
+func (c *Context) Context() context.Context {
+	return c.req.Context()
+}
+
 // BasicAuth returns the username and password from the request.
 func (c *Context) BasicAuth() (username, password string, ok bool) {
 	return c.req.BasicAuth()
