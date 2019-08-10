@@ -907,6 +907,11 @@ func (c *Context) MultipartForm() (*multipart.Form, error) {
 	return c.req.MultipartForm, err
 }
 
+// MultipartReader returns the multipart reader from the request.
+func (c *Context) MultipartReader() (*multipart.Reader, error) {
+	return c.req.MultipartReader()
+}
+
 // Cookie returns the named cookie provided in the request.
 func (c *Context) Cookie(name string) (*http.Cookie, error) {
 	return c.req.Cookie(name)
