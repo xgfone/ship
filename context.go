@@ -414,6 +414,8 @@ func (c *Context) Request() *http.Request {
 }
 
 // Response returns the inner http.ResponseWriter.
+//
+// Notice: you should not cache the returned response.
 func (c *Context) Response() http.ResponseWriter {
 	return newResponder(c, c.resp.resp)
 }
@@ -444,7 +446,11 @@ func (c *Context) SetRequest(req *http.Request) {
 
 // SetResponse resets the response to resp, which will ignore nil.
 func (c *Context) SetResponse(resp http.ResponseWriter) {
-	if resp != nil {
+	switch r := resp.(type) {
+	case nil:
+	case responder:
+		c.resp.reset(r.resp)
+	default:
 		c.resp.reset(resp)
 	}
 }
@@ -1154,6 +1160,9 @@ func (c *Context) HTMLBlob(code int, b []byte) error {
 // File sends a response with the content of the file.
 //
 // If the file does not exist, it returns ErrNotFound.
+//
+// If not set the Content-Type, it will deduce it from the extension
+// of the file name.
 func (c *Context) File(file string) (err error) {
 	f, err := os.Open(file)
 	if err != nil {
