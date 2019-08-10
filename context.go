@@ -153,10 +153,11 @@ func (r responder) Header() http.Header {
 }
 
 func (r responder) Write(p []byte) (int, error) {
+	n, err := r.resp.Write(p)
 	if !r.ctx.wrote {
 		r.ctx.wrote = true
 	}
-	return r.resp.Write(p)
+	return n, err
 }
 
 func (r responder) WriteString(s string) (int, error) {
