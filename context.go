@@ -896,6 +896,11 @@ func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
 	return fh, err
 }
 
+// FormFile2 returns the multipart form file for the provided name.
+func (c *Context) FormFile2(name string) (multipart.File, *multipart.FileHeader, error) {
+	return c.req.FormFile(name)
+}
+
 // MultipartForm returns the multipart form.
 func (c *Context) MultipartForm() (*multipart.Form, error) {
 	err := c.req.ParseMultipartForm(MaxMemoryLimit)
