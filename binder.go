@@ -61,10 +61,6 @@ func (mb *MuxBinder) Del(contentType string) {
 // Bind implements the interface Binder, which will call the registered binder
 // to bind the request to v by the request header Content-Type.
 func (mb *MuxBinder) Bind(ctx *Context, v interface{}) error {
-	if ctx.ContentLength() == 0 {
-		return nil
-	}
-
 	ct := ctx.ContentType()
 	if ct == "" {
 		return ErrMissingContentType
@@ -89,14 +85,20 @@ func BinderFunc(f func(*Context, interface{}) error) Binder {
 // JSONBinder returns a JSON binder to bind the JSON request.
 func JSONBinder() Binder {
 	return BinderFunc(func(ctx *Context, v interface{}) error {
-		return json.NewDecoder(ctx.req.Body).Decode(v)
+		if ctx.ContentLength() == 0 {
+			return nil
+		}
+		return json.NewDecoder(ctx.Body()).Decode(v)
 	})
 }
 
 // XMLBinder returns a XML binder to bind the XML request.
 func XMLBinder() Binder {
 	return BinderFunc(func(ctx *Context, v interface{}) error {
-		return xml.NewDecoder(ctx.req.Body).Decode(v)
+		if ctx.ContentLength() == 0 {
+			return nil
+		}
+		return xml.NewDecoder(ctx.Body()).Decode(v)
 	})
 }
 
