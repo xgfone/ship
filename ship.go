@@ -544,6 +544,11 @@ func (s *Ship) Shutdown(ctx context.Context) error {
 	return server.Shutdown(ctx)
 }
 
+// Stop is equal to s.Shutdown(context.Background()).
+func (s *Ship) Stop() {
+	s.Shutdown(context.Background())
+}
+
 // RegisterOnShutdown registers some functions to run when the http server is
 // shut down.
 func (s *Ship) RegisterOnShutdown(functions ...func()) *Ship {
