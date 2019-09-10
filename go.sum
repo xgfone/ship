@@ -5,5 +5,5 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
-github.com/xgfone/go-tools v5.2.0+incompatible h1:lqzETFzz1nmKozuy3Mg7tgLA0G8/REanW7sSKjf3ikA=
-github.com/xgfone/go-tools v5.2.0+incompatible/go.mod h1:jwIVCdT4a89oiv9nABSuURIQqfQSYhRocVM13Ug0Z3w=
+github.com/xgfone/go-tools/v6 v6.0.0 h1:BjNXzZxxDSLjpuXsU5h6RRaPNPRJ7Rd8yhf7g6Etw4E=
+github.com/xgfone/go-tools/v6 v6.0.0/go.mod h1:EMuga8l5Q0i8LJIAL5QEqx9O1HvhX6QsJjvsnW5r8rk=

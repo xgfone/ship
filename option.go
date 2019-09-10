@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/xgfone/go-tools/pools"
+	"github.com/xgfone/go-tools/v6/pools"
 )
 
 // Option is used to configure Ship.

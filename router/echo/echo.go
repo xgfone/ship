@@ -32,7 +32,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/go-tools/types"
+	"github.com/xgfone/go-tools/v6/types"
 )
 
 // PROPFIND stands for a PROPFIND HTTP method.

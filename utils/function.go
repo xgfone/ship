@@ -17,7 +17,7 @@ package utils
 import (
 	"reflect"
 
-	"github.com/xgfone/go-tools/function"
+	"github.com/xgfone/go-tools/v6/function"
 )
 
 // SetDefaultForStruct sets the default value by the tag "default".

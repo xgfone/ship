@@ -11,12 +11,9 @@
 go get -u github.com/xgfone/ship
 ```
 
-For the core functions, **it has no any third-party dependencies**, except for `github.com/xgfone/go-tools`.
-
-
 ## Prerequisite
 
-Now `ship` requires Go `1.7+`.
+Now `ship` requires Go `1.11+`.
 
 
 ## Quick Start

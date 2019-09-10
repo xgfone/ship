@@ -22,7 +22,7 @@ import (
 	"io"
 	"path"
 
-	"github.com/xgfone/go-tools/pools"
+	"github.com/xgfone/go-tools/v6/pools"
 )
 
 // Renderer is the interface to render the response.

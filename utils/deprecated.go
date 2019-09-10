@@ -18,10 +18,10 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/xgfone/go-tools/function"
-	"github.com/xgfone/go-tools/io2"
-	"github.com/xgfone/go-tools/lifecycle"
-	"github.com/xgfone/go-tools/types"
+	"github.com/xgfone/go-tools/v6/function"
+	"github.com/xgfone/go-tools/v6/io2"
+	"github.com/xgfone/go-tools/v6/lifecycle"
+	"github.com/xgfone/go-tools/v6/types"
 )
 
 // Some function aliases.

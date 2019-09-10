@@ -27,8 +27,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/xgfone/go-tools/lifecycle"
-	"github.com/xgfone/go-tools/pools"
+	"github.com/xgfone/go-tools/v6/lifecycle"
+	"github.com/xgfone/go-tools/v6/pools"
 	"github.com/xgfone/ship/router/echo"
 )
 

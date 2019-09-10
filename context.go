@@ -34,8 +34,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xgfone/go-tools/function"
-	"github.com/xgfone/go-tools/io2"
+	"github.com/xgfone/go-tools/v6/function"
+	"github.com/xgfone/go-tools/v6/io2"
 )
 
 var contenttypes = map[string][]string{}
