@@ -562,20 +562,20 @@ Windows 10
 Go 1.13.4
 ```
 
-|           Function          |  ops   |    ns/op    | bytes/opt  |  allocs/op
-|-----------------------------|--------|-------------|------------|--------------
-|BenchmarkGinStatic-4         |  23368 | 49788 ns/op |  8278 B/op | 157 allocs/op
-|BenchmarkGinGitHubAPI-4      |  15684 | 75104 ns/op | 10849 B/op | 203 allocs/op
-|BenchmarkGinGplusAPI-4       | 276224 |  4184 ns/op |   686 B/op |  13 allocs/op
-|BenchmarkGinParseAPI-4       | 157810 |  7537 ns/op |  1357 B/op |  26 allocs/op
-|BenchmarkEchoStatic-4        |  29432 | 39989 ns/op |  2432 B/op | 157 allocs/op
-|BenchmarkEchoGitHubAPI-4     |  20527 | 56857 ns/op |  2468 B/op | 203 allocs/op
-|BenchmarkEchoGplusAPI-4      | 387421 |  3179 ns/op |   193 B/op |  13 allocs/op
-|BenchmarkEchoParseAPI-4      | 220273 |  5575 ns/op |   365 B/op |  26 allocs/op
-|BenchmarkShipEchoStatic-4    |  34054 | 35548 ns/op |  1016 B/op |   0 allocs/op
-|BenchmarkShipEchoGitHubAPI-4 |  21842 | 54962 ns/op |  1585 B/op |   0 allocs/op
-|BenchmarkShipEchoGplusAPI-4  | 402898 |  2996 ns/op |    85 B/op |   0 allocs/op
-|BenchmarkShipEchoParseAPI-4  | 223581 |  5478 ns/op |   154 B/op |   0 allocs/op
+|           Function          |  ops   | ns/op | bytes/opt | allocs/op
+|-----------------------------|--------|-------|-----------|-----------
+|BenchmarkGinStatic-4         |  23368 | 49788 |    8278   |   157
+|BenchmarkGinGitHubAPI-4      |  15684 | 75104 |   10849   |   203
+|BenchmarkGinGplusAPI-4       | 276224 |  4184 |     686   |    13
+|BenchmarkGinParseAPI-4       | 157810 |  7537 |    1357   |    26
+|BenchmarkEchoStatic-4        |  29432 | 39989 |    2432   |   157
+|BenchmarkEchoGitHubAPI-4     |  20527 | 56857 |    2468   |   203
+|BenchmarkEchoGplusAPI-4      | 387421 |  3179 |     193   |    13
+|BenchmarkEchoParseAPI-4      | 220273 |  5575 |     365   |    26
+|BenchmarkShipEchoStatic-4    |  34054 | 35548 |    1016   |     0
+|BenchmarkShipEchoGitHubAPI-4 |  21842 | 54962 |    1585   |     0
+|BenchmarkShipEchoGplusAPI-4  | 402898 |  2996 |      85   |     0
+|BenchmarkShipEchoParseAPI-4  | 223581 |  5478 |     154   |     0
 
 ### Test 2
 ```
@@ -586,17 +586,17 @@ macOS Mojave
 Go 1.13.4
 ```
 
-|           Function          |  ops   |    ns/op    | bytes/opt  |  allocs/op
-|-----------------------------|--------|-------------|------------|--------------
-|BenchmarkEchoStatic-4        |  22624 | 47401 ns/op |  2021 B/op | 157 allocs/op
-|BenchmarkEchoGitHubAPI-4     |  16822 | 69059 ns/op |  2654 B/op | 203 allocs/op
-|BenchmarkEchoGplusAPI-4      | 326142 |  3759 ns/op |   157 B/op |  13 allocs/op
-|BenchmarkEchoParseAPI-4      | 178182 |  6713 ns/op |   402 B/op |  26 allocs/op
-|BenchmarkGinStatic-4         |  18085 | 62380 ns/op |  8494 B/op | 157 allocs/op
-|BenchmarkGinGitHubAPI-4      |  12646 | 93052 ns/op | 11115 B/op | 203 allocs/op
-|BenchmarkGinGplusAPI-4       | 224404 |  5222 ns/op |   701 B/op |  13 allocs/op
-|BenchmarkGinParseAPI-4       | 124138 |  9442 ns/op |  1387 B/op |  26 allocs/op
-|BenchmarkShipEchoStatic-4    |  27048 | 43713 ns/op |   640 B/op |   0 allocs/op
-|BenchmarkShipEchoGitHubAPI-4 |  17545 | 66953 ns/op |   987 B/op |   0 allocs/op
-|BenchmarkShipEchoGplusAPI-4  | 318595 |  3698 ns/op |    54 B/op |   0 allocs/op
-|BenchmarkShipEchoParseAPI-4  | 175984 |  6807 ns/op |   196 B/op |   0 allocs/op
+|           Function          |  ops   | ns/op | bytes/opt | allocs/op
+|-----------------------------|--------|---- --|-----------|-----------
+|BenchmarkGinStatic-4         |  18085 | 62380 |    8494   |   157
+|BenchmarkGinGitHubAPI-4      |  12646 | 93052 |   11115   |   203
+|BenchmarkGinGplusAPI-4       | 224404 |  5222 |     701   |    13
+|BenchmarkGinParseAPI-4       | 124138 |  9442 |    1387   |    26
+|BenchmarkEchoStatic-4        |  22624 | 47401 |    2021   |   157
+|BenchmarkEchoGitHubAPI-4     |  16822 | 69059 |    2654   |   203
+|BenchmarkEchoGplusAPI-4      | 326142 |  3759 |     157   |    13
+|BenchmarkEchoParseAPI-4      | 178182 |  6713 |     402   |    26
+|BenchmarkShipEchoStatic-4    |  27048 | 43713 |     640   |     0
+|BenchmarkShipEchoGitHubAPI-4 |  17545 | 66953 |     987   |     0
+|BenchmarkShipEchoGplusAPI-4  | 318595 |  3698 |      54   |     0
+|BenchmarkShipEchoParseAPI-4  | 175984 |  6807 |     196   |     0
