@@ -18,9 +18,7 @@ go get -u github.com/xgfone/ship/v2
 // example.go
 package main
 
-import (
-	"github.com/xgfone/ship/v2"
-)
+import "github.com/xgfone/ship/v2"
 
 func main() {
 	router := ship.New()
@@ -99,7 +97,7 @@ You can name the route when registering it, then you can build a URL by the name
 func main() {
     router := ship.New()
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.Param("id")))
+        fmt.Println(ctx.URL("get_url", ctx.URLParam("id")))
     })
     router.Start(":8080")
 }
@@ -338,13 +336,13 @@ func responder(ctx *ship.Context, args ...interface{}) error {
 }
 
 func main() {
-	router := ship.New()
-	router.Responder = responder
-	router.Route("/path1").GET(func(c *ship.Context) error { return c.Respond() })
-	router.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
-	router.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
-	router.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
-	router.Start(":8080")
+	app := ship.New()
+	app.Responder = responder
+	app.Route("/path1").GET(func(c *ship.Context) error { return c.Respond() })
+	app.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
+	app.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
+	app.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
+	app.Start(":8080")
 }
 ```
 
