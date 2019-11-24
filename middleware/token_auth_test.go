@@ -21,12 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestAuthToken(t *testing.T) {
-	assert := assert.New(t)
 	s := ship.New()
 
 	validateToken := func(token string) (bool, error) {
@@ -35,55 +33,67 @@ func TestAuthToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	ctx := s.NewContext(req, rec)
+	ctx := s.AcquireContext(req, rec)
 	authMiddleware := TokenAuth(validateToken, GetTokenFromHeader(ship.HeaderAuthorization, "abc"))
 	handler := authMiddleware(func(ctx *ship.Context) error {
-		return ctx.String(http.StatusOK, "test")
+		return ctx.Text(http.StatusOK, "test")
 	})
 
 	// Valid AuthToken
 	auth := "abc valid_token"
 	req.Header.Set(ship.HeaderAuthorization, auth)
-	assert.NoError(handler(ctx))
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	}
 
 	// Invalid AuthToken
 	auth = "abc invalid_token"
 	req.Header.Set(ship.HeaderAuthorization, auth)
 	he := handler(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusUnauthorized, he.Code)
+	if he.Code != http.StatusUnauthorized {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusUnauthorized, he.Code)
+	}
 
 	// Missing Authorization header
 	req.Header.Del(ship.HeaderAuthorization)
 	he = handler(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusBadRequest, he.Code)
+	if he.Code != http.StatusBadRequest {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusBadRequest, he.Code)
+	}
 
 	// Token from custom header
 	handler = TokenAuth(validateToken, GetTokenFromHeader("API-Token"))(
 		func(ctx *ship.Context) error {
-			return ctx.String(http.StatusOK, "test")
+			return ctx.Text(http.StatusOK, "test")
 		})
 	req.Header.Set("API-Token", "valid_token")
-	assert.NoError(handler(ctx))
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	}
 
 	// Token from URL query
 	handler = TokenAuth(validateToken, GetTokenFromQuery("token"))(
 		func(ctx *ship.Context) error {
-			return ctx.String(http.StatusOK, "test")
+			return ctx.Text(http.StatusOK, "test")
 		})
 	query := req.URL.Query()
 	query.Add("token", "valid_token")
 	ctx.Request().URL.RawQuery = query.Encode()
-	assert.NoError(handler(ctx))
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	}
 
 	// Token from Form
 	handler = TokenAuth(validateToken, GetTokenFromForm("token"))(
 		func(ctx *ship.Context) error {
-			return ctx.String(http.StatusOK, "test")
+			return ctx.Text(http.StatusOK, "test")
 		})
 	form := make(url.Values)
 	form.Set("token", "valid_token")
 	req = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(form.Encode()))
 	req.Header.Set(ship.HeaderContentType, ship.MIMEApplicationForm)
-	ctx = s.NewContext(req, rec)
-	assert.NoError(handler(ctx))
+	ctx = s.AcquireContext(req, rec)
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	}
 }

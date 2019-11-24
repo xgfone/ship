@@ -17,7 +17,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // TokenAuth returns a TokenAuth middleware.

@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // CSRFConfig is used to configure the CSRF middleware.
@@ -76,7 +76,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
 			var token string
-			if cookie, err := ctx.Cookie(conf.CookieName); err != nil {
+			if cookie := ctx.Cookie(conf.CookieName); cookie == nil {
 				token = conf.GenerateToken() // Generate the new token
 			} else {
 				token = cookie.Value // Reuse the token
@@ -118,7 +118,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 			ctx.Data[conf.CookieCtxKey] = token
 
 			// Protect clients from caching the response
-			ctx.Response().Header().Set(ship.HeaderVary, ship.HeaderCookie)
+			ctx.SetHeader(ship.HeaderVary, ship.HeaderCookie)
 
 			return next(ctx)
 		}

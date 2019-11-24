@@ -2,31 +2,24 @@
 
 `ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
-`ship` has been stable, and the current version is `v1`.
+`ship` has been stable, and the current version is `v2` and support Go `1.11+`.
 
 
 ## Install
 
 ```shell
-go get -u github.com/xgfone/ship
+go get -u github.com/xgfone/ship/v2
 ```
-
-## Prerequisite
-
-Now `ship` requires Go `1.11+`.
 
 
 ## Quick Start
 
 ```go
 // example.go
-
 package main
 
 import (
-	"net/http"
-
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func main() {
@@ -54,15 +47,12 @@ $ curl http://127.0.0.1:8080/ping
 
 ## API Example
 
-See [GoDOC](https://godoc.org/github.com/xgfone/ship).
-
 ### `Router`
 #### Using `Connect`, `Get`, `Post`, `Put`, `Patch`, `Delete` and `Option`
 
 ```go
 func main() {
     router := ship.New()
-
     router.Route("/path/get").GET(getHandler)
     router.Route("/path/put").PUT(putHandler)
     router.Route("/path/post").POST(postHandler)
@@ -70,8 +60,6 @@ func main() {
     router.Route("/path/delete").DELETE(deleteHandler)
     router.Route("/path/option").OPTIONS(optionHandler)
     router.Route("/path/connect").CONNECT(connectHandler)
-
-    // Start the HTTP server.
     router.Start(":8080")
 }
 ```
@@ -80,16 +68,12 @@ Notice: you can register the same handler with more than one method by `Route(pa
 
 `R` is the alias of `Route`, you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
-There is a default global ship, `DefaultShip`, and some its methods as the global functions, such as `Pre`, `Use`, `G`, `R`, `GroupWithoutMiddleware`, `RouteWithoutMiddleware`, `URL`, `Start`, `StartServer`, `Wait`, `Shutdown`. **Suggest:** You should use the default `DefaultShip` preferentially.
-
 #### Cascade the registered routes
 
 ```go
 func main() {
     router := ship.New()
     router.R("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
-
-    // Start the HTTP server.
     router.Start(":8080")
 }
 ```
@@ -104,8 +88,6 @@ func main() {
         "POST": postHandler,
         "DELETE": deleteHandler,
     })
-
-    // Start the HTTP server.
     router.Start(":8080")
 }
 ```
@@ -116,27 +98,20 @@ You can name the route when registering it, then you can build a URL by the name
 ```go
 func main() {
     router := ship.New()
-
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.Param("id)))
+        fmt.Println(ctx.URL("get_url", ctx.Param("id")))
     })
-
-    // Start the HTTP server.
     router.Start(":8080")
 }
 ```
 
-#### Add the Header and Scheme filter
+#### Add the Header filter
 
 ```go
 func main() {
     router := ship.New()
-
     handler := func(ctx *ship.Context) error { return nil }
-    router.R("/path1").Schemes("https", "wss").GET(handler)
-    router.R("/path2").Headers("Content-Type", "application/json").POST(handler)
-
-    // Start the HTTP server.
+    router.R("/path2").HasHeader("Content-Type", "application/json").POST(handler)
     router.Start(":8080")
 }
 ```
@@ -149,7 +124,7 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship"
+    "github.com/xgfone/ship/v2"
 )
 
 type TestType struct{}
@@ -178,18 +153,6 @@ router.Route("/v1/testtype/create").Name("testtype_create").POST(tv.Create)
 router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(tv.Delete)
 ```
 
-The default method mapping is as follow, which can be reset by `SetDefaultMethodMapping` when configuring `Ship`.
-```go
-opt := SetDefaultMethodMapping (map[string]string{
-    // "MethodName": "RequestMethod"
-    "Create": "POST",
-    "Delete": "DELETE",
-    "Update": "PUT",
-    "Get":    "GET",
-})
-router.Configure(opt)
-```
-
 **Notice:**
 - The name of type and method will be converted to the lower.
 - The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
@@ -200,39 +163,15 @@ router.Configure(opt)
 
 ```go
 func main() {
-    router := ship.New()
-
-    router.Use(middleware.Logger())
-    router.Use(middleware.Recover())
+    router := ship.New().Use(middleware.Logger(), middleware.Recover())
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
     v1 := router.Group("/v1")
     v1.Route("/get/path").GET(getHandler)
 
     // v2 SubRouter, which won't inherit the middlewares of the parent router.
-    v2 := router.GroupWithoutMiddleware("/v2")
-    v2.Use(MyAuthMiddleware())
+    v2 := router.Group("/v2").NoMiddlewares().Use(MyAuthMiddleware())
     v2.Route("/post/path").POST(postHandler)
-
-    router.Start(":8080")
-}
-```
-
-#### Traverse the registered route
-
-```go
-func main() {
-    router := ship.New()
-
-    router.Route("/get/path").Name("get_name").GET(getHandler)
-    router.Route("/post/path").Name("post_name").POST(posttHandler)
-
-    router.Traverse(func(name, method, path string) {
-        fmt.Println(name, method, path)
-        // Output:
-        // get_name GET /get/path
-        // post_name POST /post/path
-    })
 
     router.Start(":8080")
 }
@@ -240,36 +179,39 @@ func main() {
 
 #### Filter the unacceptable route
 ```go
-func filter(name, path, method string) bool {
-	if name == "" {
-		return false
-	} else if !strings.HasPrefix(path, "/prefix/") {
-		return false
-	}
-	return true
+func filter(ri RouteInfo) bool {
+    if ri.Name == "" {
+        return true
+    } else if !strings.HasPrefix(ri.Path, "/prefix/") {
+        return true
+    }
+    return false
 }
 
 func main() {
-	// Don't register the router without name.
-	app := ship.New(SetRouteFilter(filter))
+    // Don't register the router without name.
+    app := ship.New()
+    app.RouteFilter = filter
 
-	app.Group("/prefix").R("/name").Name("test").GET(handler) // Register the route
-	app.Group("/prefix").R("/noname").GET(handler)            // Don't register the route
-	app.R("/no_group").GET(handler)                           // Don't register the route
+    app.Group("/prefix").R("/name").Name("test").GET(handler) // Register the route
+    app.Group("/prefix").R("/noname").GET(handler)            // Don't register the route
+    app.R("/no_group").GET(handler)                           // Don't register the route
 }
 ```
 
 #### Modify the registered route
 ```go
-func modifier(name, path, method string) (string, string, string) {
-	return name, "/prefix"+path, method
+func modifier(ri RouteInfo) RouteInfo {
+    ri.Path = "/prefix" + ri.Path
+    return ri
 }
 
 func main() {
-	app := ship.New(SetRouteModifier(modifier))
+    app := ship.New()
+    app.RouteModifier = modifier
 
-	// Register the path as "/prefix/path".
-	app.R("/path").Name("test").GET(handler)
+    // Register the path as "/prefix/path".
+    app.R("/path").Name("test").GET(handler)
 }
 ```
 
@@ -281,14 +223,13 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship"
-    "github.com/xgfone/ship/middleware"
+    "github.com/xgfone/ship/v2"
+    "github.com/xgfone/ship/v2/middleware"
 )
 
 func main() {
     // We disable the default error log because we have used the Logger middleware.
-    app := ship.New(ship.DisableErrorLog(true))
-    app.Use(middleware.Logger(), middleware.Recover())
+    app := ship.New().Use(middleware.Logger(), middleware.Recover())
     app.Use(MyAuthMiddleware())
     app.Route("/url/path").GET(handler)
     app.Start(":8080").Wait()
@@ -298,6 +239,15 @@ func main() {
 You can register a middleware to run before finding the router. You may affect the router finding by registering **Before** middleware. For example,
 
 ```go
+package main
+
+import (
+    "net/http"
+
+    "github.com/xgfone/ship/v2"
+    "github.com/xgfone/ship/v2/middleware"
+)
+
 func RemovePathPrefix(prefix string) ship.Middleware {
     if len(prefix) < 2 || prefix[len(prefix)-1] == "/" {
         panic(fmt.Errorf("invalid prefix: '%s'", prefix))
@@ -324,38 +274,24 @@ func main() {
 }
 ```
 
-The sub-packages [`middleware`](https://godoc.org/github.com/xgfone/ship/middleware) has implemented some middleware as follows:
-
-- [CORS](https://godoc.org/github.com/xgfone/ship/middleware#CORS)
-- [CSRF](https://godoc.org/github.com/xgfone/ship/middleware#CSRF)
-- [Flat](https://godoc.org/github.com/xgfone/ship/middleware#Flat)
-- [Gzip](https://godoc.org/github.com/xgfone/ship/middleware#Gzip)
-- [Logger](https://godoc.org/github.com/xgfone/ship/middleware#Logger)
-- [Recover](https://godoc.org/github.com/xgfone/ship/middleware#Recover)
-- [Matchers](https://godoc.org/github.com/xgfone/ship/middleware#Matchers)
-- [CleanPath](https://godoc.org/github.com/xgfone/ship/middleware#CleanPath)
-- [BodyLimit](https://godoc.org/github.com/xgfone/ship/middleware#BodyLimit)
-- [RequestID](https://godoc.org/github.com/xgfone/ship/middleware#RequestID)
-- [TokenAuth](https://godoc.org/github.com/xgfone/ship/middleware#TokenAuth)
-- [MaxRequests](https://godoc.org/github.com/xgfone/ship/middleware#MaxRequests)
-- [ResetResponse](https://godoc.org/github.com/xgfone/ship/middleware#ResetResponse)
-- [SetCtxHandler](https://godoc.org/github.com/xgfone/ship/middleware#SetCtxHandler)
-- [RemoveTrailingSlash](https://godoc.org/github.com/xgfone/ship/middleware#RemoveTrailingSlash)
-
 ### Add the Virtual Host
 
 ```go
+package main
+
+import "github.com/xgfone/ship/v2"
+
 func main() {
-    router := ship.New()
-    router.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "default") })
+	router := ship.New()
+	router.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "default") })
 
-    vhost1 := router.VHost("host1.example.com")
-    vhost1.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost1") })
+	vhost1 := router.Host("host1.example.com")
+	vhost1.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost1") })
 
-    vhost2 := router.VHost("host2.example.com")
-    vhost2.Route("/router").GET(func(c *ship.Context) error { return c.String(200, "vhost2") })
+	vhost2 := router.Host("host2.example.com")
+	vhost2.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
 
-    router.Start(":8080")
+	router.Start(":8080")
 }
 ```
 
@@ -370,60 +306,18 @@ $ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
 vhost2
 ```
 
-### Many HTTP Server
-
-```go
-package main
-
-import (
-	"github.com/xgfone/ship"
-)
-
-func main() {
-	app1 := ship.New(ship.SetName("app1"))
-	app1.Route("/").GET(func(ctx *ship.Context) error { return ctx.String(200, "app1") })
-
-	app2 := app1.Clone("app2").Link(app1)
-	app2.Route("/").GET(func(ctx *ship.Context) error { return ctx.String(200, "app2") })
-
-	go app2.Start(":8001")
-	app1.Start(":8000").Wait()
-}
-```
-
-When you runs it, the console will output like this:
-```shell
-2019/03/07 22:25:41.701704 ship.go:571: [I] The HTTP Server [app1] is running on :8000
-2019/03/07 22:25:41.702308 ship.go:571: [I] The HTTP Server [app2] is running on :8001
-```
-
-Then you can access `http://127.0.0.1:8000` and `http://127.0.0.1:8001`. The servers returns `app1` and `app2`.
-
-When you keys `Ctrl+C`, the two servers will exit and output like this.
-```shell
-2019/03/07 22:26:16.243693 once.go:44: [I] The HTTP Server [app1] is shutdown
-2019/03/07 22:26:16.243998 once.go:44: [I] The HTTP Server [app2] is shutdown
-```
-
-**Notice:**
-1. The router app returned by `ship.New()` will listen on the signals.
-2. For `Clone()`, `app2` will also exit when `app1` exits.
-3. For `Link()`, both `app1` and `app2` will exit when either exits.
-
 ### Handle the complex response
 
 ```go
 package main
 
 import (
-	"fmt"
 	"net/http"
 
-	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/middleware"
+	"github.com/xgfone/ship/v2"
 )
 
-func Responder := func(ctx *ship.Context, args ...interface{}) error {
+func responder(ctx *ship.Context, args ...interface{}) error {
 	switch len(args) {
 	case 0:
 		return ctx.NoContent(http.StatusOK)
@@ -432,12 +326,12 @@ func Responder := func(ctx *ship.Context, args ...interface{}) error {
 		case int:
 			return ctx.NoContent(v)
 		case string:
-			return ctx.String(http.StatusOK, v)
+			return ctx.Text(http.StatusOK, v)
 		}
 	case 2:
 		switch v0 := args[0].(type) {
 		case int:
-			return ctx.String(v0, "%v", args[1])
+			return ctx.Text(v0, "%v", args[1])
 		}
 	}
 	return ctx.NoContent(http.StatusInternalServerError)
@@ -445,12 +339,11 @@ func Responder := func(ctx *ship.Context, args ...interface{}) error {
 
 func main() {
 	router := ship.New()
-	router.Use(middleware.SetCtxHandler(Responder))
-	router.Route("/path1").GET(func(c *ship.Context) error { return c.Handle() })
-	router.Route("/path2").GET(func(c *ship.Context) error { return c.Handle(200) })
-	router.Route("/path3").GET(func(c *ship.Context) error { return c.Handle("Hello, World") })
-	router.Route("/path4").GET(func(c *ship.Context) error { return c.Handle(200, "Hello, World") })
-
+	router.Responder = responder
+	router.Route("/path1").GET(func(c *ship.Context) error { return c.Respond() })
+	router.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
+	router.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
+	router.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
 	router.Start(":8080")
 }
 ```
@@ -485,20 +378,10 @@ func main() {
 ```go
 package main
 
-import (
-	"net/http"
-
-	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/renderers/django"
-)
-
-var filename = "test_django_engine.html"
+import "github.com/xgfone/ship/v2"
 
 func main() {
-	engine := django.New(".", ".html")
-
 	router := ship.New()
-	router.MuxRenderer().Add(engine.Ext(), engine)
 
 	// For JSON
 	router.Route("/json").GET(func(ctx *ship.Context) error {
@@ -524,13 +407,6 @@ func main() {
 		// return ctx.Render("xml", 200, []string{"msg", "xml"})
 	})
 
-	// For HTML
-	router.Route("/html").GET(func(ctx *ship.Context) error {
-		return ctx.Render(filename, 200, map[string]interface{}{"name": "django"})
-		// Or
-		// return ctx.HTML(200, `<html>...</html>`)
-	})
-
 	// For others
 	// ...
 
@@ -545,18 +421,13 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func main() {
 	app := ship.New()
 	app.R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
-	app.Start(":8080")
-	app.Wait()
-
-	// You can write it like this:
-	//
-	// ship.New().R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler())).Ship().Start(":8080").Wait()
+	app.Start(":8080").Wait()
 }
 ```
 
@@ -567,7 +438,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -579,7 +450,9 @@ func DisableBuiltinCollector() {
 
 func main() {
 	DisableBuiltinCollector()
-	ship.New().R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler())).Ship().Start(":8080").Wait()
+	app := ship.New()
+	app.R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
+	app.Start(":8080").Wait()
 }
 ```
 
@@ -590,7 +463,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -621,7 +494,7 @@ func Prometheus(gatherer ...prometheus.Gatherer) ship.Handler {
 
 		for _, mf := range mfs {
 			if err = enc.Encode(mf); err != nil {
-				ctx.Logger().Error("failed to encode prometheus metric: %s", err)
+				ctx.Logger().Errorf("failed to encode prometheus metric: %s", err)
 			}
 		}
 
@@ -640,54 +513,90 @@ func main() {
 
 `ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route, which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://godoc.org/github.com/xgfone/ship/router/echo#NewRouter).
 
-You can appoint your own implementation by implementing the interface [`ship.Router`](https://godoc.org/github.com/xgfone/ship/core#Router).
+You can appoint your own implementation by implementing the interface [`Router`](https://godoc.org/github.com/xgfone/ship/router#Router).
 
 ```go
 type Router interface {
 	// Generate a URL by the url name and parameters.
 	URL(name string, params ...interface{}) string
 
-	// Add a route with name, path, method and handler,
-	// and return the number of the parameters if there are the parameters
-	// in the route. Or return 0.
+	// Add a route with name, path, method and handler, and return the number
+	// of the parameters if there are the parameters in the route. Or return 0.
 	//
-	// If the name has been added for the same path, it should be allowed.
-	// Or it should panic.
-	//
-	// If the router does not support the parameter, it should panic.
+	// If there is any error, it should panic.
 	//
 	// Notice: for keeping consistent, the parameter should start with ":"
 	// or "*". ":" stands for a single parameter, and "*" stands for
 	// a wildcard parameter.
-	Add(name string, path string, method string, handler interface{}) (paramNum int)
+	Add(name, method, path string, handler interface{}) (paramNum int)
 
 	// Find a route handler by the method and path of the request.
 	//
-	// Return nil if the route does not exist.
+	// Return defaultHandler instead if the route does not exist.
 	//
-	// If the route has more than one parameter, the name and value
-	// of the parameters should be stored `pnames` and `pvalues` respectively.
-	Find(method string, path string, pnames []string, pvalues []string) (handler interface{})
-
-	// Traverse each route.
-	Each(func(name string, method string, path string))
+	// If the route has parameters, the name and value of the parameters
+	// should be stored `pnames` and `pvalues` respectively, which has
+	// the enough capacity to store the paramether names and values.
+	Find(method, path string, pnames, pvalues []string,
+		defaultHandler interface{}) (handler interface{})
 }
 ```
 
 ```go
 func main() {
     NewMyRouter := func() ship.Router { return ... }
-    router := ship.New(ship.SetNewRouter(NewMyRouter))
-    ...
+    router := ship.New().SetNewRouter(NewMyRouter)
+    // ...
 }
 ```
 
-## TODO
 
-- [x] Add Host match for `Route`, referring to [mux.Route.Host](https://godoc.org/github.com/gorilla/mux#Route.Host). _We use the **Virtual Host** instead._
-- [x] Add Query match for `Route`, referring to [mux.Route.Queries](https://godoc.org/github.com/gorilla/mux#Route.Queries). _We use `Matcher` to operate it._
-- [x] Add the serialization and deserialization middleware. _We use `Binder` and `Renderer`._
-- [x] Add HTML template render.
-- [x] Add CORS middlware.
-- [ ] Add JWT middleware.
-- [ ] Add OAuth 2.0 middleware.
+## Benchmark
+
+### Test 1
+```
+Dell Vostro 3470
+Intel Core i5-7400 3.0GHz
+8GB DDR4 2666MHz
+Windows 10
+Go 1.13.4
+```
+
+|           Function          |  ops   |    ns/op    | bytes/opt  |  allocs/op
+|-----------------------------|--------|-------------|------------|--------------
+|BenchmarkGinStatic-4         |  23368 | 49788 ns/op |  8278 B/op | 157 allocs/op
+|BenchmarkGinGitHubAPI-4      |  15684 | 75104 ns/op | 10849 B/op | 203 allocs/op
+|BenchmarkGinGplusAPI-4       | 276224 |  4184 ns/op |   686 B/op |  13 allocs/op
+|BenchmarkGinParseAPI-4       | 157810 |  7537 ns/op |  1357 B/op |  26 allocs/op
+|BenchmarkEchoStatic-4        |  29432 | 39989 ns/op |  2432 B/op | 157 allocs/op
+|BenchmarkEchoGitHubAPI-4     |  20527 | 56857 ns/op |  2468 B/op | 203 allocs/op
+|BenchmarkEchoGplusAPI-4      | 387421 |  3179 ns/op |   193 B/op |  13 allocs/op
+|BenchmarkEchoParseAPI-4      | 220273 |  5575 ns/op |   365 B/op |  26 allocs/op
+|BenchmarkShipEchoStatic-4    |  34054 | 35548 ns/op |  1016 B/op |   0 allocs/op
+|BenchmarkShipEchoGitHubAPI-4 |  21842 | 54962 ns/op |  1585 B/op |   0 allocs/op
+|BenchmarkShipEchoGplusAPI-4  | 402898 |  2996 ns/op |    85 B/op |   0 allocs/op
+|BenchmarkShipEchoParseAPI-4  | 223581 |  5478 ns/op |   154 B/op |   0 allocs/op
+
+### Test 2
+```
+MacBook Pro(Retina, 13-inch, Mid 2014)
+Intel Core i5 2.6GHz
+8GB DDR3 1600MHz
+macOS Mojave
+Go 1.13.4
+```
+
+|           Function          |  ops   |    ns/op    | bytes/opt  |  allocs/op
+|-----------------------------|--------|-------------|------------|--------------
+|BenchmarkEchoStatic-4        |  22624 | 47401 ns/op |  2021 B/op | 157 allocs/op
+|BenchmarkEchoGitHubAPI-4     |  16822 | 69059 ns/op |  2654 B/op | 203 allocs/op
+|BenchmarkEchoGplusAPI-4      | 326142 |  3759 ns/op |   157 B/op |  13 allocs/op
+|BenchmarkEchoParseAPI-4      | 178182 |  6713 ns/op |   402 B/op |  26 allocs/op
+|BenchmarkGinStatic-4         |  18085 | 62380 ns/op |  8494 B/op | 157 allocs/op
+|BenchmarkGinGitHubAPI-4      |  12646 | 93052 ns/op | 11115 B/op | 203 allocs/op
+|BenchmarkGinGplusAPI-4       | 224404 |  5222 ns/op |   701 B/op |  13 allocs/op
+|BenchmarkGinParseAPI-4       | 124138 |  9442 ns/op |  1387 B/op |  26 allocs/op
+|BenchmarkShipEchoStatic-4    |  27048 | 43713 ns/op |   640 B/op |   0 allocs/op
+|BenchmarkShipEchoGitHubAPI-4 |  17545 | 66953 ns/op |   987 B/op |   0 allocs/op
+|BenchmarkShipEchoGplusAPI-4  | 318595 |  3698 ns/op |    54 B/op |   0 allocs/op
+|BenchmarkShipEchoParseAPI-4  | 175984 |  6807 ns/op |   196 B/op |   0 allocs/op

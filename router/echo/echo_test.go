@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2019 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,60 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package echo_test
+package echo
 
-import (
-	"fmt"
-	"testing"
-
-	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/router/echo"
-)
+import "testing"
 
 func TestRouter(t *testing.T) {
-	router := echo.NewRouter(nil, nil)
-	router.Add("static", "/static", "GET", func(ctx *ship.Context) error { return ctx.String(200, "STATIC") })
-	router.Add("param", "/test/:name", "POST", func(ctx *ship.Context) error {
-		return ctx.String(200, fmt.Sprintf("hello %s", ctx.Param("name")))
-	})
+	var handler bool
+	router := NewRouter(nil)
+	router.Add("static", "GET", "/static", handler)
+	router.Add("param", "POST", "/test/:name", handler)
 
-	router.Each(func(name, method, path string) {
-		switch name {
-		case "static":
-			if method != "GET" || path != "/static" {
-				t.Fail()
-			}
-		case "param":
-			if method != "POST" || path != "/test/:name" {
-				t.Fail()
-			}
-		}
-	})
-
-	if router.URL("param", "Aaron") != "/test/Aaron" {
-		t.Fail()
+	if v := router.URL("param", "Aaron"); v != "/test/Aaron" {
+		t.Errorf("expected '/test/Aaron', got '%s'", v)
 	}
 
-	if router.Find("GET", "/static", nil, nil) == nil {
-		t.Fail()
+	if router.Find("GET", "/static", nil, nil, nil) == nil {
+		t.Error("no route handler for 'GET /static'")
 	}
 
 	pnames := make([]string, 1)
 	pvalues := make([]string, 1)
-	if router.Find("POST", "/test/Aaron", pnames, pvalues) == nil {
-		t.Fail()
+	if router.Find("POST", "/test/Aaron", pnames, pvalues, nil) == nil {
+		t.Error("no route handler for 'POST /test/Aaron'")
 	}
-	if pnames[0] != "name" || pvalues[0] != "Aaron" {
-		t.Fail()
+	if pnames[0] != "name" {
+		t.Errorf("expected url param name 'name', but got '%s'", pnames[0])
+	} else if pvalues[0] != "Aaron" {
+		t.Errorf("expected url param value 'Aaron', but got '%s'", pvalues[0])
 	}
 
 	pnames[0] = ""
 	pvalues[0] = ""
-	router.Add("", "/static/*path", "GET", func(ctx *ship.Context) error { return nil })
-	if router.Find("GET", "/static/path/to/file", pnames, pvalues) == nil {
-		t.Fail()
-	}
-	if len(pnames) != 1 || pnames[0] != "path" || pvalues[0] != "path/to/file" {
-		t.Fail()
+	router.Add("", "GET", "/static/*", handler)
+	if router.Find("GET", "/static/path/to/file", pnames, pvalues, nil) == nil {
+		t.Error("no route handler for 'GET /static/path/to/file'")
+	} else if len(pnames) != 1 || pnames[0] != "*" || pvalues[0] != "path/to/file" {
+		t.Errorf("expected dir 'path/to/file', but got '%s'", pvalues[0])
 	}
 }

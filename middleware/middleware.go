@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 const (
@@ -98,7 +98,7 @@ func getTokenFromHeaderWithType(header, _type string) TokenFunc {
 	typelen := len(_type)
 
 	return func(ctx *ship.Context) (string, error) {
-		token := ctx.Request().Header.Get(header)
+		token := ctx.GetHeader(header)
 		if token == "" {
 			return "", ErrTokenFromHeader
 		} else if len(token) > typelen+1 && token[:typelen] == _type {

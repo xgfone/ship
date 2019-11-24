@@ -17,22 +17,11 @@ package middleware
 import (
 	"fmt"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
-func handlePanic(ctx *ship.Context, err interface{}) {
-	if logger := ctx.Logger(); logger != nil {
-		logger.Error("%v", err)
-	}
-}
-
 // Recover returns a middleware to wrap the panic.
-//
-// Change:
-//    1. Ignore the argument handle. In order to keep the backward compatibility,
-//       we don't remove it until the next major version.
-//    2. This middleware only recovers the panic and returns it as an error.
-func Recover(handle ...func(*ship.Context, interface{})) Middleware {
+func Recover() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {
 			defer func() {

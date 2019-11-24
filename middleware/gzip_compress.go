@@ -15,16 +15,13 @@
 package middleware
 
 import (
-	"bufio"
 	"compress/gzip"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/utils"
+	"github.com/xgfone/ship/v2"
 )
 
 // Gzip returns a middleware to compress the response body by GZIP.
@@ -36,12 +33,12 @@ func Gzip(level ...int) Middleware {
 
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
-			if strings.Contains(ctx.Request().Header.Get(ship.HeaderAcceptEncoding), "gzip") {
-				resp := ctx.Response()
-				resp.Header().Add(ship.HeaderVary, ship.HeaderAcceptEncoding)
-				resp.Header().Set(ship.HeaderContentEncoding, "gzip")
+			if strings.Contains(ctx.GetHeader(ship.HeaderAcceptEncoding), "gzip") {
+				ctx.AddHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
+				ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
 
-				writer := utils.GetResponseFromPool(resp)
+				resp := ctx.ResponseWriter()
+				writer := ship.GetResponseFromPool(resp)
 				newWriter, err := gzip.NewWriterLevel(writer, glevel)
 				if err != nil {
 					return err
@@ -49,12 +46,12 @@ func Gzip(level ...int) Middleware {
 
 				defer func() {
 					if writer.Size == 0 {
-						resp.Header().Del(ship.HeaderContentEncoding)
+						ctx.DelHeader(ship.HeaderContentEncoding)
 						ctx.SetResponse(resp)
 						newWriter.Reset(ioutil.Discard)
 					}
 					newWriter.Close()
-					utils.PutResponseIntoPool(writer)
+					ship.PutResponseIntoPool(writer)
 				}()
 
 				gzipWriter := &gzipResponseWriter{Writer: newWriter, ResponseWriter: resp}
@@ -73,7 +70,7 @@ type gzipResponseWriter struct {
 
 func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 	if statusCode == http.StatusNoContent {
-		g.ResponseWriter.Header().Del(ship.HeaderContentEncoding)
+		g.Header().Del(ship.HeaderContentEncoding)
 	}
 	g.Header().Del(ship.HeaderContentLength)
 	g.ResponseWriter.WriteHeader(statusCode)
@@ -88,12 +85,4 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 
 func (g *gzipResponseWriter) Flush() {
 	g.Writer.(*gzip.Writer).Flush()
-}
-
-func (g *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return g.ResponseWriter.(http.Hijacker).Hijack()
-}
-
-func (g *gzipResponseWriter) CloseNotify() <-chan bool {
-	return g.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }

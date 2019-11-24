@@ -21,7 +21,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package ship
+package binder
 
 import (
 	"bytes"
@@ -31,40 +31,69 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/xgfone/ship/v2/herror"
 )
+
+var testMuxBinder = NewMuxBinder()
+
+func init() {
+	testMuxBinder.Add("application/json", JSONBinder())
+	testMuxBinder.Add("application/xml", XMLBinder())
+	testMuxBinder.Add("text/xml", XMLBinder())
+	testMuxBinder.Add("multipart/form-data", FormBinder(1024))
+	testMuxBinder.Add("application/x-www-form-urlencoded", FormBinder(1024))
+}
 
 //////////////////////////////////////////////////////////////////////////////
 
+func objectsAreEqual(expected, actual interface{}) bool {
+	if expected == nil || actual == nil {
+		return expected == actual
+	}
+
+	exp, ok := expected.([]byte)
+	if !ok {
+		return reflect.DeepEqual(expected, actual)
+	}
+
+	act, ok := actual.([]byte)
+	if !ok {
+		return false
+	}
+	if exp == nil || act == nil {
+		return exp == nil && act == nil
+	}
+	return bytes.Equal(exp, act)
+}
+
 func testBindOkay(t *testing.T, r io.Reader, ctype string) {
 	req := httptest.NewRequest(http.MethodPost, "/", r)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
-	req.Header.Set(HeaderContentType, ctype)
+	req.Header.Set("Content-Type", ctype)
 	u := new(user)
-	err := ctx.Bind(u)
-	if err == nil {
-		assert.Equal(t, 1, u.ID)
-		assert.Equal(t, "Jon Snow", u.Name)
+	if err := testMuxBinder.Bind(req, u); err == nil {
+		if u.ID != 1 {
+			t.Errorf("ID: expect %d, got %d", 1, u.ID)
+		} else if u.Name != "Jon Snow" {
+			t.Errorf("Name: expect '%s', got '%s'", "Jon Snow", u.Name)
+		}
 	} else {
-		t.Fail()
+		t.Error(err)
 	}
 }
 
 func testBindError(t *testing.T, r io.Reader, ctype string, expectedInternal error) {
 	req := httptest.NewRequest(http.MethodPost, "/", r)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
-	req.Header.Set(HeaderContentType, ctype)
-	u := new(user)
-	err := ctx.Bind(u)
-
-	assert.IsType(t, expectedInternal, err)
+	req.Header.Set("Content-Type", ctype)
+	err := testMuxBinder.Bind(req, new(user))
+	if !objectsAreEqual(reflect.TypeOf(expectedInternal), reflect.TypeOf(err)) {
+		t.Fail()
+	}
 }
 
 type (
@@ -145,31 +174,29 @@ func (s *Struct) UnmarshalBind(src string) error {
 }
 
 func TestBindJSON(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userJSON), MIMEApplicationJSON)
-	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationJSON,
+	testBindOkay(t, strings.NewReader(userJSON), "application/json")
+	testBindError(t, strings.NewReader(invalidContent), "application/json",
 		&json.SyntaxError{})
 	testBindError(t, strings.NewReader(userJSONInvalidType),
-		MIMEApplicationJSON, &json.UnmarshalTypeError{})
+		"application/json", &json.UnmarshalTypeError{})
 }
 
 func TestBindXML(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userXML), MIMEApplicationXML)
-	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationXML, ErrMissingContentType)
-	testBindError(t, strings.NewReader(userXMLConvertNumberError), MIMEApplicationXML, &strconv.NumError{})
-	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), MIMEApplicationXML, &xml.SyntaxError{})
-	testBindOkay(t, strings.NewReader(userXML), MIMETextXML)
-	testBindError(t, strings.NewReader(invalidContent), MIMETextXML, ErrMissingContentType)
-	testBindError(t, strings.NewReader(userXMLConvertNumberError), MIMETextXML, &strconv.NumError{})
-	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), MIMETextXML, &xml.SyntaxError{})
+	testBindOkay(t, strings.NewReader(userXML), "application/xml")
+	testBindError(t, strings.NewReader(invalidContent), "application/xml", herror.ErrMissingContentType)
+	testBindError(t, strings.NewReader(userXMLConvertNumberError), "application/xml", &strconv.NumError{})
+	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), "application/xml", &xml.SyntaxError{})
+	testBindOkay(t, strings.NewReader(userXML), "text/xml")
+	testBindError(t, strings.NewReader(invalidContent), "text/xml", herror.ErrMissingContentType)
+	testBindError(t, strings.NewReader(userXMLConvertNumberError), "text/xml", &strconv.NumError{})
+	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), "text/xml", &xml.SyntaxError{})
 }
 
 func TestBindForm(t *testing.T) {
-	testBindOkay(t, strings.NewReader(userForm), MIMEApplicationForm)
+	testBindOkay(t, strings.NewReader(userForm), "application/x-www-form-urlencoded")
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(userForm))
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
-	req.Header.Set(HeaderContentType, MIMEApplicationForm)
-	err := ctx.Bind(&[]struct{ Field string }{})
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	err := testMuxBinder.Bind(req, &[]struct{ Field string }{})
 	if err == nil {
 		t.Fail()
 	}
@@ -177,43 +204,37 @@ func TestBindForm(t *testing.T) {
 
 func TestBindQueryParams(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?id=1&name=Jon+Snow", nil)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.BindQuery(u)
-	if err == nil {
-		assert.Equal(t, 1, u.ID)
-		assert.Equal(t, "Jon Snow", u.Name)
-	} else {
+	if err := QueryBinder().Bind(req, u); err != nil {
+		t.Error(err)
+	} else if u.ID != 1 {
 		t.Fail()
+	} else if u.Name != "Jon Snow" {
+		t.Errorf("Name: expect '%s', got '%s'", "Jon Snow", u.Name)
 	}
 }
 
 func TestBindQueryParamsCaseInsensitive(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?ID=1&NAME=Jon+Snow", nil)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.BindQuery(u)
-	if err == nil {
-		assert.Equal(t, 1, u.ID)
-		assert.Equal(t, "Jon Snow", u.Name)
-	} else {
+	if err := QueryBinder().Bind(req, u); err != nil {
+		t.Error(err)
+	} else if u.ID != 1 {
 		t.Fail()
+	} else if u.Name != "Jon Snow" {
+		t.Errorf("Name: expect '%s', got '%s'", "Jon Snow", u.Name)
 	}
 }
 
 func TestBindQueryParamsCaseSensitivePrioritized(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?id=1&ID=2&NAME=Jon+Snow&name=Jon+Doe", nil)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
 	u := new(user)
-	err := ctx.BindQuery(u)
-	if err == nil {
-		assert.Equal(t, 1, u.ID)
-		assert.Equal(t, "Jon Doe", u.Name)
-	} else {
+	if err := QueryBinder().Bind(req, u); err != nil {
+		t.Error(err)
+	} else if u.ID != 1 {
 		t.Fail()
+	} else if u.Name != "Jon Doe" {
+		t.Errorf("Name: expect '%s', got '%s'", "Jon Doe", u.Name)
 	}
 }
 
@@ -221,37 +242,34 @@ func TestBindUnmarshalBind(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet,
 		"/?ts=2016-12-06T19:09:05Z&sa=one,two,three&ta=2016-12-06T19:09:05Z&ta=2016-12-06T19:09:05Z&ST=baz",
 		nil)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
 	result := struct {
 		T  Timestamp   `query:"ts"`
 		TA []Timestamp `query:"ta"`
 		SA StringArray `query:"sa"`
 		ST Struct
 	}{}
-	err := ctx.Bind(&result)
-	ts := Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC))
 
-	if err == nil {
-		assert.Equal(t, ts, result.T)
-		assert.Equal(t, StringArray([]string{"one", "two", "three"}), result.SA)
-		assert.Equal(t, []Timestamp{ts, ts}, result.TA)
-		assert.Equal(t, Struct{"baz"}, result.ST)
+	ts := Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC))
+	if err := QueryBinder().Bind(req, &result); err != nil {
+		t.Error(err)
+	} else if ts != result.T {
+		t.Errorf("expect %v, got %v", ts, result.T)
+	} else if len(result.SA) != 3 || len(result.TA) != 2 {
+		t.Fail()
+	} else if result.ST.Foo != "baz" {
+		t.Errorf("expect '%v', got '%v'", result.ST.Foo, "baz")
 	}
 }
 
 func TestBindUnmarshalBindPtr(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/?ts=2016-12-06T19:09:05Z", nil)
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
 	result := struct {
 		Tptr *Timestamp `query:"ts"`
 	}{}
-	err := ctx.BindQuery(&result)
-	if err == nil {
-		assert.Equal(t, Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)), *result.Tptr)
-	} else {
-		t.Fail()
+	if err := QueryBinder().Bind(req, &result); err != nil {
+		t.Error(err)
+	} else if v := Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC)); *result.Tptr != v {
+		t.Errorf("expect '%v', got '%v'", v, *result.Tptr)
 	}
 }
 
@@ -266,19 +284,17 @@ func TestBindMultipartForm(t *testing.T) {
 }
 
 func TestBindUnsupportedMediaType(t *testing.T) {
-	testBindError(t, strings.NewReader(invalidContent), MIMEApplicationJSON,
+	testBindError(t, strings.NewReader(invalidContent), "application/json",
 		&json.SyntaxError{})
 }
 
 func TestBindUnmarshalTypeError(t *testing.T) {
 	body := bytes.NewBufferString(`{ "id": "text" }`)
 	req := httptest.NewRequest(http.MethodPost, "/", body)
-	req.Header.Set(HeaderContentType, MIMEApplicationJSON)
-
-	rec := httptest.NewRecorder()
-	ctx := New().NewContext(req, rec)
+	req.Header.Set("Content-Type", "application/json")
 	u := new(user)
-
-	err := ctx.Bind(u)
-	assert.Equal(t, "json: cannot unmarshal string into Go struct field user.id of type int", err.Error())
+	s := "json: cannot unmarshal string into Go struct field user.id of type int"
+	if e := testMuxBinder.Bind(req, u).Error(); e != s {
+		t.Errorf("expect '%s', got '%s'", s, e)
+	}
 }

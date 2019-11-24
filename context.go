@@ -15,12 +15,9 @@
 package ship
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -29,22 +26,24 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/xgfone/go-tools/v6/function"
-	"github.com/xgfone/go-tools/v6/io2"
+	"github.com/xgfone/ship/v2/binder"
+	"github.com/xgfone/ship/v2/render"
+	"github.com/xgfone/ship/v2/router"
+	"github.com/xgfone/ship/v2/session"
 )
+
+// MaxMemoryLimit is the maximum memory.
+var MaxMemoryLimit int64 = 32 << 20 // 32MB
 
 var contenttypes = map[string][]string{}
 
 // AddContentTypeToSlice add a rule to convert contentType to contentTypeSlice.
-//
-// When calling `Context#SetContentType(contentType)` to set the response header
-// Content-Type, it will use contentTypeSlice to avoid to allocate the memory.
-// See the function `ToContentTypes(contentType)`.
+// So you can call SetContextType to set the Content-Type to contentTypeSlice
+// by contentType to avoid to allocate the memory.
 func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
 		panic(fmt.Errorf("the Content-Type is empty"))
@@ -55,155 +54,57 @@ func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	contenttypes[contentType] = contentTypeSlice
 }
 
-// ToContentTypes converts the Content-Type to the Content-Type slice.
-func ToContentTypes(contentType string) []string {
-	return toContentTypes(contentType)
-}
-
-func toContentTypes(contentType string) []string {
-	switch contentType {
+// SetContextType sets the Content-Type header of resp to ct.
+func SetContextType(res http.ResponseWriter, ct string) {
+	var cts []string
+	switch ct {
 	case MIMEApplicationJSON:
-		return MIMEApplicationJSONs
+		cts = MIMEApplicationJSONs
 	case MIMEApplicationJSONCharsetUTF8:
-		return MIMEApplicationJSONCharsetUTF8s
+		cts = MIMEApplicationJSONCharsetUTF8s
 	case MIMEApplicationJavaScript:
-		return MIMEApplicationJavaScripts
+		cts = MIMEApplicationJavaScripts
 	case MIMEApplicationJavaScriptCharsetUTF8:
-		return MIMEApplicationJavaScriptCharsetUTF8s
+		cts = MIMEApplicationJavaScriptCharsetUTF8s
 	case MIMEApplicationXML:
-		return MIMEApplicationXMLs
+		cts = MIMEApplicationXMLs
 	case MIMEApplicationXMLCharsetUTF8:
-		return MIMEApplicationXMLCharsetUTF8s
+		cts = MIMEApplicationXMLCharsetUTF8s
 	case MIMETextXML:
-		return MIMETextXMLs
+		cts = MIMETextXMLs
 	case MIMETextXMLCharsetUTF8:
-		return MIMETextXMLCharsetUTF8s
+		cts = MIMETextXMLCharsetUTF8s
 	case MIMEApplicationForm:
-		return MIMEApplicationForms
+		cts = MIMEApplicationForms
 	case MIMEApplicationProtobuf:
-		return MIMEApplicationProtobufs
+		cts = MIMEApplicationProtobufs
 	case MIMEApplicationMsgpack:
-		return MIMEApplicationMsgpacks
+		cts = MIMEApplicationMsgpacks
 	case MIMETextHTML:
-		return MIMETextHTMLs
+		cts = MIMETextHTMLs
 	case MIMETextHTMLCharsetUTF8:
-		return MIMETextHTMLCharsetUTF8s
+		cts = MIMETextHTMLCharsetUTF8s
 	case MIMETextPlain:
-		return MIMETextPlains
+		cts = MIMETextPlains
 	case MIMETextPlainCharsetUTF8:
-		return MIMETextPlainCharsetUTF8s
+		cts = MIMETextPlainCharsetUTF8s
 	case MIMEMultipartForm:
-		return MIMEMultipartForms
+		cts = MIMEMultipartForms
 	case MIMEOctetStream:
-		return MIMEOctetStreams
+		cts = MIMEOctetStreams
 	default:
-		if ss := contenttypes[contentType]; ss != nil {
-			return ss
+		if ss := contenttypes[ct]; ss != nil {
+			cts = ss
+		} else {
+			res.Header().Set(HeaderContentType, ct)
+			return
 		}
-		return []string{contentType}
 	}
-}
-
-var (
-	indexPage  = "index.html"
-	emptyStrS  = [256]string{}
-	emptyValue = emptyType(0)
-)
-
-type emptyType uint8
-
-// MaxMemoryLimit is the maximum memory.
-var MaxMemoryLimit int64 = 32 << 20 // 32MB
-
-type contextKeyT int
-
-var contextKey contextKeyT
-
-func setContext(ctx *Context) {
-	if ctx.req != nil {
-		ctx.req = ctx.req.WithContext(context.WithValue(context.TODO(), contextKey, ctx))
-	}
-}
-
-// GetContext gets the Context from the http Request.
-//
-// Notice: you must enable it by SetEnableCtxHTTPContext(true).
-func GetContext(req *http.Request) *Context {
-	if v := req.Context().Value(contextKey); v != nil {
-		return v.(*Context)
-	}
-	return nil
-}
-
-type responder struct {
-	resp http.ResponseWriter
-	ctx  *Context
-}
-
-func newResponder(ctx *Context, resp http.ResponseWriter) responder {
-	return responder{ctx: ctx, resp: resp}
-}
-
-func (r *responder) reset(resp http.ResponseWriter) {
-	r.resp = resp
-}
-
-func (r responder) Header() http.Header {
-	return r.resp.Header()
-}
-
-func (r responder) Write(p []byte) (int, error) {
-	n, err := r.resp.Write(p)
-	if !r.ctx.wrote {
-		r.ctx.wrote = true
-	}
-	return n, err
-}
-
-func (r responder) WriteString(s string) (int, error) {
-	n, err := io.WriteString(r.resp, s)
-	if !r.ctx.wrote {
-		r.ctx.wrote = true
-	}
-	return n, err
-}
-
-// WriteHeader implements http.ResponseWriter#WriteHeader().
-func (r responder) WriteHeader(code int) {
-	r.resp.WriteHeader(code)
-	r.ctx.wrote = true
-	r.ctx.code = code
-}
-
-// See [http.Flusher](https://golang.org/pkg/net/http/#Flusher)
-func (r responder) Flush() {
-	r.resp.(http.Flusher).Flush()
-}
-
-// See [http.Hijacker](https://golang.org/pkg/net/http/#Hijacker)
-func (r responder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return r.resp.(http.Hijacker).Hijack()
-}
-
-// See [http.CloseNotifier](https://golang.org/pkg/net/http/#CloseNotifier)
-func (r responder) CloseNotify() <-chan bool {
-	return r.resp.(http.CloseNotifier).CloseNotify()
+	res.Header()[HeaderContentType] = cts
 }
 
 // Context represetns a request and response context.
 type Context struct {
-	// you can use it to pass the error between the handlers or the middlewares.
-	//
-	// Notice: when the new request is coming, it will be reset to nil.
-	Err error
-
-	// ReqCtxData is the data what each request has, the lifecycle of which is
-	// the same as this context, that's, when creating this context, it will
-	// call `newCtxData()`, which is set by `SetNewCtxData()` as the option of
-	// the ship router, to creating ReqCtxData. When finishing the request,
-	// it will be reset by the context and put into the pool with this context.
-	ReqCtxData Resetter
-
 	// Data is used to store many key-value pairs about the context.
 	//
 	// Data maybe asks the system to allocate many memories.
@@ -217,83 +118,45 @@ type Context struct {
 	Key3 interface{}
 	Data map[string]interface{}
 
-	ship  *Ship
-	code  int
-	wrote bool
+	res *Response
+	req *http.Request
 
-	req    *http.Request
-	resp   responder
-	query  url.Values
-	router Router
+	query          url.Values
+	urlParamNames  []string
+	urlParamValues []string
 
-	handler func(*Context, ...interface{}) error
-	pnames  []string
-	pvalues []string
-
-	sessionK string
-	sessionV interface{}
+	logger    Logger
+	buffer    BufferAllocator
+	router    router.Router
+	binder    binder.Binder
+	session   session.Session
+	renderer  render.Renderer
+	getURL    func(string, ...interface{}) string
+	qbinder   func(interface{}, url.Values) error
+	responder func(*Context, ...interface{}) error
+	notFound  Handler
 }
 
-// NewContext returns a new context.
-func newContext(s *Ship, req *http.Request, resp http.ResponseWriter, maxParam int) *Context {
+// NewContext returns a new Context.
+func NewContext(urlParamMaxNum, dataSize int) *Context {
 	var pnames, pvalues []string
-	if maxParam > 0 {
-		pnames = make([]string, maxParam)
-		pvalues = make([]string, maxParam)
+	if urlParamMaxNum > 0 {
+		pnames = make([]string, urlParamMaxNum)
+		pvalues = make([]string, urlParamMaxNum)
 	}
 
-	ctx := &Context{
-		ship:    s,
-		code:    200,
-		pnames:  pnames,
-		pvalues: pvalues,
-		Data:    make(map[string]interface{}, s.ctxDataSize),
+	return &Context{
+		res:  NewResponse(nil),
+		Data: make(map[string]interface{}, dataSize),
+
+		urlParamNames:  pnames,
+		urlParamValues: pvalues,
 	}
-	ctx.setReqResp(req, resp)
-
-	if s.newCtxData != nil {
-		ctx.ReqCtxData = s.newCtxData(ctx)
-	}
-
-	return ctx
-}
-
-func (c *Context) reset() {
-	c.Err = nil
-	c.Key1 = nil
-	c.Key2 = nil
-	c.Key3 = nil
-	c.ClearData()
-
-	if c.ReqCtxData != nil {
-		c.ReqCtxData.Reset()
-	}
-
-	c.code = 200
-	c.wrote = false
-
-	c.req = nil
-	c.resp.reset(nil)
-	c.query = nil
-	c.router = nil
-
-	c.handler = nil
-	c.resetURLParam()
-
-	c.sessionK = ""
-	c.sessionV = nil
 }
 
 func (c *Context) resetURLParam() {
-	copy(c.pnames, emptyStrS[:len(c.pnames)])
-	copy(c.pvalues, emptyStrS[:len(c.pvalues)])
-}
-
-func (c *Context) setReqResp(r *http.Request, w http.ResponseWriter) {
-	c.req = r
-	c.resp = newResponder(c, w)
-	if c.ship.enableCtxHTTPContext {
-		setContext(c)
+	for i := range c.urlParamNames {
+		c.urlParamNames[i] = ""
 	}
 }
 
@@ -304,62 +167,117 @@ func (c *Context) ClearData() {
 	}
 }
 
-// FindHandler finds the registered router handler by the method and
-// path of the request.
-//
-// Return nil if not found.
-func (c *Context) FindHandler(method, path string) Handler {
+// Reset resets the context to the initalizing state.
+func (c *Context) Reset() {
+	c.Key1 = nil
+	c.Key2 = nil
+	c.Key3 = nil
+	c.ClearData()
+
+	c.req = nil
+	c.res.Reset(nil)
+	c.query = nil
 	c.resetURLParam()
-	return c.findHandler(method, path)
+
+	// (xgfone) Maybe do it??
+	// c.logger = nil
+	// c.buffer = nil
+	// c.router = nil
+	// c.binder = nil
+	// c.getURL = nil
+	// c.qbinder = nil
+	// c.renderer = nil
+	// c.session = nil
+	// c.handler = nil
+	// c.notFound = nil
 }
 
-func (c *Context) findHandler(method, path string) Handler {
-	switch h := c.router.Find(method, path, c.pnames, c.pvalues).(type) {
-	case Handler:
-		return h
-	case func(ctx *Context) error:
-		return Handler(h)
-	case nil:
-		return nil
-	default:
-		panic(fmt.Errorf("unknown handler type '%T'", h))
+// SetRouter sets the router to r.
+func (c *Context) SetRouter(r router.Router) { c.router = r }
+
+// Router returns the router.
+func (c *Context) Router() router.Router { return c.router }
+
+// Execute finds the route and calls the handler.
+func (c *Context) Execute(notFound Handler) error {
+	if notFound == nil && c.notFound != nil {
+		notFound = c.notFound
 	}
+
+	return c.router.Find(c.req.Method, c.req.URL.Path, c.urlParamNames,
+		c.urlParamValues, notFound).(Handler)(c)
 }
 
-// NotFoundHandler returns the configured NotFound handler.
-func (c *Context) NotFoundHandler() Handler {
-	return c.ship.notFoundHandler
+// SetNotFoundHandler sets the NotFound handler.
+func (c *Context) SetNotFoundHandler(notFound Handler) { c.notFound = notFound }
+
+// NotFoundHandler returns the NotFound Handler, but returns nil instead
+// if not set.
+func (c *Context) NotFoundHandler() Handler { return c.notFound }
+
+//----------------------------------------------------------------------------
+// URL
+//----------------------------------------------------------------------------
+
+// SetGetURL sets the url getter to getURL.
+func (c *Context) SetGetURL(getURL func(name string, params ...interface{}) string) {
+	c.getURL = getURL
 }
 
 // URL generates an URL by route name and provided parameters.
-func (c *Context) URL(name string, params ...interface{}) string {
-	return c.ship.URL(name, params...)
-}
-
-// Logger returns the logger implementation.
-func (c *Context) Logger() Logger {
-	return c.ship.logger
-}
-
-// Router returns the router.
-func (c *Context) Router() Router {
-	return c.router
-}
-
-// AcquireBuffer acquires a buffer.
 //
-// Notice: you should call ReleaseBuffer() to release it.
-func (c *Context) AcquireBuffer() *bytes.Buffer {
-	return c.ship.AcquireBuffer()
+// Return "" if there is no the route named name.
+func (c *Context) URL(name string, params ...interface{}) string {
+	return c.getURL(name, params...)
 }
 
-// ReleaseBuffer releases a buffer into the pool.
-func (c *Context) ReleaseBuffer(buf *bytes.Buffer) {
-	c.ship.ReleaseBuffer(buf)
+//----------------------------------------------------------------------------
+// Logger
+//----------------------------------------------------------------------------
+
+// SetLogger sets the logger to logger.
+func (c *Context) SetLogger(logger Logger) { c.logger = logger }
+
+// Logger returns the logger.
+func (c *Context) Logger() Logger { return c.logger }
+
+//----------------------------------------------------------------------------
+// Request & Response
+//----------------------------------------------------------------------------
+
+// SetReqRes is the same as Reset, but only reset the request and response,
+// not all things.
+func (c *Context) SetReqRes(r *http.Request, w http.ResponseWriter) {
+	c.req = r
+	c.res.SetWriter(w)
 }
 
-// SetHandler sets a context handler in order to call it across the functions
-// by the method Handle(), which is used to handle the various arguments.
+// SetRequest resets the request to req.
+func (c *Context) SetRequest(req *http.Request) { c.req = req }
+
+// SetResponse resets the response to resp, which will ignore nil.
+func (c *Context) SetResponse(res http.ResponseWriter) { c.res.SetWriter(res) }
+
+// Request returns the inner Request.
+func (c *Context) Request() *http.Request { return c.req }
+
+// Response returns the inner Response.
+func (c *Context) Response() *Response { return c.res }
+
+// ResponseWriter returns the underlying http.ResponseWriter.
+func (c *Context) ResponseWriter() http.ResponseWriter { return c.res.ResponseWriter }
+
+// StatusCode returns the status code of the response.
+func (c *Context) StatusCode() int { return c.res.Status }
+
+// IsResponded reports whether the response is sent.
+func (c *Context) IsResponded() bool { return c.res.Wrote }
+
+//----------------------------------------------------------------------------
+// Responder
+//----------------------------------------------------------------------------
+
+// SetResponder sets the responder to handle the complicated response.
 //
 // For example,
 //
@@ -372,242 +290,265 @@ func (c *Context) ReleaseBuffer(buf *bytes.Buffer) {
 //            case int:
 //                return ctx.NoContent(v)
 //            case string:
-//                return ctx.String(http.StatusOK, v)
+//                return ctx.Text(http.StatusOK, v)
 //            }
 //        case 2:
 //            switch v0 := args[0].(type) {
 //            case int:
-//                return ctx.String(v0, "%v", args[1])
+//                return ctx.Text(v0, "%v", args[1])
 //            }
 //        }
 //        return ctx.NoContent(http.StatusInternalServerError)
 //    }
 //
-//    sethandler := func(next Handler) Handler {
-//        return func(ctx *Context) error {
-//            ctx.SetHandler(responder)
-//            return next(ctx)
-//        }
-//    }
-//
 //    router := New()
-//    router.Use(sethandler)
+//    router.Responder =responder
 //    router.Route("/path1").GET(func(c *Context) error { return c.Handle() })
 //    router.Route("/path2").GET(func(c *Context) error { return c.Handle(200) })
 //    router.Route("/path3").GET(func(c *Context) error { return c.Handle("Hello, World") })
 //    router.Route("/path4").GET(func(c *Context) error { return c.Handle(200, "Hello, World") })
 //
-func (c *Context) SetHandler(h func(*Context, ...interface{}) error) {
-	c.handler = h
-}
+func (c *Context) SetResponder(h func(*Context, ...interface{}) error) { c.responder = h }
 
-// Handle calls the context handler.
+// Respond calls the context handler set by SetHandler.
 //
-// Return ErrNoHandler if the context handler or the global handler is not set.
-func (c *Context) Handle(args ...interface{}) error {
-	if c.handler != nil {
-		return c.handler(c, args...)
-	} else if c.ship.ctxHandler != nil {
-		return c.ship.ctxHandler(c, args...)
+// Return ErrNoResponder if the context handler or the global handler is not set.
+func (c *Context) Respond(args ...interface{}) error {
+	if c.responder == nil {
+		return ErrNoResponder
 	}
-	return ErrNoHandler
+	return c.responder(c, args...)
 }
 
-// Request returns the inner Request.
-func (c *Context) Request() *http.Request {
-	return c.req
+//----------------------------------------------------------------------------
+// Buffer
+//----------------------------------------------------------------------------
+
+// BufferAllocator is used to acquire and release a buffer.
+type BufferAllocator interface {
+	AcquireBuffer() *bytes.Buffer
+	ReleaseBuffer(*bytes.Buffer)
 }
 
-// Response returns the inner http.ResponseWriter.
+// SetBufferAllocator sets the buffer allocator to alloc.
+func (c *Context) SetBufferAllocator(alloc BufferAllocator) { c.buffer = alloc }
+
+// AcquireBuffer acquires a buffer.
 //
-// Notice: you should not cache the returned response.
-func (c *Context) Response() http.ResponseWriter {
-	return newResponder(c, c.resp.resp)
-}
+// Notice: you should call ReleaseBuffer() to release it.
+func (c *Context) AcquireBuffer() *bytes.Buffer { return c.buffer.AcquireBuffer() }
 
-// StatusCode returns the status code of the response.
-//
-// Notice: it's used by the middleware, such as Logger in general.
-func (c *Context) StatusCode() int {
-	return c.code
-}
+// ReleaseBuffer releases a buffer into the pool.
+func (c *Context) ReleaseBuffer(buf *bytes.Buffer) { c.buffer.ReleaseBuffer(buf) }
 
-// IsResponded reports whether the response is sent.
-func (c *Context) IsResponded() bool {
-	return c.wrote
-}
+//----------------------------------------------------------------------------
+// URL Params
+//----------------------------------------------------------------------------
 
-// SetResponded sets the response to be sent or not.
-func (c *Context) SetResponded(yes bool) {
-	c.wrote = yes
-}
-
-// SetRequest resets the request to req, which will ignore nil.
-func (c *Context) SetRequest(req *http.Request) {
-	if req != nil {
-		c.req = req
-	}
-}
-
-// SetResponse resets the response to resp, which will ignore nil.
-func (c *Context) SetResponse(resp http.ResponseWriter) {
-	switch r := resp.(type) {
-	case nil:
-	case responder:
-		c.resp.reset(r.resp)
-	default:
-		c.resp.reset(resp)
-	}
-}
-
-// SetConnectionClose tell the server to close the connection.
-func (c *Context) SetConnectionClose() {
-	c.resp.Header().Set(HeaderConnection, "close")
-}
-
-// Param returns the parameter value in the url path by name.
-func (c *Context) Param(name string) string {
-	for i, _len := 0, len(c.pnames); i < _len; i++ {
-		switch v := c.pnames[i]; v {
+// URLParam returns the parameter value in the url path by name.
+func (c *Context) URLParam(name string) string {
+	for i, n := range c.urlParamNames {
+		switch n {
 		case "":
 			return ""
 		case name:
-			return c.pvalues[i]
+			return c.urlParamValues[i]
 		}
 	}
 	return ""
 }
 
-// Params returns all the parameters as the key-value map in the url path.
-func (c *Context) Params() map[string]string {
-	_len := len(c.pnames)
+// URLParams returns all the parameters as the key-value map in the url path.
+func (c *Context) URLParams() map[string]string {
+	_len := len(c.urlParamNames)
 	ms := make(map[string]string, _len)
-	for i := 0; i < _len; i++ {
-		if c.pnames[i] == "" {
+	for i, name := range c.urlParamNames {
+		if name == "" {
 			break
 		}
-		ms[c.pnames[i]] = c.pvalues[i]
+		ms[name] = c.urlParamValues[i]
 	}
 	return ms
 }
 
-// ParamNames returns all the names of the URL parameters.
-func (c *Context) ParamNames() []string {
-	i, _len := 0, len(c.pnames)
-	for ; i < _len; i++ {
-		if c.pnames[i] == "" {
-			return c.pnames[:i]
+// URLParamNames returns the names of all the URL parameters.
+func (c *Context) URLParamNames() []string {
+	if len(c.urlParamNames) == 0 || c.urlParamNames[0] == "" {
+		return nil
+	}
+
+	for i, name := range c.urlParamNames {
+		if name == "" {
+			return c.urlParamNames[:i]
 		}
 	}
-	if i == 0 {
-		return []string{}
-	}
-	return c.pnames
+	return c.urlParamNames
 }
 
-// ParamValues returns all the names of the URL parameters.
-func (c *Context) ParamValues() []string {
-	i, _len := 0, len(c.pnames)
-	for ; i < _len; i++ {
-		if c.pnames[i] == "" {
-			return c.pvalues[:i]
+// URLParamValues returns the values of all the URL parameters.
+func (c *Context) URLParamValues() []string {
+	if len(c.urlParamNames) == 0 || c.urlParamNames[0] == "" {
+		return nil
+	}
+
+	for i, name := range c.urlParamNames {
+		if name == "" {
+			return c.urlParamValues[:i]
 		}
 	}
-	if i == 0 {
-		return []string{}
-	}
-	return c.pvalues
+	return c.urlParamValues
 }
 
-// ParamToStruct scans the url parameters to a pointer v to the struct.
-//
-// For the struct, the argument name is the field name by default. But you can
-// change it by the tag "url", such as `url:"name"`. The tag `url:"-"`, however,
-// will ignore this field.
-func (c *Context) ParamToStruct(v interface{}) error {
-	if v == nil {
-		return errors.New("the argument is nil")
-	}
-
-	value := reflect.ValueOf(v)
-	if value.Kind() != reflect.Ptr {
-		return errors.New("the argument is not a pointer")
-	} else if value = value.Elem(); value.Kind() != reflect.Struct {
-		return errors.New("the argument is not a pointer to struct")
-	}
-
-	vtype := value.Type()
-	for i, num := 0, value.NumField(); i < num; i++ {
-		fieldv := value.Field(i)
-		fieldt := vtype.Field(i)
-
-		name := fieldt.Name
-		if n := fieldt.Tag.Get("url"); n != "" {
-			if n == "-" {
-				continue
-			}
-			name = n
-		}
-
-		// Check whether the field can be set.
-		if !fieldv.CanSet() {
-			continue
-		}
-
-		if fieldv.Kind() != reflect.Ptr {
-			fieldv = fieldv.Addr()
-		}
-
-		if v := c.Param(name); v != "" {
-			if err := function.SetValue(fieldv.Interface(), v); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// Header is the alias of GetHeader.
-func (c *Context) Header(name string) string {
-	return c.GetHeader(name)
-}
+//----------------------------------------------------------------------------
+// Header
+//----------------------------------------------------------------------------
 
 // ReqHeader returns the header of the request.
-func (c *Context) ReqHeader() http.Header {
-	return c.req.Header
-}
+func (c *Context) ReqHeader() http.Header { return c.req.Header }
 
 // RespHeader returns the header of the response.
-func (c *Context) RespHeader() http.Header {
-	return c.resp.Header()
-}
+func (c *Context) RespHeader() http.Header { return c.res.Header() }
+
+// Header is equal to RespHeader().
+func (c *Context) Header() http.Header { return c.res.Header() }
 
 // GetHeader returns the first value of the request header named name.
 //
 // Return "" if the header does not exist.
-func (c *Context) GetHeader(name string) string {
-	return c.req.Header.Get(name)
-}
+func (c *Context) GetHeader(name string) string { return c.req.Header.Get(name) }
 
 // SetHeader sets the response header name to value.
-func (c *Context) SetHeader(name, value string) {
-	c.resp.Header().Set(name, value)
-}
+func (c *Context) SetHeader(name, value string) { c.res.Header().Set(name, value) }
 
 // AddHeader appends the value for the response header name.
-func (c *Context) AddHeader(name, value string) {
-	c.resp.Header().Add(name, value)
+func (c *Context) AddHeader(name, value string) { c.res.Header().Add(name, value) }
+
+// DelHeader deletes the header named name from the response.
+func (c *Context) DelHeader(name string) { c.res.Header().Del(name) }
+
+//----------------------------------------------------------------------------
+// Cookie
+//----------------------------------------------------------------------------
+
+// Cookies returns the HTTP cookies sent with the request.
+func (c *Context) Cookies() []*http.Cookie { return c.req.Cookies() }
+
+// Cookie returns the named cookie provided in the request.
+//
+// Return nil if no the cookie named name.
+func (c *Context) Cookie(name string) *http.Cookie {
+	cookie, _ := c.req.Cookie(name)
+	return cookie
 }
 
-// IsDebug reports whether to enable the debug mode.
-func (c *Context) IsDebug() bool {
-	return c.ship.debug
+// SetCookie adds a `Set-Cookie` header in HTTP response.
+func (c *Context) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c.res, cookie)
 }
+
+//----------------------------------------------------------------------------
+// Request Query
+//----------------------------------------------------------------------------
+
+// QueryParam returns the query param for the provided name.
+func (c *Context) QueryParam(name string) string {
+	if c.query == nil {
+		c.query = c.req.URL.Query()
+	}
+	return c.query.Get(name)
+}
+
+// QueryParams returns the query parameters as `url.Values`.
+func (c *Context) QueryParams() url.Values {
+	if c.query == nil {
+		c.query = c.req.URL.Query()
+	}
+	return c.query
+}
+
+// QueryRawString returns the URL query string.
+func (c *Context) QueryRawString() string {
+	return c.req.URL.RawQuery
+}
+
+//----------------------------------------------------------------------------
+// Request Form
+//----------------------------------------------------------------------------
+
+// FormValue returns the form field value for the provided name.
+func (c *Context) FormValue(name string) string {
+	return c.req.FormValue(name)
+}
+
+// FormParams returns the form parameters as `url.Values`.
+func (c *Context) FormParams() (url.Values, error) {
+	if strings.HasPrefix(c.req.Header.Get(HeaderContentType), MIMEMultipartForm) {
+		if err := c.req.ParseMultipartForm(MaxMemoryLimit); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := c.req.ParseForm(); err != nil {
+			return nil, err
+		}
+	}
+	return c.req.Form, nil
+}
+
+// FormFile returns the multipart form file for the provided name.
+func (c *Context) FormFile(name string) (multipart.File, *multipart.FileHeader, error) {
+	return c.req.FormFile(name)
+}
+
+// MultipartForm returns the multipart form.
+func (c *Context) MultipartForm() (*multipart.Form, error) {
+	err := c.req.ParseMultipartForm(MaxMemoryLimit)
+	return c.req.MultipartForm, err
+}
+
+// MultipartReader returns the multipart reader from the request.
+func (c *Context) MultipartReader() (*multipart.Reader, error) {
+	return c.req.MultipartReader()
+}
+
+//----------------------------------------------------------------------------
+// Request Body
+//----------------------------------------------------------------------------
+
+// Body returns the reader of the request body.
+func (c *Context) Body() io.ReadCloser { return c.req.Body }
+
+// GetBody reads all the contents from the body and returns it as string.
+func (c *Context) GetBody() (string, error) {
+	buf := c.AcquireBuffer()
+	err := ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	body := buf.String()
+	c.ReleaseBuffer(buf)
+	return body, err
+}
+
+// GetBodyReader reads all the contents from the body to buffer and returns it.
+//
+// Notice: You should call ReleaseBuffer(buf) to release the buffer at last.
+func (c *Context) GetBodyReader() (buf *bytes.Buffer, err error) {
+	buf = c.AcquireBuffer()
+	err = ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	if err != nil {
+		c.ReleaseBuffer(buf)
+		return nil, err
+	}
+	return
+}
+
+//----------------------------------------------------------------------------
+// Other Request Information
+//----------------------------------------------------------------------------
 
 // IsTLS reports whether HTTP connection is TLS or not.
-func (c *Context) IsTLS() bool {
-	return c.req.TLS != nil
+func (c *Context) IsTLS() bool { return c.req.TLS != nil }
+
+// IsAjax reports whether the request is ajax or not.
+func (c *Context) IsAjax() bool {
+	return c.req.Header.Get(HeaderXRequestedWith) == "XMLHttpRequest"
 }
 
 // IsWebSocket reports whether HTTP connection is WebSocket or not.
@@ -620,9 +561,36 @@ func (c *Context) IsWebSocket() bool {
 	return false
 }
 
-// IsAjax reports whether the request is ajax or not.
-func (c *Context) IsAjax() bool {
-	return c.req.Header.Get(HeaderXRequestedWith) == "XMLHttpRequest"
+// Host returns the host of the request.
+func (c *Context) Host() string { return c.req.Host }
+
+// Hostname returns the hostname of the request.
+func (c *Context) Hostname() string { return c.req.URL.Hostname() }
+
+// Method returns the method of the request.
+func (c *Context) Method() string { return c.req.Method }
+
+// Path returns the path of the request.
+func (c *Context) Path() string { return c.req.URL.Path }
+
+// Referer returns the Referer header of the request.
+func (c *Context) Referer() string { return c.req.Referer() }
+
+// UserAgent returns the User-Agent header of the request.
+func (c *Context) UserAgent() string { return c.req.UserAgent() }
+
+// RemoteAddr returns the remote address of the http connection.
+func (c *Context) RemoteAddr() string { return c.req.RemoteAddr }
+
+// RequestURI returns the URI of the request.
+func (c *Context) RequestURI() string { return c.req.RequestURI }
+
+// ContentLength return the length of the request body.
+func (c *Context) ContentLength() int64 { return c.req.ContentLength }
+
+// BasicAuth returns the username and password from the request.
+func (c *Context) BasicAuth() (username, password string, ok bool) {
+	return c.req.BasicAuth()
 }
 
 // Accept returns the content of the header Accept.
@@ -637,7 +605,6 @@ func (c *Context) IsAjax() bool {
 //   3. If the value is "*/*", it will be amended as "".
 //
 func (c *Context) Accept() []string {
-
 	type acceptT struct {
 		ct string
 		q  float64
@@ -689,26 +656,6 @@ func (c *Context) Accept() []string {
 	return results
 }
 
-// Host returns the host of the request.
-func (c *Context) Host() string {
-	return c.req.Host
-}
-
-// Hostname returns the hostname of the request.
-func (c *Context) Hostname() string {
-	return c.req.URL.Hostname()
-}
-
-// Method returns the method of the request.
-func (c *Context) Method() string {
-	return c.req.Method
-}
-
-// Path returns the path of the request.
-func (c *Context) Path() string {
-	return c.req.URL.Path
-}
-
 // Scheme returns the HTTP protocol scheme, `http` or `https`.
 func (c *Context) Scheme() (scheme string) {
 	// Can't use `r.Request.URL.Scheme`
@@ -746,36 +693,6 @@ func (c *Context) RealIP() string {
 	return ra
 }
 
-// Referer returns the Referer header of the request.
-func (c *Context) Referer() string {
-	return c.req.Referer()
-}
-
-// UserAgent returns the User-Agent header of the request.
-func (c *Context) UserAgent() string {
-	return c.req.UserAgent()
-}
-
-// RemoteAddr returns the remote address of the http connection.
-func (c *Context) RemoteAddr() string {
-	return c.req.RemoteAddr
-}
-
-// RequestURI returns the URI of the request.
-func (c *Context) RequestURI() string {
-	return c.req.RequestURI
-}
-
-// Context returns the Context from the request.
-func (c *Context) Context() context.Context {
-	return c.req.Context()
-}
-
-// BasicAuth returns the username and password from the request.
-func (c *Context) BasicAuth() (username, password string, ok bool) {
-	return c.req.BasicAuth()
-}
-
 // Charset returns the charset of the request content.
 //
 // Return "" if there is no charset.
@@ -802,169 +719,24 @@ func (c *Context) ContentType() (ct string) {
 	return
 }
 
-// ContentLength return the length of the request body.
-func (c *Context) ContentLength() int64 {
-	return c.req.ContentLength
-}
+//----------------------------------------------------------------------------
+// Session Management
+//----------------------------------------------------------------------------
 
-// SetContentTypes sets the Content-Type of the response body to more than one.
-func (c *Context) SetContentTypes(contentTypes []string) {
-	c.resp.Header()[HeaderContentType] = contentTypes
-}
-
-// SetContentType sets the Content-Type of the response body to contentType,
-// but does nothing if contentType is "".
-//
-// Notice: In order to avoid the memory allocation to improve performance,
-// it will look up the corresponding Content-Type slice constant firstly,
-// or generate one by the argument contentType, then set the response header
-// Content-Type to the Content-Type slice. Howevre, you can call
-// SetContentTypes() to set it to avoid the memory allocation, and pass ""
-// to the response function, for example, JSON(), String(), Blob(), etc.
-//
-// For the pre-defined Content-Type slices, please see
-// https://godoc.org/github.com/xgfone/ship/#pkg-variables.
-func (c *Context) SetContentType(contentType string) {
-	if contentType != "" {
-		c.SetContentTypes(toContentTypes(contentType))
-	}
-}
-
-// Body returns the reader of the request body.
-func (c *Context) Body() io.ReadCloser {
-	return c.req.Body
-}
-
-// GetBody reads all the contents from the body and returns it as string.
-func (c *Context) GetBody() (string, error) {
-	buf := c.AcquireBuffer()
-	err := io2.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
-	body := buf.String()
-	c.ReleaseBuffer(buf)
-	return body, err
-}
-
-// GetBodyReader reads all the contents from the body to buffer and returns it.
-//
-// Notice: You should call ReleaseBuffer(buf) to release the buffer at last.
-func (c *Context) GetBodyReader() (buf *bytes.Buffer, err error) {
-	buf = c.AcquireBuffer()
-	err = io2.ReadNWriter(buf, c.req.Body, c.req.ContentLength)
-	if err != nil {
-		c.ReleaseBuffer(buf)
-		return nil, err
-	}
-	return
-}
-
-// QueryParam returns the query param for the provided name.
-func (c *Context) QueryParam(name string) string {
-	if c.query == nil {
-		c.query = c.req.URL.Query()
-	}
-	return c.query.Get(name)
-}
-
-// QueryParams returns the query parameters as `url.Values`.
-func (c *Context) QueryParams() url.Values {
-	if c.query == nil {
-		c.query = c.req.URL.Query()
-	}
-	return c.query
-}
-
-// QueryRawString returns the URL query string.
-func (c *Context) QueryRawString() string {
-	return c.req.URL.RawQuery
-}
-
-// FormValue returns the form field value for the provided name.
-func (c *Context) FormValue(name string) string {
-	return c.req.FormValue(name)
-}
-
-// FormParams returns the form parameters as `url.Values`.
-func (c *Context) FormParams() (url.Values, error) {
-	if strings.HasPrefix(c.req.Header.Get(HeaderContentType), MIMEMultipartForm) {
-		if err := c.req.ParseMultipartForm(MaxMemoryLimit); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := c.req.ParseForm(); err != nil {
-			return nil, err
-		}
-	}
-	return c.req.Form, nil
-}
-
-// FormFile returns the multipart form file for the provided name.
-func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
-	file, fh, err := c.req.FormFile(name)
-	if file != nil {
-		file.Close()
-	}
-	return fh, err
-}
-
-// FormFile2 returns the multipart form file for the provided name.
-func (c *Context) FormFile2(name string) (multipart.File, *multipart.FileHeader, error) {
-	return c.req.FormFile(name)
-}
-
-// MultipartForm returns the multipart form.
-func (c *Context) MultipartForm() (*multipart.Form, error) {
-	err := c.req.ParseMultipartForm(MaxMemoryLimit)
-	return c.req.MultipartForm, err
-}
-
-// MultipartReader returns the multipart reader from the request.
-func (c *Context) MultipartReader() (*multipart.Reader, error) {
-	return c.req.MultipartReader()
-}
-
-// Cookie returns the named cookie provided in the request.
-func (c *Context) Cookie(name string) (*http.Cookie, error) {
-	return c.req.Cookie(name)
-}
-
-// Cookies returns the HTTP cookies sent with the request.
-func (c *Context) Cookies() []*http.Cookie {
-	return c.req.Cookies()
-}
-
-// SetCookie adds a `Set-Cookie` header in HTTP response.
-func (c *Context) SetCookie(cookie *http.Cookie) {
-	http.SetCookie(c.resp, cookie)
-}
+// SetSessionManagement sets the session management to s.
+func (c *Context) SetSessionManagement(s session.Session) { c.session = s }
 
 // GetSession returns the session content by id from the backend store.
 //
-// If the session id does not exist, it maybe return (nil, nil).
-//
-// Notice: for the same session id, the context maybe optimize GetSession
-// by the cache, which will call the backend store only once.
+// If the session id does not exist, it returns ErrSessionNotExist.
 func (c *Context) GetSession(id string) (v interface{}, err error) {
 	if id == "" {
-		return nil, ErrSessionNotExist
-	}
-	if c.sessionK == id {
-		switch c.sessionV {
-		case nil, emptyValue:
-			return nil, ErrSessionNotExist
-		}
-		return c.sessionV, nil
-	}
-
-	if c.ship.session == nil {
+		return nil, ErrInvalidSession
+	} else if c.session == nil {
 		return nil, ErrNoSessionSupport
-	}
-	if v, err = c.ship.session.GetSession(id); err == nil {
-		c.sessionK = id
+	} else if v, err = c.session.GetSession(id); err == nil {
 		if v == nil {
 			err = ErrSessionNotExist
-			c.sessionV = emptyValue
-		} else {
-			c.sessionV = v
 		}
 	}
 
@@ -972,126 +744,136 @@ func (c *Context) GetSession(id string) (v interface{}, err error) {
 }
 
 // SetSession sets the session to the backend store.
-//
-// id must not be "".
-//
-// value should not be nil. If nil, however, it will tell the context
-// that the session id is missing, and the context should not forward
-// the request to the underlying session store when calling GetSession.
 func (c *Context) SetSession(id string, value interface{}) (err error) {
-	if c.ship.session == nil {
+	if id == "" || value == nil {
+		return ErrInvalidSession
+	} else if c.session == nil {
 		return ErrNoSessionSupport
 	}
-	if id == "" {
-		return ErrInvalidSession
-	}
-	if value == nil {
-		c.sessionK = id
-		c.sessionV = emptyValue
-		return nil
-	}
-	if err = c.ship.session.SetSession(id, value); err != nil {
-		return err
-	}
-	c.sessionK = id
-	c.sessionV = value
-	return nil
+
+	return c.session.SetSession(id, value)
 }
 
 // DelSession deletes the session from the backend store.
-//
-// id must not be "".
 func (c *Context) DelSession(id string) (err error) {
 	if id == "" {
 		return ErrInvalidSession
-	}
-	if c.ship.session == nil {
+	} else if c.session == nil {
 		return ErrNoSessionSupport
 	}
-	if err = c.ship.session.DelSession(id); err != nil {
-		return
-	}
-	if c.sessionK == id {
-		c.sessionV = nil
-	}
-	return nil
+
+	return c.session.DelSession(id)
 }
+
+//----------------------------------------------------------------------------
+// Binder
+//----------------------------------------------------------------------------
+
+// SetBinder sets the binder to b to bind the request information to an object.
+func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
 
 // Bind binds the request information into the provided value v.
 //
 // The default binder does it based on Content-Type header.
-func (c *Context) Bind(v interface{}) error {
-	return c.ship.binder.Bind(c, v)
-}
+func (c *Context) Bind(v interface{}) error { return c.binder.Bind(c.req, v) }
+
+// SetQueryBinder sets the query binder to f to bind the url query to an object.
+func (c *Context) SetQueryBinder(f func(interface{}, url.Values) error) { c.qbinder = f }
 
 // BindQuery binds the request URL query into the provided value v.
-func (c *Context) BindQuery(v interface{}) error {
-	return c.ship.bindQuery(v, c.QueryParams())
-}
+func (c *Context) BindQuery(v interface{}) error { return c.qbinder(v, c.QueryParams()) }
+
+//----------------------------------------------------------------------------
+// Renderer
+//----------------------------------------------------------------------------
+
+// SetRenderer sets the renderer to r to render the response to the peer.
+func (c *Context) SetRenderer(r render.Renderer) { c.renderer = r }
 
 // Render renders a template named name with data and sends a text/html response
 // with status code.
 func (c *Context) Render(name string, code int, data interface{}) error {
-	if c.ship.renderer == nil {
+	if c.renderer == nil {
 		return ErrRendererNotRegistered
 	}
-	return c.ship.renderer.Render(c, name, code, data)
+	return c.renderer.Render(c, name, code, data)
 }
+
+//----------------------------------------------------------------------------
+// Set Repsonse
+//----------------------------------------------------------------------------
+
+// SetConnectionClose tell the server to close the connection.
+func (c *Context) SetConnectionClose() {
+	c.res.Header().Set(HeaderConnection, "close")
+}
+
+// SetContentType sets the Content-Type header of the response body to ct,
+// but does nothing if contentType is "".
+func (c *Context) SetContentType(ct string) {
+	if ct != "" {
+		SetContextType(c.res, ct)
+	}
+}
+
+//----------------------------------------------------------------------------
+// Send Repsonse
+//----------------------------------------------------------------------------
+
+// WriteHeader sends an HTTP response header with the provided status code.
+func (c *Context) WriteHeader(statusCode int) { c.res.WriteHeader(statusCode) }
 
 // Write writes the content to the peer.
 //
-// it will write the header firstly if the header is not sent.
-func (c *Context) Write(b []byte) (int, error) {
-	return c.resp.Write(b)
-}
+// it will write the header firstly with 200 if the header is not sent.
+func (c *Context) Write(b []byte) (int, error) { return c.res.Write(b) }
 
 // NoContent sends a response with no body and a status code.
-func (c *Context) NoContent(code int) error {
-	c.resp.WriteHeader(code)
-	return nil
-}
+func (c *Context) NoContent(code int) error { c.res.WriteHeader(code); return nil }
 
 // Redirect redirects the request to a provided URL with status code.
 func (c *Context) Redirect(code int, toURL string) error {
-	if code < 300 || code > 308 {
+	if code < 300 || code >= 400 {
 		return ErrInvalidRedirectCode
 	}
-	c.resp.Header().Set(HeaderLocation, toURL)
-	c.resp.WriteHeader(code)
-	return nil
+	c.res.Header().Set(HeaderLocation, toURL)
+	return c.NoContent(code)
+}
+
+func (c *Context) setContextTypeAndCode(code int, ct string) {
+	c.SetContentType(ct)
+	c.res.WriteHeader(code)
 }
 
 // Stream sends a streaming response with status code and content type.
 func (c *Context) Stream(code int, contentType string, r io.Reader) (err error) {
-	c.SetContentType(contentType)
-	c.resp.WriteHeader(code)
-	_, err = io.Copy(c.resp, r)
+	c.setContextTypeAndCode(code, contentType)
+	_, err = io.CopyBuffer(c.res, r, make([]byte, 2048))
 	return
 }
 
 // Blob sends a blob response with status code and content type.
 func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
-	c.SetContentType(contentType)
-	c.resp.WriteHeader(code)
-	_, err = c.resp.Write(b)
+	c.setContextTypeAndCode(code, contentType)
+	_, err = c.res.Write(b)
 	return
 }
 
-// BlobString sends a string blob response with status code and content type.
-func (c *Context) BlobString(code int, contentType string, format string, args ...interface{}) (err error) {
-	c.SetContentType(contentType)
-	c.resp.WriteHeader(code)
+// BlobText sends a string blob response with status code and content type.
+func (c *Context) BlobText(code int, contentType string, format string,
+	args ...interface{}) (err error) {
+	c.setContextTypeAndCode(code, contentType)
 	if len(args) > 0 {
-		_, err = fmt.Fprintf(c.resp, format, args...)
+		_, err = fmt.Fprintf(c.res, format, args...)
 	} else {
-		_, err = io.WriteString(c.resp, format)
+		_, err = c.res.WriteString(format)
 	}
 	return err
 }
 
-// String sends a string response with status code.
-func (c *Context) String(code int, format string, args ...interface{}) (err error) {
-	return c.BlobString(code, MIMETextPlainCharsetUTF8, format, args...)
+// Text sends a string response with status code.
+func (c *Context) Text(code int, format string, args ...interface{}) error {
+	return c.BlobText(code, MIMETextPlainCharsetUTF8, format, args...)
 }
 
 // Error sends an error response with status code.
@@ -1101,29 +883,25 @@ func (c *Context) String(code int, format string, args ...interface{}) (err erro
 func (c *Context) Error(code int, err error) error {
 	if he, ok := err.(HTTPError); ok {
 		if he.CT == "" {
-			return c.BlobString(he.Code, he.CT, err.Error())
+			return c.Text(he.Code, err.Error())
 		}
-		return c.String(he.Code, err.Error())
+		return c.BlobText(he.Code, he.CT, err.Error())
 	}
-	return c.String(code, err.Error())
+	return c.Text(code, err.Error())
 }
 
 // JSON sends a JSON response with status code.
-func (c *Context) JSON(code int, i interface{}) error {
-	b, err := json.Marshal(i)
-	if err != nil {
-		return err
-	}
-	return c.JSONBlob(code, b)
+func (c *Context) JSON(code int, v interface{}) error {
+	c.setContextTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
+	return json.NewEncoder(c.res).Encode(v)
 }
 
 // JSONPretty sends a pretty-print JSON with status code.
-func (c *Context) JSONPretty(code int, i interface{}, indent string) error {
-	b, err := json.MarshalIndent(i, "", indent)
-	if err != nil {
-		return err
-	}
-	return c.JSONBlob(code, b)
+func (c *Context) JSONPretty(code int, v interface{}, indent string) error {
+	c.setContextTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
+	enc := json.NewEncoder(c.res)
+	enc.SetIndent("", indent)
+	return enc.Encode(v)
 }
 
 // JSONBlob sends a JSON blob response with status code.
@@ -1145,49 +923,51 @@ func (c *Context) JSONP(code int, callback string, i interface{}) error {
 // to construct the JSONP payload.
 func (c *Context) JSONPBlob(code int, callback string, b []byte) (err error) {
 	c.SetContentType(MIMEApplicationJavaScriptCharsetUTF8)
-	c.resp.WriteHeader(code)
-	if _, err = c.resp.Write([]byte(callback + "(")); err != nil {
+	c.res.WriteHeader(code)
+	if _, err = c.res.WriteString(callback); err != nil {
+		return
+	} else if _, err = c.res.WriteString("("); err != nil {
+		return
+	} else if _, err = c.res.Write(b); err != nil {
 		return
 	}
-	if _, err = c.resp.Write(b); err != nil {
-		return
-	}
-	_, err = c.resp.Write([]byte("):"))
+	_, err = c.res.WriteString("):")
 	return
 }
 
 // XML sends an XML response with status code.
-func (c *Context) XML(code int, i interface{}) error {
-	b, err := xml.Marshal(i)
-	if err != nil {
+func (c *Context) XML(code int, v interface{}) error {
+	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	if _, err := c.res.WriteString(xml.Header); err != nil {
 		return err
 	}
-	return c.XMLBlob(code, b)
+	return xml.NewEncoder(c.res).Encode(v)
 }
 
 // XMLPretty sends a pretty-print XML with status code.
-func (c *Context) XMLPretty(code int, i interface{}, indent string) error {
-	b, err := xml.MarshalIndent(i, "", indent)
-	if err != nil {
+func (c *Context) XMLPretty(code int, v interface{}, indent string) error {
+	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	if _, err := c.res.WriteString(xml.Header); err != nil {
 		return err
 	}
-	return c.XMLBlob(code, b)
+	enc := xml.NewEncoder(c.res)
+	enc.Indent("", indent)
+	return enc.Encode(v)
 }
 
 // XMLBlob sends an XML blob response with status code.
 func (c *Context) XMLBlob(code int, b []byte) (err error) {
-	c.SetContentType(MIMEApplicationXMLCharsetUTF8)
-	c.resp.WriteHeader(code)
-	if _, err = c.resp.Write([]byte(xml.Header)); err != nil {
+	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	if _, err = c.res.WriteString(xml.Header); err != nil {
 		return
 	}
-	_, err = c.resp.Write(b)
+	_, err = c.res.Write(b)
 	return
 }
 
 // HTML sends an HTTP response with status code.
 func (c *Context) HTML(code int, html string) error {
-	return c.BlobString(code, MIMETextHTMLCharsetUTF8, html)
+	return c.BlobText(code, MIMETextHTMLCharsetUTF8, html)
 }
 
 // HTMLBlob sends an HTTP blob response with status code.
@@ -1208,31 +988,36 @@ func (c *Context) File(file string) (err error) {
 	}
 	defer f.Close()
 
-	if fi, _ := f.Stat(); fi != nil {
-		if fi.IsDir() {
-			file = filepath.Join(file, indexPage)
-			if f, err = os.Open(file); err != nil {
-				return ErrNotFound
-			}
-			defer f.Close()
-			if fi, err = f.Stat(); err != nil {
-				return
-			}
+	fi, err := f.Stat()
+	if err != nil {
+		return ErrInternalServerError.NewError(err)
+	} else if fi.IsDir() {
+		f, err := os.Open(filepath.Join(file, "index.html"))
+		if err != nil {
+			fmt.Println("----------")
+			return ErrNotFound
 		}
-		http.ServeContent(c.resp, c.req, fi.Name(), fi.ModTime(), f)
+		defer f.Close()
+
+		if fi, err = f.Stat(); err != nil {
+			return ErrInternalServerError.NewError(err)
+		}
+
+		http.ServeContent(c.res, c.req, fi.Name(), fi.ModTime(), f)
+	} else {
+		http.ServeContent(c.res, c.req, fi.Name(), fi.ModTime(), f)
 	}
 
 	return
 }
 
 func (c *Context) contentDisposition(file, name, dispositionType string) error {
-	c.resp.Header().Set(HeaderContentDisposition,
-		fmt.Sprintf("%s; filename=%q", dispositionType, name))
+	disposition := fmt.Sprintf("%s; filename=%q", dispositionType, name)
+	c.res.Header().Set(HeaderContentDisposition, disposition)
 	return c.File(file)
 }
 
-// Attachment sends a response as attachment, prompting client to save the
-// file.
+// Attachment sends a response as attachment, prompting client to save the file.
 //
 // If the file does not exist, it returns ErrNotFound.
 func (c *Context) Attachment(file string, name string) error {

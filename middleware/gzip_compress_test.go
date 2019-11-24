@@ -19,18 +19,17 @@ import (
 	"compress/gzip"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestGzip(t *testing.T) {
 	s := ship.New()
-	assert := assert.New(t)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	ctx := s.NewContext(req, rec)
+	ctx := s.AcquireContext(req, rec)
 
 	// Skip if no Accept-Encoding header
 	handler := Gzip()(func(ctx *ship.Context) error {
@@ -39,22 +38,29 @@ func TestGzip(t *testing.T) {
 	})
 
 	handler(ctx)
-	assert.Equal("test", rec.Body.String())
+	if s := rec.Body.String(); s != "test" {
+		t.Errorf("Body: expect '%s', got '%s'", "test", s)
+	}
 
 	// Gzip
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
+	ctx = s.AcquireContext(req, rec)
 	handler(ctx)
-	assert.Equal("gzip", rec.Header().Get(ship.HeaderContentEncoding))
-	assert.Contains(rec.Header().Get(ship.HeaderContentType), ship.MIMETextPlain)
-	reader, err := gzip.NewReader(rec.Body)
-	if assert.NoError(err) {
+	if v := rec.Header().Get(ship.HeaderContentEncoding); v != "gzip" {
+		t.Errorf("%s: expect '%s', got '%s'", ship.HeaderContentEncoding, "gzip", v)
+	} else if v = rec.Header().Get(ship.HeaderContentType); !strings.Contains(v, ship.MIMETextPlain) {
+		t.Errorf("%s is '%s', not contain '%s'", ship.HeaderContentType, v, ship.MIMETextPlain)
+	} else if reader, err := gzip.NewReader(rec.Body); err != nil {
+		t.Error(err)
+	} else {
 		buf := new(bytes.Buffer)
 		defer reader.Close()
 		buf.ReadFrom(reader)
-		assert.Equal("test", buf.String())
+		if buf.String() != "test" {
+			t.Errorf("GZIP: expect '%s', got '%s'", "test", buf.String())
+		}
 	}
 }
 
@@ -63,21 +69,26 @@ func TestGzipNoContent(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
 	rec := httptest.NewRecorder()
-	ctx := s.NewContext(req, rec)
+	ctx := s.AcquireContext(req, rec)
 	handler := Gzip()(func(ctx *ship.Context) error {
 		return ctx.NoContent(http.StatusNoContent)
 	})
 
-	if assert.NoError(t, handler(ctx)) {
-		assert.Empty(t, rec.Header().Get(ship.HeaderContentEncoding))
-		assert.Empty(t, rec.Header().Get(ship.HeaderContentType))
-		assert.Equal(t, 0, len(rec.Body.Bytes()))
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	} else if rec.Header().Get(ship.HeaderContentEncoding) != "" {
+		t.Fail()
+	} else if rec.Header().Get(ship.HeaderContentType) != "" {
+		t.Fail()
+	} else if rec.Body.Len() != 0 {
+		t.Fail()
 	}
 }
 
 func TestGzipErrorReturned(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	s := ship.New(ship.SetLogger(ship.NewNoLevelLogger(buf, 0)))
+	s := ship.New()
+	s.Logger = ship.NewLoggerFromWriter(buf, "", 0)
 	s.Use(Gzip())
 	s.R("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
 
@@ -85,6 +96,9 @@ func TestGzipErrorReturned(t *testing.T) {
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Empty(t, rec.Header().Get(ship.HeaderContentEncoding))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, rec.Code)
+	} else if rec.Header().Get(ship.HeaderContentEncoding) != "" {
+		t.Fail()
+	}
 }

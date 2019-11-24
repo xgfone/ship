@@ -18,16 +18,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship"
-	"github.com/xgfone/ship/router/echo"
+	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v2/router/echo"
 )
 
 func TestGithubAPI(t *testing.T) {
 	var maxParamNum int
 	handler := ship.OkHandler()
-	router := echo.NewRouter(nil, nil)
+	router := echo.NewRouter(nil)
 	for _, r := range githubAPI {
-		if n := router.Add("", r.Path, r.Method, handler); n > maxParamNum {
+		if n := router.Add("", r.Method, r.Path, handler); n > maxParamNum {
 			maxParamNum = n
 		}
 	}
@@ -35,7 +35,7 @@ func TestGithubAPI(t *testing.T) {
 	pnames := make([]string, maxParamNum)
 	pvalues := make([]string, maxParamNum)
 	for _, r := range githubAPI {
-		h := router.Find(r.Method, r.Path, pnames, pvalues)
+		h := router.Find(r.Method, r.Path, pnames, pvalues, nil)
 		if h == nil || (strings.IndexByte(r.Path, ':') > 0 && (len(pnames) == 0 || len(pvalues) == 0)) {
 			t.Fail()
 		}

@@ -20,14 +20,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestRecover(t *testing.T) {
 	bs := bytes.NewBuffer(nil)
-	router := ship.New(ship.SetErrorHandler(func(ctx *ship.Context, err error) {
+	router := ship.New().Use(Recover())
+	router.HandleError = func(ctx *ship.Context, err error) {
 		bs.WriteString(err.Error())
-	})).Use(Recover())
+	}
 
 	router.Route("/panic").GET(func(ctx *ship.Context) error {
 		panic("test panic")

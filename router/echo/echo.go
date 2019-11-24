@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 xgfone
+// Copyright (c) 2019 xgfone
 // Copyright (c) 2017 LabStack
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,36 +26,48 @@ package echo
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-
-	"github.com/xgfone/go-tools/v6/types"
+	"strconv"
+	"sync"
 )
 
-// PROPFIND stands for a PROPFIND HTTP method.
-var PROPFIND = "PROPFIND"
+// PROPFIND Method can be used on collection and property resources.
+const PROPFIND = "PROPFIND"
+
+// REPORT Method can be used to get information about a resource, see rfc 3253
+const REPORT = "REPORT"
+
+var methods = [...]string{
+	http.MethodConnect,
+	http.MethodDelete,
+	http.MethodGet,
+	http.MethodHead,
+	http.MethodOptions,
+	http.MethodPatch,
+	http.MethodPost,
+	PROPFIND,
+	http.MethodPut,
+	http.MethodTrace,
+	REPORT,
+}
+
+var bufPool = sync.Pool{New: func() interface{} {
+	return bytes.NewBuffer(make([]byte, 0, 64))
+}}
 
 type (
-	// Route contains a handler and information for matching against requests.
-	route struct {
-		Method string `json:"method"`
-		Path   string `json:"path"`
-		Name   string `json:"name"`
-	}
-	// Router is the registry of all registered routes for an `Echo` instance
-	// for request matching and URL path parameter parsing.
+	// Router is the registry of all registered routes for request matching
+	// and URL path parameter parsing.
 	Router struct {
-		tree       *node
-		routes     map[string]*route
-		allroutes  []*route
-		options    func(methods []string) interface{}
-		notAllowed func(methods []string) interface{}
+		tree   *node
+		pnum   int
+		routes map[string]string
+
+		methodNotAllowed interface{}
 	}
 	node struct {
-		router        *Router
 		kind          kind
 		label         byte
 		prefix        string
@@ -75,9 +87,10 @@ type (
 		options  interface{}
 		patch    interface{}
 		post     interface{}
+		propfind interface{}
 		put      interface{}
 		trace    interface{}
-		propfind interface{}
+		report   interface{}
 	}
 )
 
@@ -87,116 +100,76 @@ const (
 	akind
 )
 
-var methods = [...]string{
-	http.MethodConnect,
-	http.MethodOptions,
-	http.MethodDelete,
-	http.MethodPatch,
-	http.MethodTrace,
-	http.MethodHead,
-	http.MethodPost,
-	http.MethodGet,
-	http.MethodPut,
-	PROPFIND,
-}
-
 // NewRouter returns a new Router instance.
-func NewRouter(handleMethodNotAllowed, handleOptions func(methods []string) (handler interface{})) *Router {
-	r := &Router{
-		tree:       &node{methodHandler: new(methodHandler)},
-		routes:     map[string]*route{},
-		allroutes:  []*route{},
-		options:    handleOptions,
-		notAllowed: handleMethodNotAllowed,
-	}
-	r.tree.router = r
-	return r
-}
+func NewRouter(methodNotAllowedHandler interface{}) *Router {
+	return &Router{
+		tree:   &node{methodHandler: new(methodHandler)},
+		routes: make(map[string]string, 32),
 
-// Each implements github.com/xgfone/ship:Router#Each.
-func (r *Router) Each(f func(name, method, path string)) {
-	for _, route := range r.allroutes {
-		f(route.Name, route.Method, route.Path)
+		methodNotAllowed: methodNotAllowedHandler,
 	}
 }
 
-// URL implements github.com/xgfone/ship:Router#URL.
+// URL returns a url by the name and the params.
 func (r *Router) URL(name string, params ...interface{}) string {
-	route := r.routes[name]
-	if route == nil {
+	path := r.routes[name]
+	if path == "" {
 		return ""
 	}
 
-	uri := new(bytes.Buffer)
+	buf := bufPool.Get().(*bytes.Buffer)
 	ln := len(params)
 	n := 0
-	for i, l := 0, len(route.Path); i < l; i++ {
-		if route.Path[i] == ':' && n < ln {
-			for ; i < l && route.Path[i] != '/'; i++ {
+	for i, l := 0, len(path); i < l; i++ {
+		if path[i] == ':' && n < ln {
+			for ; i < l && path[i] != '/'; i++ {
 			}
-			if s, err := types.ToString(params[n]); err == nil {
-				uri.WriteString(s)
-			} else {
-				fmt.Fprintf(uri, "%v", params[n])
+
+			switch v := params[n].(type) {
+			case error:
+				buf.WriteString(v.Error())
+			case fmt.Stringer:
+				buf.WriteString(v.String())
+			case io.WriterTo:
+				v.WriteTo(buf)
+			case float32:
+				buf.WriteString(strconv.FormatFloat(float64(v), 'f', -1, 32))
+			case float64:
+				buf.WriteString(strconv.FormatFloat(v, 'f', -1, 32))
+			default:
+				fmt.Fprintf(buf, "%v", v)
 			}
 			n++
 		}
 		if i < l {
-			uri.WriteByte(route.Path[i])
+			buf.WriteByte(path[i])
 		}
 	}
 
-	return uri.String()
+	uri := buf.String()
+	buf.Reset()
+	bufPool.Put(buf)
+	return uri
 }
 
-// Add implements github.com/xgfone/ship:Router#Add, which will register
-// a new route for method and path with matching handler.
-func (r *Router) Add(name, path string, method string, handler interface{}) int {
-	for _, _r := range r.allroutes {
-		if _r.Method == method && _r.Path == path {
-			panic(fmt.Errorf("the route('%s', '%s') has been registered", method, path))
-		}
-	}
-
-	_route := &route{Name: name, Method: method, Path: path}
-	if len(name) > 0 {
-		if _r, ok := r.routes[name]; ok && _r.Path != path {
-			panic(fmt.Errorf("the url name '%s' has been registered for the path '%s'",
-				name, _r.Path))
-		}
-		r.routes[name] = _route
-	}
-	r.allroutes = append(r.allroutes, _route)
-
-	return r.add(path, method, handler)
-}
-
-func (r *Router) add(path string, method string, h interface{}) int {
+// Add registers a new route for method and path with matching handler.
+func (r *Router) Add(name, method, path string, h interface{}) (paramNum int) {
 	// Validate path
 	if path == "" {
-		panic(errors.New("echo: path cannot be empty"))
+		path = "/"
 	}
 	if path[0] != '/' {
 		path = "/" + path
 	}
-
 	pnames := []string{} // Param names
 	ppath := path        // Pristine path
 
 	for i, l := 0, len(path); i < l; i++ {
 		if path[i] == ':' {
-			if path[i-1] != '/' {
-				panic(errors.New("':' msut be following with '/'"))
-			}
-
 			j := i + 1
 
 			r.insert(method, path[:i], nil, skind, "", nil)
 			for ; i < l && path[i] != '/'; i++ {
-			}
-
-			if i == j {
-				panic(errors.New("':' is not followed by any argument"))
 			}
 
 			pnames = append(pnames, path[j:i])
@@ -205,33 +178,34 @@ func (r *Router) add(path string, method string, h interface{}) int {
 
 			if i == l {
 				r.insert(method, path[:i], h, pkind, ppath, pnames)
-				return len(pnames)
+			} else {
+				r.insert(method, path[:i], nil, pkind, "", nil)
 			}
-			r.insert(method, path[:i], nil, pkind, "", nil)
 		} else if path[i] == '*' {
 			r.insert(method, path[:i], nil, skind, "", nil)
-
-			name := strings.TrimRight(path[i+1:], "/ ")
-			if name == "" {
-				name = "*"
-			}
-			pnames = append(pnames, name)
-
+			pnames = append(pnames, "*")
 			r.insert(method, path[:i+1], h, akind, ppath, pnames)
-			return len(pnames)
 		}
 	}
 
 	r.insert(method, path, h, skind, ppath, pnames)
-	return len(pnames)
+	if name != "" {
+		r.routes[name] = ppath
+	}
+	return r.pnum
 }
 
 func (r *Router) insert(method, path string, h interface{}, t kind,
 	ppath string, pnames []string) {
+	// Adjust max param
+	l := len(pnames)
+	if r.pnum < l {
+		r.pnum = l
+	}
 
 	cn := r.tree // Current node as root
 	if cn == nil {
-		panic(errors.New("echo: invalid method"))
+		panic("echo: invalid method")
 	}
 	search := path
 
@@ -260,7 +234,7 @@ func (r *Router) insert(method, path string, h interface{}, t kind,
 			}
 		} else if l < pl {
 			// Split node
-			n := newNode(r, cn.kind, cn.prefix[l:], cn, cn.children,
+			n := newNode(cn.kind, cn.prefix[l:], cn, cn.children,
 				cn.methodHandler, cn.ppath, cn.pnames)
 
 			// Reset parent node
@@ -282,7 +256,7 @@ func (r *Router) insert(method, path string, h interface{}, t kind,
 				cn.pnames = pnames
 			} else {
 				// Create child node
-				n = newNode(r, t, search[l:], cn, nil, new(methodHandler), ppath, pnames)
+				n = newNode(t, search[l:], cn, nil, new(methodHandler), ppath, pnames)
 				n.addHandler(method, h)
 				cn.addChild(n)
 			}
@@ -295,7 +269,7 @@ func (r *Router) insert(method, path string, h interface{}, t kind,
 				continue
 			}
 			// Create child node
-			n := newNode(r, t, search, cn, nil, new(methodHandler), ppath, pnames)
+			n := newNode(t, search, cn, nil, new(methodHandler), ppath, pnames)
 			n.addHandler(method, h)
 			cn.addChild(n)
 		} else {
@@ -312,10 +286,9 @@ func (r *Router) insert(method, path string, h interface{}, t kind,
 	}
 }
 
-func newNode(r *Router, t kind, pre string, p *node, c children,
-	mh *methodHandler, ppath string, pnames []string) *node {
+func newNode(t kind, pre string, p *node, c children, mh *methodHandler,
+	ppath string, pnames []string) *node {
 	return &node{
-		router:        r,
 		kind:          t,
 		label:         pre[0],
 		prefix:        pre,
@@ -374,14 +347,14 @@ func (n *node) addHandler(method string, h interface{}) {
 		n.methodHandler.patch = h
 	case http.MethodPost:
 		n.methodHandler.post = h
+	case PROPFIND:
+		n.methodHandler.propfind = h
 	case http.MethodPut:
 		n.methodHandler.put = h
 	case http.MethodTrace:
 		n.methodHandler.trace = h
-	case "PROPFIND":
-		n.methodHandler.propfind = h
-	default:
-		panic(errors.New("not support the method +'" + method + "'"))
+	case REPORT:
+		n.methodHandler.report = h
 	}
 }
 
@@ -401,78 +374,34 @@ func (n *node) findHandler(method string) interface{} {
 		return n.methodHandler.patch
 	case http.MethodPost:
 		return n.methodHandler.post
+	case PROPFIND:
+		return n.methodHandler.propfind
 	case http.MethodPut:
 		return n.methodHandler.put
 	case http.MethodTrace:
 		return n.methodHandler.trace
-	case "PROPFIND":
-		return n.methodHandler.propfind
+	case REPORT:
+		return n.methodHandler.report
 	default:
 		return nil
 	}
 }
 
-func (n *node) checkMethodNotAllowed(method string) interface{} {
-	if n.router.notAllowed == nil || method == http.MethodConnect {
-		return nil
-	}
-
-	ms := make([]string, 0, len(methods))
-	for _, m := range methods {
-		if h := n.findHandler(m); h != nil {
-			ms = append(ms, m)
+func (n *node) checkMethodNotAllowed(r *Router, h interface{}) interface{} {
+	if r.methodNotAllowed != nil {
+		for _, m := range methods {
+			if h := n.findHandler(m); h != nil {
+				return r.methodNotAllowed
+			}
 		}
 	}
-
-	if len(ms) == 0 {
-		return nil
-	}
-	return n.router.notAllowed(ms)
+	return h
 }
 
-func (n *node) checkOptions(method string) interface{} {
-	if n.router.options == nil || method != http.MethodOptions {
-		return nil
-	}
-
-	ms := make([]string, 0, len(methods))
-	h := n.methodHandler
-	if h.connect != nil {
-		ms = append(ms, http.MethodConnect)
-	}
-	if h.delete != nil {
-		ms = append(ms, http.MethodDelete)
-	}
-	if h.get != nil {
-		ms = append(ms, http.MethodGet)
-	}
-	if h.head != nil {
-		ms = append(ms, http.MethodHead)
-	}
-	if h.patch != nil {
-		ms = append(ms, http.MethodPatch)
-	}
-	if h.post != nil {
-		ms = append(ms, http.MethodPost)
-	}
-	if h.put != nil {
-		ms = append(ms, http.MethodPut)
-	}
-	if h.trace != nil {
-		ms = append(ms, http.MethodTrace)
-	}
-	if h.propfind != nil {
-		ms = append(ms, PROPFIND)
-	}
-
-	if len(ms) == 0 {
-		return nil
-	}
-	return n.router.options(ms)
-}
-
-// Find implements github.com/xgfone/ship:Router#Find.
-func (r *Router) Find(method, path string, pnames, pvalues []string) (handler interface{}) {
+// Find lookup a handler registered for method and path. It also parses URL
+// for path parameters and load them into context.
+func (r *Router) Find(method, path string, pnames, pvalues []string,
+	defaultHandler interface{}) (handler interface{}) {
 	cn := r.tree // Current node as root
 
 	var (
@@ -510,6 +439,9 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (handler in
 			// Continue search
 			search = search[l:]
 		} else {
+			if nn == nil { // Issue #1348
+				return defaultHandler // Not found
+			}
 			cn = nn
 			search = ns
 			if nk == pkind {
@@ -517,8 +449,6 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (handler in
 			} else if nk == akind {
 				goto Any
 			}
-			// Not found
-			return
 		}
 
 		if search == "" {
@@ -568,6 +498,9 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (handler in
 			if nn != nil {
 				cn = nn
 				nn = cn.parent // Next (Issue #954)
+				if nn != nil {
+					nk = nn.kind
+				}
 				search = ns
 				if nk == pkind {
 					goto Param
@@ -575,8 +508,7 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (handler in
 					goto Any
 				}
 			}
-			// Not found
-			return
+			return defaultHandler // Not found
 		}
 		pvalues[len(cn.pnames)-1] = search
 		break
@@ -587,19 +519,17 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (handler in
 
 	// NOTE: Slow zone...
 	if handler == nil {
-		if handler = cn.checkOptions(method); handler != nil {
-			return
-		}
-		_cn := cn
+		handler = cn.checkMethodNotAllowed(r, defaultHandler)
 
 		// Dig further for any, might have an empty value for *, e.g.
 		// serving a directory. Issue #207.
 		if cn = cn.findChildByKind(akind); cn == nil {
-			handler = _cn.checkMethodNotAllowed(method)
 			return
 		}
-		if handler = cn.findHandler(method); handler == nil {
-			handler = cn.checkMethodNotAllowed(method)
+		if h := cn.findHandler(method); h != nil {
+			handler = h
+		} else {
+			handler = cn.checkMethodNotAllowed(r, defaultHandler)
 		}
 		copy(pnames, cn.pnames)
 		pvalues[len(cn.pnames)-1] = ""

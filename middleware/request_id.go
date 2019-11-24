@@ -15,7 +15,7 @@
 package middleware
 
 import (
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // RequestID returns a X-Request-ID middleware.
@@ -31,14 +31,13 @@ func RequestID(generateRequestID ...func() string) Middleware {
 
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
-
 			req := ctx.Request()
 			xid := req.Header.Get(ship.HeaderXRequestID)
 			if xid == "" {
 				xid = getRequestID()
 				req.Header.Set(ship.HeaderXRequestID, xid)
 			}
-			ctx.Response().Header().Set(ship.HeaderXRequestID, xid)
+			ctx.SetHeader(ship.HeaderXRequestID, xid)
 
 			return next(ctx)
 		}

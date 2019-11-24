@@ -24,83 +24,96 @@ import (
 	"path"
 	"reflect"
 	"strings"
+
+	"github.com/xgfone/ship/v2/router"
 )
 
-// Matcher is used to check whether the request match some conditions.
-type Matcher func(*http.Request) error
+// AllMethods represents all HTTP methods.
+var AllMethods = []string{
+	http.MethodConnect, http.MethodHead, http.MethodOptions, http.MethodTrace,
+	http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete,
+	http.MethodPatch,
+}
+
+// RouteFilter is used to filter the registering route if it returns true.
+type RouteFilter func(RouteInfo) bool
+
+// RouteModifier is used to modify the registering route.
+type RouteModifier func(RouteInfo) RouteInfo
+
+type kvalues struct {
+	Key    string
+	Values []string
+}
+
+// RouteInfo is used to represent the information of the registered route.
+type RouteInfo struct {
+	Name    string
+	Host    string
+	Path    string
+	Method  string
+	Handler Handler
+	Router  router.Router
+}
 
 // Route represents a route information.
 type Route struct {
 	ship    *Ship
-	group   *Group
+	group   *RouteGroup
+	host    string
 	path    string
 	name    string
-	router  Router
 	mdwares []Middleware
-
-	matchers []Matcher
-	headers  []string
-	schemes  []string
-
-	matcherM func([]Matcher) Middleware
+	headers []kvalues
 }
 
-func newRoute(s *Ship, g *Group, router Router, prefix, path string, m ...Middleware) *Route {
-	if !s.keepTrailingSlashPath {
-		path = strings.TrimSuffix(path, "/")
-	}
-
-	if len(path) == 0 {
-		if len(prefix) == 0 {
-			path = "/"
-		}
+func newRoute(s *Ship, g *RouteGroup, prefix, host, path string,
+	ms ...Middleware) *Route {
+	if path == "" {
+		panic("the route path must not be empty")
 	} else if path[0] != '/' {
 		panic(fmt.Errorf("path '%s' must start with '/'", path))
 	}
 
-	ms := make([]Middleware, 0, len(m))
 	return &Route{
-		ship:  s,
-		group: g,
-		path:  prefix + path,
-
-		router:  router,
-		mdwares: append(ms, m...),
+		ship:    s,
+		group:   g,
+		host:    host,
+		path:    strings.TrimSuffix(prefix, "/") + path,
+		mdwares: append([]Middleware{}, ms...),
 	}
 }
 
 // New clones a new Route based on the current route.
 func (r *Route) New() *Route {
 	return &Route{
-		ship:   r.ship,
-		path:   r.path,
-		name:   r.name,
-		router: r.router,
+		ship:  r.ship,
+		host:  r.host,
+		path:  r.path,
+		name:  r.name,
+		group: r.group,
 
-		mdwares:  append([]Middleware{}, r.mdwares...),
-		matchers: append([]Matcher{}, r.matchers...),
-		headers:  append([]string{}, r.headers...),
-		schemes:  append([]string{}, r.schemes...),
+		mdwares: append([]Middleware{}, r.mdwares...),
+		headers: append([]kvalues{}, r.headers...),
 	}
 }
 
 // Ship returns the ship that the current route is associated with.
-func (r *Route) Ship() *Ship {
-	return r.ship
-}
+func (r *Route) Ship() *Ship { return r.ship }
 
 // Group returns the group that the current route belongs to.
 //
 // Notice: it will return nil if the route is from ship.Route.
-func (r *Route) Group() *Group {
-	return r.group
-}
+func (r *Route) Group() *RouteGroup { return r.group }
+
+// NoMiddlewares clears all the middlewares and returns itself.
+func (r *Route) NoMiddlewares() *Route { r.mdwares = nil; return r }
 
 // Name sets the route name.
-func (r *Route) Name(name string) *Route {
-	r.name = name
-	return r
-}
+func (r *Route) Name(name string) *Route { r.name = name; return r }
+
+// Host sets the host of the route to host.
+func (r *Route) Host(host string) *Route { r.host = host; return r }
 
 // Use adds some middlwares for the route.
 func (r *Route) Use(middlewares ...Middleware) *Route {
@@ -108,26 +121,7 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 	return r
 }
 
-// Match adds the matchers of the request to check whether the request matches
-// these conditions.
-//
-// These matchers will be executes as the middlewares.
-func (r *Route) Match(matchers ...Matcher) *Route {
-	r.matchers = append(r.matchers, matchers...)
-	return r
-}
-
-// MatchMiddleware sets the matcher middleware.
-//
-// The default implementation will execute those matchers in turn.
-// If a certain matcher returns an error, it will return a HTTPError
-// with 404 and the error.
-func (r *Route) MatchMiddleware(f func([]Matcher) Middleware) *Route {
-	r.matcherM = f
-	return r
-}
-
-// Header checks whether the request contains the request header.
+// HasHeader checks whether the request contains the request header.
 // If no, the request will be rejected.
 //
 // If the header value is given, it will be tested to match.
@@ -138,104 +132,33 @@ func (r *Route) MatchMiddleware(f func([]Matcher) Middleware) *Route {
 //     // The request must contains the header "Content-Type: application/json".
 //     s.R("/path/to").HasHeader("Content-Type", "application/json").POST(handler)
 //
-// Notice: it is implemented by using Matcher.
-func (r *Route) Header(headerK string, headerV ...string) *Route {
-	var value string
-	if len(headerV) > 0 {
-		value = headerV[0]
-	}
-	r.headers = append(r.headers, http.CanonicalHeaderKey(headerK), value)
+func (r *Route) HasHeader(headerK string, headerV ...string) *Route {
+	r.headers = append(r.headers, kvalues{http.CanonicalHeaderKey(headerK), headerV})
 	return r
 }
 
-func (r *Route) buildHeadersMatcher() Matcher {
+func (r *Route) buildHeaderMiddleware() Middleware {
 	if len(r.headers) == 0 {
 		return nil
 	}
 
-	return func(req *http.Request) error {
-		for i, _len := 0, len(r.headers); i < _len; i += 2 {
-			key, value := r.headers[i], r.headers[i+1]
-			if value != "" {
-				if req.Header.Get(key) != value {
-					return fmt.Errorf("missing the header '%s: %s'", key, value)
-				}
-			} else {
-				if req.Header.Get(key) == "" {
-					return fmt.Errorf("missing the header '%s'", key)
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// HasSchemes checks whether the request is one of the schemes.
-// If no, the request will be rejected.
-//
-// Example
-//
-//     s := ship.New()
-//     // We only handle https and wss, others will be rejected.
-//     s.R("/path/to").HasSchemes("https", "wss").POST(handler)
-//
-// Notice: it is implemented by using Matcher.
-func (r *Route) HasSchemes(schemes ...string) *Route {
-	_len := len(schemes)
-	if _len == 0 {
-		return r
-	}
-	for i := 0; i < _len; i++ {
-		schemes[i] = strings.ToLower(schemes[i])
-	}
-	r.schemes = append(r.schemes, schemes...)
-	return r
-}
-
-func (r *Route) buildSchemesMatcher() Matcher {
-	if len(r.schemes) == 0 {
-		return nil
-	}
-
-	return func(req *http.Request) error {
-		scheme := req.URL.Scheme
-		for _, s := range r.schemes {
-			if s == scheme {
-				return nil
-			}
-		}
-		return fmt.Errorf("not support the scheme '%s'", scheme)
-	}
-}
-
-func (r *Route) buildMatcherMiddleware() Middleware {
-	ms := []Matcher{
-		r.buildHeadersMatcher(),
-		r.buildSchemesMatcher(),
-	}
-
-	matchers := make([]Matcher, 0, len(r.matchers)+4)
-	matchers = append(matchers, r.matchers...)
-	for _, m := range ms {
-		if m != nil {
-			matchers = append(matchers, m)
-		}
-	}
-
-	if len(matchers) == 0 {
-		return nil
-	}
-
-	if r.matcherM != nil {
-		return r.matcherM(matchers)
-	}
-
 	return func(next Handler) Handler {
-		return func(ctx *Context) (err error) {
-			req := ctx.Request()
-			for _, matcher := range matchers {
-				if err = matcher(req); err != nil {
-					return ErrNotFound.NewError(err)
+		return func(ctx *Context) error {
+			for _, kv := range r.headers {
+				value := ctx.GetHeader(kv.Key)
+				if len(kv.Values) == 0 {
+					if value == "" {
+						err := fmt.Errorf("missing the header '%s'", kv.Key)
+						return ErrBadRequest.NewError(err)
+					}
+				} else {
+					for _, v := range kv.Values {
+						if v == value {
+							return next(ctx)
+						}
+					}
+					err := fmt.Errorf("invalid header '%s: %s'", kv.Key, value)
+					return ErrBadRequest.NewError(err)
 				}
 			}
 			return next(ctx)
@@ -243,7 +166,8 @@ func (r *Route) buildMatcherMiddleware() Middleware {
 	}
 }
 
-func (r *Route) addRoute(name, path string, handler Handler, methods ...string) *Route {
+func (r *Route) addRoute(name, host, path string, handler Handler,
+	methods ...string) *Route {
 	if handler == nil {
 		panic(errors.New("handler must not be nil"))
 	}
@@ -261,35 +185,24 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 	}
 
 	middlewares := r.mdwares
-	matcherMiddleware := r.buildMatcherMiddleware()
-	if matcherMiddleware != nil {
+	if m := r.buildHeaderMiddleware(); m != nil {
 		middlewares = make([]Middleware, 0, len(r.mdwares)+1)
 		middlewares = append(middlewares, r.mdwares...)
-		middlewares = append(middlewares, matcherMiddleware)
+		middlewares = append(middlewares, m)
 	}
 
 	middlewaresLen := len(middlewares)
-	if middlewaresLen > r.ship.middlewareMaxNum {
+	if middlewaresLen > r.ship.MiddlewareMaxNum {
 		panic(fmt.Errorf("the number of middlewares '%d' has exceeded the maximum '%d'",
-			middlewaresLen, r.ship.middlewareMaxNum))
+			middlewaresLen, r.ship.MiddlewareMaxNum))
 	}
 
 	for i := middlewaresLen - 1; i >= 0; i-- {
 		handler = middlewares[i](handler)
 	}
 
-	r.ship.lock.RLock()
-	filter := r.ship.filter
-	modifier := r.ship.modifier
-	r.ship.lock.RUnlock()
-
-	for i := range methods {
-		method := strings.ToUpper(methods[i])
-		name, path, method = modifier(name, path, method)
-		if filter(name, path, method) {
-			n := r.router.Add(name, path, method, handler)
-			r.ship.setURLParamNum(n)
-		}
+	for _, method := range methods {
+		r.ship.addRoute(name, host, path, method, handler)
 	}
 
 	return r
@@ -301,16 +214,14 @@ func (r *Route) addRoute(name, path string, handler Handler, methods ...string) 
 //
 // Notice: The method must be called at last.
 func (r *Route) Method(handler Handler, methods ...string) *Route {
-	r.addRoute(r.name, r.path, handler, methods...)
+	r.addRoute(r.name, r.host, r.path, handler, methods...)
 	return r
 }
 
 // Any registers all the supported methods , which is short for
-// r.Method(handler, "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE" )
+// r.Method(handler, AllMethods...)
 func (r *Route) Any(handler Handler) *Route {
-	return r.Method(handler, http.MethodConnect, http.MethodGet,
-		http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch,
-		http.MethodDelete, http.MethodOptions, http.MethodTrace)
+	return r.Method(handler, AllMethods...)
 }
 
 // CONNECT is the short for r.Method(handler, "CONNECT").
@@ -416,15 +327,15 @@ func (r *Route) Map(method2handlers map[string]Handler) *Route {
 //    func (*Context) error
 //
 // Notice: the name of type and method will be converted to the lower.
-func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
+func (r *Route) MapType(tv interface{}) *Route {
 	if tv == nil {
 		panic(errors.New("the type value must no be nil"))
 	}
 
 	value := reflect.ValueOf(tv)
-	methodMaps := r.ship.defaultMethodMapping
-	if len(mapping) > 0 {
-		methodMaps = mapping[0]
+	methodMaps := r.ship.MethodMapping
+	if methodMaps == nil {
+		methodMaps = DefaultMethodMapping
 	}
 
 	var err error
@@ -457,7 +368,7 @@ func (r *Route) MapType(tv interface{}, mapping ...map[string]string) *Route {
 			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
 
 			name := fmt.Sprintf("%s_%s", typeName, methodName)
-			r.addRoute(name, path, func(ctx *Context) error {
+			r.addRoute(name, r.host, path, func(ctx *Context) error {
 				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
 				return vs[0].Interface().(error)
 			}, reqMethod)
@@ -498,8 +409,12 @@ func (r *Route) StaticFile(filePath string) *Route {
 		panic(errors.New("URL parameters cannot be used when serving a static file"))
 	}
 
-	r.addRoute("", r.path, func(ctx *Context) error { return ctx.File(filePath) }, http.MethodGet)
-	r.addRoute("", r.path, func(ctx *Context) error { return r.serveFileMetadata(ctx, filePath) }, http.MethodHead)
+	r.addRoute("", r.host, r.path, func(ctx *Context) error {
+		return ctx.File(filePath)
+	}, http.MethodGet)
+	r.addRoute("", r.host, r.path, func(ctx *Context) error {
+		return r.serveFileMetadata(ctx, filePath)
+	}, http.MethodHead)
 	return r
 }
 
@@ -510,11 +425,10 @@ func (r *Route) StaticFS(fs http.FileSystem) *Route {
 	}
 
 	fileServer := http.StripPrefix(r.path, http.FileServer(fs))
-	rpath := path.Join(r.path, "/*filepath")
+	rpath := path.Join(r.path, "/*")
 
-	r.addRoute("", rpath, func(ctx *Context) error {
-		filepath := ctx.Param("filepath")
-		if _, err := fs.Open(filepath); err != nil {
+	r.addRoute("", r.host, rpath, func(ctx *Context) error {
+		if _, err := fs.Open(ctx.URLParam("*")); err != nil {
 			return ctx.NotFoundHandler()(ctx)
 		}
 		fileServer.ServeHTTP(ctx.Response(), ctx.Request())

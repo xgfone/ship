@@ -21,44 +21,51 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestCSRF(t *testing.T) {
 	s := ship.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	ctx := s.NewContext(req, rec)
+	ctx := s.AcquireContext(req, rec)
 	csrf := CSRF(CSRFConfig{GenerateToken: GenerateToken(16)})
 
 	handler := csrf(func(ctx *ship.Context) error {
-		return ctx.String(http.StatusOK, "test")
+		return ctx.Text(http.StatusOK, "test")
 	})
 
 	// Generate CSRF token
 	handler(ctx)
-	assert.Contains(t, rec.Header().Get(ship.HeaderSetCookie), "_csrf")
+	if v := rec.Header().Get(ship.HeaderSetCookie); !strings.Contains(v, "_csrf") {
+		t.Fail()
+	}
 
 	// Without CSRF cookie
 	req = httptest.NewRequest(http.MethodPost, "/", nil)
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
-	assert.Error(t, handler(ctx))
+	ctx = s.AcquireContext(req, rec)
+	if handler(ctx) == nil {
+		t.Fail()
+	}
 
 	// Empty/invalid CSRF token
 	req = httptest.NewRequest(http.MethodPost, "/", nil)
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
+	ctx = s.AcquireContext(req, rec)
 	req.Header.Set(ship.HeaderXCSRFToken, "")
-	assert.Error(t, handler(ctx))
+	if handler(ctx) == nil {
+		t.Fail()
+	}
 
 	// Valid CSRF token
 	token := GenerateToken(16)()
 	req.Header.Set(ship.HeaderCookie, "_csrf="+token)
 	req.Header.Set(ship.HeaderXCSRFToken, token)
-	if assert.NoError(t, handler(ctx)) {
-		assert.Equal(t, http.StatusOK, rec.Code)
+	if err := handler(ctx); err != nil {
+		t.Error(err)
+	} else if rec.Code != http.StatusOK {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
 	}
 }
 
@@ -69,14 +76,15 @@ func TestCSRFTokenFromForm(t *testing.T) {
 	s := ship.New()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(form.Encode()))
 	req.Header.Add(ship.HeaderContentType, ship.MIMEApplicationForm)
-	ctx := s.NewContext(req, nil)
+	ctx := s.AcquireContext(req, nil)
 
-	token, err := GetTokenFromForm("csrf")(ctx)
-	if assert.NoError(t, err) {
-		assert.Equal(t, "token", token)
+	if token, err := GetTokenFromForm("csrf")(ctx); err != nil {
+		t.Error(err)
+	} else if token != "token" {
+		t.Errorf("token != '%s'", token)
+	} else if _, err = GetTokenFromForm("invalid")(ctx); err == nil {
+		t.Fail()
 	}
-	_, err = GetTokenFromForm("invalid")(ctx)
-	assert.Error(t, err)
 }
 
 func TestCSRFTokenFromQuery(t *testing.T) {
@@ -87,12 +95,13 @@ func TestCSRFTokenFromQuery(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	req.Header.Add(ship.HeaderContentType, ship.MIMEApplicationForm)
 	req.URL.RawQuery = form.Encode()
-	ctx := s.NewContext(req, nil)
+	ctx := s.AcquireContext(req, nil)
 
-	token, err := GetTokenFromQuery("csrf")(ctx)
-	if assert.NoError(t, err) {
-		assert.Equal(t, "token", token)
+	if token, err := GetTokenFromQuery("csrf")(ctx); err != nil {
+		t.Error(err)
+	} else if token != "token" {
+		t.Errorf("token != '%s'", token)
+	} else if _, err = GetTokenFromQuery("invalid")(ctx); err == nil {
+		t.Fail()
 	}
-	_, err = GetTokenFromQuery("invalid")(ctx)
-	assert.Error(t, err)
 }

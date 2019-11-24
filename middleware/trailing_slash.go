@@ -17,7 +17,7 @@ package middleware
 import (
 	"strings"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // RemoveTrailingSlash returns a new middleware to remove the trailing slash

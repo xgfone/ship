@@ -6,11 +6,156 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/labstack/echo"
-	"github.com/xgfone/ship"
+	"github.com/labstack/echo/v4"
+	"github.com/xgfone/ship/v2"
 )
 
-func TestEmpty(t *testing.T) {}
+func loadEchoRoutes(e *echo.Echo, routes []*Route) {
+	for _, r := range routes {
+		switch r.Method {
+		case "GET":
+			e.GET(r.Path, echoHandler(r.Method, r.Path))
+		case "POST":
+			e.POST(r.Path, echoHandler(r.Method, r.Path))
+		case "PATCH":
+			e.PATCH(r.Path, echoHandler(r.Method, r.Path))
+		case "PUT":
+			e.PUT(r.Path, echoHandler(r.Method, r.Path))
+		case "DELETE":
+			e.DELETE(r.Path, echoHandler(r.Method, r.Path))
+		}
+	}
+}
+
+func echoHandler(method, path string) echo.HandlerFunc {
+	return func(c echo.Context) error { return c.String(http.StatusOK, "OK") }
+}
+
+func BenchmarkEchoStatic(b *testing.B) {
+	e := echo.New()
+	loadEchoRoutes(e, static)
+	benchmarkRoutes(b, e, static)
+}
+
+func BenchmarkEchoGitHubAPI(b *testing.B) {
+	e := echo.New()
+	loadEchoRoutes(e, githubAPI)
+	benchmarkRoutes(b, e, githubAPI)
+}
+
+func BenchmarkEchoGplusAPI(b *testing.B) {
+	e := echo.New()
+	loadEchoRoutes(e, gplusAPI)
+	benchmarkRoutes(b, e, gplusAPI)
+}
+
+func BenchmarkEchoParseAPI(b *testing.B) {
+	e := echo.New()
+	loadEchoRoutes(e, parseAPI)
+	benchmarkRoutes(b, e, parseAPI)
+}
+
+/// ----------------------------------------------------------------------- ///
+
+func loadGinRoutes(g *gin.Engine, routes []*Route) {
+	for _, r := range routes {
+		switch r.Method {
+		case "GET":
+			g.GET(r.Path, ginHandler(r.Method, r.Path))
+		case "POST":
+			g.POST(r.Path, ginHandler(r.Method, r.Path))
+		case "PATCH":
+			g.PATCH(r.Path, ginHandler(r.Method, r.Path))
+		case "PUT":
+			g.PUT(r.Path, ginHandler(r.Method, r.Path))
+		case "DELETE":
+			g.DELETE(r.Path, ginHandler(r.Method, r.Path))
+		}
+	}
+}
+
+func ginHandler(method, path string) gin.HandlerFunc {
+	return func(c *gin.Context) { c.String(http.StatusOK, "OK") }
+}
+
+func BenchmarkGinStatic(b *testing.B) {
+	gin.SetMode(gin.ReleaseMode)
+	g := gin.New()
+	loadGinRoutes(g, static)
+	benchmarkRoutes(b, g, static)
+}
+
+func BenchmarkGinGitHubAPI(b *testing.B) {
+	gin.SetMode(gin.ReleaseMode)
+	g := gin.New()
+	loadGinRoutes(g, githubAPI)
+	benchmarkRoutes(b, g, githubAPI)
+}
+
+func BenchmarkGinGplusAPI(b *testing.B) {
+	gin.SetMode(gin.ReleaseMode)
+	g := gin.New()
+	loadGinRoutes(g, gplusAPI)
+	benchmarkRoutes(b, g, gplusAPI)
+}
+
+func BenchmarkGinParseAPI(b *testing.B) {
+	gin.SetMode(gin.ReleaseMode)
+	g := gin.New()
+	loadGinRoutes(g, parseAPI)
+	benchmarkRoutes(b, g, parseAPI)
+}
+
+/// ----------------------------------------------------------------------- ///
+
+func loadShipRoutes(s *ship.Ship, routes []*Route) {
+	h := func(c *ship.Context) error { return c.Text(http.StatusOK, "OK") }
+	for _, r := range routes {
+		s.R(r.Path).Method(h, r.Method)
+	}
+}
+
+func BenchmarkShipEchoStatic(b *testing.B) {
+	r := ship.New()
+	loadShipRoutes(r, static)
+	benchmarkRoutes(b, r, static)
+}
+
+func BenchmarkShipEchoGitHubAPI(b *testing.B) {
+	r := ship.New()
+	loadShipRoutes(r, githubAPI)
+	benchmarkRoutes(b, r, githubAPI)
+}
+
+func BenchmarkShipEchoGplusAPI(b *testing.B) {
+	r := ship.New()
+	loadShipRoutes(r, gplusAPI)
+	benchmarkRoutes(b, r, gplusAPI)
+}
+
+func BenchmarkShipEchoParseAPI(b *testing.B) {
+	r := ship.New()
+	loadShipRoutes(r, parseAPI)
+	benchmarkRoutes(b, r, parseAPI)
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+func benchmarkRoutes(b *testing.B, router http.Handler, routes []*Route) {
+	r := httptest.NewRequest("GET", "/", nil)
+	u := r.URL
+	w := httptest.NewRecorder()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for _, route := range routes {
+			r.Method = route.Method
+			u.Path = route.Path
+			router.ServeHTTP(w, r)
+		}
+	}
+}
 
 type Route struct {
 	Method string
@@ -510,166 +655,3 @@ var (
 
 	apis = [][]*Route{githubAPI, gplusAPI, parseAPI}
 )
-
-func testRoutes(t *testing.T) {
-}
-
-func benchmarkRoutes(b *testing.B, router http.Handler, routes []*Route) {
-	b.ReportAllocs()
-	r := httptest.NewRequest("GET", "/", nil)
-	u := r.URL
-	w := httptest.NewRecorder()
-
-	for i := 0; i < b.N; i++ {
-		for _, route := range routes {
-			r.Method = route.Method
-			u.Path = route.Path
-			router.ServeHTTP(w, r)
-		}
-	}
-}
-
-func loadEchoRoutes(e *echo.Echo, routes []*Route) {
-	for _, r := range routes {
-		switch r.Method {
-		case "GET":
-			e.GET(r.Path, echoHandler(r.Method, r.Path))
-		case "POST":
-			e.POST(r.Path, echoHandler(r.Method, r.Path))
-		case "PATCH":
-			e.PATCH(r.Path, echoHandler(r.Method, r.Path))
-		case "PUT":
-			e.PUT(r.Path, echoHandler(r.Method, r.Path))
-		case "DELETE":
-			e.DELETE(r.Path, echoHandler(r.Method, r.Path))
-		}
-	}
-}
-
-func echoHandler(method, path string) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		return c.String(http.StatusOK, "OK")
-	}
-}
-
-func BenchmarkEchoStatic(b *testing.B) {
-	e := echo.New()
-	loadEchoRoutes(e, static)
-	benchmarkRoutes(b, e, static)
-}
-
-func BenchmarkEchoGitHubAPI(b *testing.B) {
-	e := echo.New()
-	loadEchoRoutes(e, githubAPI)
-	benchmarkRoutes(b, e, githubAPI)
-}
-
-func BenchmarkEchoGplusAPI(b *testing.B) {
-	e := echo.New()
-	loadEchoRoutes(e, gplusAPI)
-	benchmarkRoutes(b, e, gplusAPI)
-}
-
-func BenchmarkEchoParseAPI(b *testing.B) {
-	e := echo.New()
-	loadEchoRoutes(e, parseAPI)
-	benchmarkRoutes(b, e, parseAPI)
-}
-
-func loadGinRoutes(g *gin.Engine, routes []*Route) {
-	for _, r := range routes {
-		switch r.Method {
-		case "GET":
-			g.GET(r.Path, ginHandler(r.Method, r.Path))
-		case "POST":
-			g.POST(r.Path, ginHandler(r.Method, r.Path))
-		case "PATCH":
-			g.PATCH(r.Path, ginHandler(r.Method, r.Path))
-		case "PUT":
-			g.PUT(r.Path, ginHandler(r.Method, r.Path))
-		case "DELETE":
-			g.DELETE(r.Path, ginHandler(r.Method, r.Path))
-		}
-	}
-}
-
-func ginHandler(method, path string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.String(http.StatusOK, "OK")
-	}
-}
-
-func BenchmarkGinStatic(b *testing.B) {
-	gin.SetMode(gin.ReleaseMode)
-	g := gin.New()
-	loadGinRoutes(g, static)
-	benchmarkRoutes(b, g, static)
-}
-
-func BenchmarkGinGitHubAPI(b *testing.B) {
-	gin.SetMode(gin.ReleaseMode)
-	g := gin.New()
-	loadGinRoutes(g, githubAPI)
-	benchmarkRoutes(b, g, githubAPI)
-}
-
-func BenchmarkGinGplusAPI(b *testing.B) {
-	gin.SetMode(gin.ReleaseMode)
-	g := gin.New()
-	loadGinRoutes(g, gplusAPI)
-	benchmarkRoutes(b, g, gplusAPI)
-}
-
-func BenchmarkGinParseAPI(b *testing.B) {
-	gin.SetMode(gin.ReleaseMode)
-	g := gin.New()
-	loadGinRoutes(g, parseAPI)
-	benchmarkRoutes(b, g, parseAPI)
-}
-
-func loadShipRoutes(s *ship.Ship, routes []*Route) {
-	for _, r := range routes {
-		switch r.Method {
-		case "GET":
-			s.Route(r.Path).GET(shipHandler(r.Method, r.Path))
-		case "POST":
-			s.Route(r.Path).POST(shipHandler(r.Method, r.Path))
-		case "PATCH":
-			s.Route(r.Path).PATCH(shipHandler(r.Method, r.Path))
-		case "PUT":
-			s.Route(r.Path).PUT(shipHandler(r.Method, r.Path))
-		case "DELETE":
-			s.Route(r.Path).DELETE(shipHandler(r.Method, r.Path))
-		}
-	}
-}
-
-func shipHandler(method, path string) ship.Handler {
-	return func(c *ship.Context) error {
-		return c.String(http.StatusOK, "OK")
-	}
-}
-
-func BenchmarkShipEchoStatic(b *testing.B) {
-	r := ship.New(ship.SetKeepTrailingSlashPath(true))
-	loadShipRoutes(r, static)
-	benchmarkRoutes(b, r, static)
-}
-
-func BenchmarkShipEchoGitHubAPI(b *testing.B) {
-	r := ship.New(ship.SetKeepTrailingSlashPath(true))
-	loadShipRoutes(r, githubAPI)
-	benchmarkRoutes(b, r, githubAPI)
-}
-
-func BenchmarkShipEchoGplusAPI(b *testing.B) {
-	r := ship.New(ship.SetKeepTrailingSlashPath(true))
-	loadShipRoutes(r, gplusAPI)
-	benchmarkRoutes(b, r, gplusAPI)
-}
-
-func BenchmarkShipEchoParseAPI(b *testing.B) {
-	r := ship.New(ship.SetKeepTrailingSlashPath(true))
-	loadShipRoutes(r, parseAPI)
-	benchmarkRoutes(b, r, parseAPI)
-}

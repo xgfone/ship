@@ -21,8 +21,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestBodyLimitReader(t *testing.T) {
@@ -34,62 +33,79 @@ func TestBodyLimitReader(t *testing.T) {
 	reader.Reset(req.Body)
 	_, err := ioutil.ReadAll(reader)
 	he := err.(ship.HTTPError)
-	assert.Equal(t, http.StatusRequestEntityTooLarge, he.Code)
+	if he.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("StatusCode: expect %d, got %d",
+			http.StatusRequestEntityTooLarge, he.Code)
+	}
 
 	// reset reader and read six bytes must succeed.
 	buf := make([]byte, 6)
 	reader.Reset(ioutil.NopCloser(bytes.NewReader(bs)))
 	n, err := reader.Read(buf)
-	assert.Equal(t, 6, n)
-	assert.Equal(t, nil, err)
-	assert.Equal(t, []byte("Hello,"), buf)
+	if n != 6 {
+		t.Fail()
+	} else if err != nil {
+		t.Error(err)
+	} else if s := string(buf); s != "Hello," {
+		t.Errorf("expect '%s', got '%s'", "Hello,", s)
+	}
 }
 
 func TestBodyLimit(t *testing.T) {
-	bs := []byte("Hello, World")
+	bs := "Hello, World"
 	limit := int64(2 * 1024 * 1024) // 2M
-
-	assert := assert.New(t)
 	s := ship.New()
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bs))
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec := httptest.NewRecorder()
-	ctx := s.NewContext(req, rec)
+	ctx := s.AcquireContext(req, rec)
 
 	handler := func(ctx *ship.Context) error {
 		body, err := ioutil.ReadAll(ctx.Request().Body)
 		if err != nil {
 			return err
 		}
-		return ctx.String(http.StatusOK, string(body))
+		return ctx.Text(http.StatusOK, string(body))
 	}
 
 	// Based on content length (within limit)
-	if assert.NoError(BodyLimit(limit)(handler)(ctx)) {
-		assert.Equal(http.StatusOK, rec.Code)
-		assert.Equal(bs, rec.Body.Bytes())
+	if err := BodyLimit(limit)(handler)(ctx); err != nil {
+		t.Error(err)
+	} else if rec.Code != http.StatusOK {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
+	} else if s := rec.Body.String(); s != bs {
+		t.Errorf("Body: expect '%s', got '%s'", bs, s)
 	}
 
 	// Based on content read (overlimit)
-	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bs))
+	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
+	ctx = s.AcquireContext(req, rec)
 	he := BodyLimit(6)(handler)(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusRequestEntityTooLarge, he.Code)
+	if he.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("StatusCode: expect %d, got %d",
+			http.StatusRequestEntityTooLarge, he.Code)
+	}
 
 	// Based on content read (within limit)
-	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bs))
+	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
-	if assert.NoError(BodyLimit(limit)(handler)(ctx)) {
-		assert.Equal(http.StatusOK, rec.Code)
-		assert.Equal(bs, rec.Body.Bytes())
+	ctx = s.AcquireContext(req, rec)
+	if err := BodyLimit(limit)(handler)(ctx); err != nil {
+		t.Error(err)
+	} else if rec.Code != http.StatusOK {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
+	} else if s := rec.Body.String(); s != bs {
+		t.Errorf("Body: expect '%s', got '%s'", bs, s)
 	}
 
 	// Based on content read (overlimit)'
-	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bs))
+	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
-	ctx = s.NewContext(req, rec)
+	ctx = s.AcquireContext(req, rec)
 	he = BodyLimit(6)(handler)(ctx).(ship.HTTPError)
-	assert.Equal(http.StatusRequestEntityTooLarge, he.Code)
+	if he.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("StatusCode: expect %d, got %d",
+			http.StatusRequestEntityTooLarge, he.Code)
+	}
 }

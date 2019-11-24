@@ -14,117 +14,46 @@
 
 package ship
 
-import (
-	"errors"
-	"fmt"
-	"net/http"
-)
+import "github.com/xgfone/ship/v2/herror"
 
-// Some non-HTTP Errors
+// Re-export some errors.
 var (
-	ErrRendererNotRegistered = errors.New("renderer not registered")
-	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
-	ErrCookieNotFound        = errors.New("cookie not found")
-	ErrNoHandler             = errors.New("no handler")
-	ErrNoSessionSupport      = errors.New("no session support")
-	ErrInvalidSession        = errors.New("invalid session")
-	ErrSessionNotExist       = errors.New("session does not exist")
-	ErrMissingContentType    = errors.New("missing the header 'Content-Type'")
+	// Some non-HTTP errors
+	ErrMissingContentType    = herror.ErrMissingContentType
+	ErrRendererNotRegistered = herror.ErrRendererNotRegistered
+	ErrInvalidRedirectCode   = herror.ErrInvalidRedirectCode
+	ErrInvalidSession        = herror.ErrInvalidSession
+	ErrSessionNotExist       = herror.ErrSessionNotExist
+	ErrNoSessionSupport      = herror.ErrNoSessionSupport
+	ErrNoResponder           = herror.ErrNoResponder
+
+	// Some HTTP error.
+	ErrBadRequest                    = herror.ErrBadRequest
+	ErrUnauthorized                  = herror.ErrUnauthorized
+	ErrForbidden                     = herror.ErrForbidden
+	ErrNotFound                      = herror.ErrNotFound
+	ErrMethodNotAllowed              = herror.ErrMethodNotAllowed
+	ErrStatusNotAcceptable           = herror.ErrStatusNotAcceptable
+	ErrRequestTimeout                = herror.ErrRequestTimeout
+	ErrStatusConflict                = herror.ErrStatusConflict
+	ErrStatusGone                    = herror.ErrStatusGone
+	ErrStatusRequestEntityTooLarge   = herror.ErrStatusRequestEntityTooLarge
+	ErrUnsupportedMediaType          = herror.ErrUnsupportedMediaType
+	ErrTooManyRequests               = herror.ErrTooManyRequests
+	ErrInternalServerError           = herror.ErrInternalServerError
+	ErrStatusNotImplemented          = herror.ErrStatusNotImplemented
+	ErrBadGateway                    = herror.ErrBadGateway
+	ErrServiceUnavailable            = herror.ErrServiceUnavailable
+	ErrStatusGatewayTimeout          = herror.ErrStatusGatewayTimeout
+	ErrStatusHTTPVersionNotSupported = herror.ErrStatusHTTPVersionNotSupported
+
+	// ErrSkip is not an error, which is used to suggest that the middeware
+	// should skip and return it back to the outer middleware to handle.
+	ErrSkip = herror.ErrSkip
 )
 
-// Some HTTP error.
-var (
-	ErrUnsupportedMediaType        = NewHTTPError(http.StatusUnsupportedMediaType)
-	ErrNotFound                    = NewHTTPError(http.StatusNotFound)
-	ErrUnauthorized                = NewHTTPError(http.StatusUnauthorized)
-	ErrForbidden                   = NewHTTPError(http.StatusForbidden)
-	ErrMethodNotAllowed            = NewHTTPError(http.StatusMethodNotAllowed)
-	ErrStatusRequestEntityTooLarge = NewHTTPError(http.StatusRequestEntityTooLarge)
-	ErrTooManyRequests             = NewHTTPError(http.StatusTooManyRequests)
-	ErrBadRequest                  = NewHTTPError(http.StatusBadRequest)
-	ErrBadGateway                  = NewHTTPError(http.StatusBadGateway)
-	ErrInternalServerError         = NewHTTPError(http.StatusInternalServerError)
-	ErrRequestTimeout              = NewHTTPError(http.StatusRequestTimeout)
-	ErrServiceUnavailable          = NewHTTPError(http.StatusServiceUnavailable)
-)
+// HTTPError is the alias of herror.HTTPError.
+type HTTPError = herror.HTTPError
 
-// ErrSkip is not an error, which is used to suggest that the middeware should
-// skip and return it back to the outer middleware to handle.
-//
-// Notice: it is only a suggestion.
-var ErrSkip = errors.New("skip")
-
-// HTTPError represents an error with HTTP Status Code.
-type HTTPError struct {
-	Code int
-	Msg  string
-	Err  error
-	CT   string // For Content-Type
-}
-
-// NewHTTPError returns a new HTTPError.
-func NewHTTPError(code int, msg ...string) HTTPError {
-	if len(msg) > 0 {
-		return HTTPError{Code: code, Msg: msg[0]}
-	}
-	return HTTPError{Code: code}
-}
-
-func (e HTTPError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return e.Msg
-}
-
-// GetError returns the inner error.
-//
-// If Err is nil but Msg is not "", return `errors.New(e.Msg)` instead;
-// Or return nil.
-//
-//     HTTPError{Err: errors.New("")}.GetError() != nil
-//     HTTPError{Msg: "xxx"}.GetError() != nil
-//     HTTPError{Code: 200}.GetError() == nil
-func (e HTTPError) GetError() error {
-	if e.Err != nil {
-		return e.Err
-	} else if e.Msg != "" {
-		return errors.New(e.Msg)
-	}
-	return nil
-}
-
-// GetMsg returns a message.
-func (e HTTPError) GetMsg() string {
-	if e.Msg != "" {
-		return e.Msg
-	} else if e.Code < 500 && e.Err != nil {
-		return e.Err.Error()
-	}
-	return ""
-}
-
-// NewError returns a new HTTPError with the new error.
-func (e HTTPError) NewError(err error) HTTPError {
-	nerr := e
-	nerr.Err = err
-	return nerr
-}
-
-// NewMsg returns a new HTTPError with the new msg.
-func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
-	nerr := e
-	if len(args) == 0 {
-		nerr.Msg = msg
-	} else {
-		nerr.Msg = fmt.Sprintf(msg, args...)
-	}
-	return nerr
-}
-
-// NewCT returns a new HTTPError with the new ContentType ct.
-func (e HTTPError) NewCT(ct string) HTTPError {
-	nerr := e
-	nerr.CT = ct
-	return nerr
-}
+// NewHTTPError is the alias of herror.NewHTTPError.
+var NewHTTPError = herror.NewHTTPError

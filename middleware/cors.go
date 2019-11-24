@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // CORSConfig is used to configure the CORS middleware.

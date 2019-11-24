@@ -18,20 +18,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 // Logger returns a new logger middleware that will log the request.
-//
-// By default getTime is time.Now().
-//
-// Notice: If using this middleware, you should configure Ship with
-// ship.DisableErrorLog(true) to disable the default error log. For example,
-//
-//   app := ship.New(ship.DisableErrorLog(true))
-// Or
-//   app := ship.New()
-//   app.Configure(ship.DisableErrorLog(true))
 func Logger(now ...func() time.Time) Middleware {
 	_now := time.Now
 	if len(now) > 0 && now[0] != nil {
@@ -65,10 +55,10 @@ func Logger(now ...func() time.Time) Middleware {
 			}
 
 			if errmsg == "" {
-				ctx.Logger().Info("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s",
+				ctx.Logger().Infof("addr=%s, code=%d, method=%s, url=%q, starttime=%d, cost=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost)
 			} else {
-				ctx.Logger().Error("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s, err=%s",
+				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, url=%q, starttime=%d, cost=%s, err=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost, errmsg)
 			}
 

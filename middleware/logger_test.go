@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xgfone/ship"
+	"github.com/xgfone/ship/v2"
 )
 
 func TestLogger(t *testing.T) {
@@ -35,13 +35,14 @@ func TestLogger(t *testing.T) {
 	}
 
 	bs := bytes.NewBuffer(nil)
-	logger := ship.NewNoLevelLogger(bs, 0)
+	logger := ship.NewLoggerFromWriter(bs, "", 0)
 
-	router := ship.New(ship.SetLogger(logger))
+	router := ship.New()
+	router.Logger = logger
 	router.Use(Logger(getNow))
 
 	router.Route("/test").GET(func(ctx *ship.Context) error {
-		ctx.Logger().Info("handler")
+		ctx.Logger().Infof("handler")
 		return nil
 	})
 
@@ -54,8 +55,8 @@ func TestLogger(t *testing.T) {
 	if ss[0] != "[I] handler" {
 		t.Fail()
 	}
-	if strings.Join(strings.Split(ss[1], ", ")[1:5], ", ") !=
-		"code=200, method=GET, url=/test, starttime=1543846200" {
-		t.Error(ss[1])
+	if s := strings.Join(strings.Split(ss[1], ", ")[1:5], ", "); s !=
+		`code=200, method=GET, url="/test", starttime=1543846200` {
+		t.Error(s)
 	}
 }
