@@ -131,6 +131,7 @@ func Default() *Ship {
 }
 
 // Clone clones itself to a new one without routes, middlewares and the server.
+// Meanwhile, it will reset the signals of the new Ship to nil.
 func (s *Ship) Clone() *Ship {
 	newShip := new(Ship)
 
@@ -162,6 +163,7 @@ func (s *Ship) Clone() *Ship {
 	if s.Runner != nil {
 		newShip.Runner = NewRunner(s.Runner.Name, s.Runner.Handler)
 		newShip.Runner.ConnState = s.Runner.ConnState
+		newShip.Runner.Signals = nil
 	}
 
 	newShip.SetLogger(s.Logger)
