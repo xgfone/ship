@@ -43,10 +43,21 @@ func TestRouter(t *testing.T) {
 
 	pnames[0] = ""
 	pvalues[0] = ""
-	router.Add("", "GET", "/static/*", handler)
-	if router.Find("GET", "/static/path/to/file", pnames, pvalues, nil) == nil {
-		t.Error("no route handler for 'GET /static/path/to/file'")
+	router.Add("", "GET", "/static1/*", handler)
+	if router.Find("GET", "/static1/path/to/file", pnames, pvalues, nil) == nil {
+		t.Error("no route handler for 'GET /static1/path/to/file'")
 	} else if len(pnames) != 1 || pnames[0] != "*" || pvalues[0] != "path/to/file" {
 		t.Errorf("expected dir 'path/to/file', but got '%s'", pvalues[0])
+	}
+
+	pnames[0] = ""
+	pvalues[0] = ""
+	router.Add("", "GET", "/static2/*filepath", handler)
+	if router.Find("GET", "/static2/path/to/file", pnames, pvalues, nil) == nil {
+		t.Error("no route handler for 'GET /static2/path/to/file'")
+	} else if len(pnames) != 1 || pnames[0] != "filepath" {
+		t.Errorf("ParamName: expect '%s', got '%s'", "filepath", pnames[0])
+	} else if pvalues[0] != "path/to/file" {
+		t.Errorf("ParamValue: expected dir 'path/to/file', but got '%s'", pvalues[0])
 	}
 }

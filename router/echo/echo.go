@@ -30,6 +30,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -183,7 +184,11 @@ func (r *Router) Add(name, method, path string, h interface{}) (paramNum int) {
 			}
 		} else if path[i] == '*' {
 			r.insert(method, path[:i], nil, skind, "", nil)
-			pnames = append(pnames, "*")
+			name := strings.TrimRight(path[i+1:], "/ ")
+			if name == "" {
+				name = "*"
+			}
+			pnames = append(pnames, name)
 			r.insert(method, path[:i+1], h, akind, ppath, pnames)
 		}
 	}
@@ -390,7 +395,7 @@ func (n *node) findHandler(method string) interface{} {
 func (n *node) checkMethodNotAllowed(r *Router, h interface{}) interface{} {
 	if r.methodNotAllowed != nil {
 		for _, m := range methods {
-			if h := n.findHandler(m); h != nil {
+			if n.findHandler(m) != nil {
 				return r.methodNotAllowed
 			}
 		}
@@ -514,25 +519,23 @@ func (r *Router) Find(method, path string, pnames, pvalues []string,
 		break
 	}
 
-	handler = cn.findHandler(method)
-	copy(pnames, cn.pnames)
-
-	// NOTE: Slow zone...
-	if handler == nil {
+	if handler = cn.findHandler(method); handler == nil { // NOTE: Slow zone...
 		handler = cn.checkMethodNotAllowed(r, defaultHandler)
 
 		// Dig further for any, might have an empty value for *, e.g.
 		// serving a directory. Issue #207.
 		if cn = cn.findChildByKind(akind); cn == nil {
 			return
-		}
-		if h := cn.findHandler(method); h != nil {
-			handler = h
-		} else {
+		} else if handler = cn.findHandler(method); handler == nil {
 			handler = cn.checkMethodNotAllowed(r, defaultHandler)
 		}
+
+		if len(cn.pnames) > 0 {
+			copy(pnames, cn.pnames)
+			pvalues[len(cn.pnames)-1] = ""
+		}
+	} else if len(cn.pnames) > 0 {
 		copy(pnames, cn.pnames)
-		pvalues[len(cn.pnames)-1] = ""
 	}
 
 	return
