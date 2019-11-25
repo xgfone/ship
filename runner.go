@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 // DefaultSignals is a set of default signals.
@@ -42,18 +43,20 @@ type Runner struct {
 	Signals   []os.Signal
 	ConnState func(net.Conn, http.ConnState)
 
-	stopfs []*OnceRunner
-	stop   *OnceRunner
-	shut   *OnceRunner
-	done   chan struct{}
+	shut *OnceRunner
+	done chan struct{}
 }
 
 // NewRunner returns a new Runner.
 func NewRunner(name string, handler http.Handler) *Runner {
-	r := &Runner{Name: name, Handler: handler, done: make(chan struct{})}
-	r.shut = NewOnceRunner(r.runShutdown)
-	r.stop = NewOnceRunner(r.runStopfs)
-	r.Signals = DefaultSignals
+	r := &Runner{
+		Name:    name,
+		Server:  &http.Server{Handler: handler},
+		Signals: DefaultSignals,
+		Handler: handler, done: make(chan struct{}),
+	}
+
+	r.shut = NewOnceRunner(r.shutdown)
 	return r
 }
 
@@ -61,38 +64,34 @@ func NewRunner(name string, handler http.Handler) *Runner {
 // shut down.
 func (r *Runner) RegisterOnShutdown(functions ...func()) *Runner {
 	for _, f := range functions {
-		r.stopfs = append(r.stopfs, NewOnceRunner(f))
+		r.Server.RegisterOnShutdown(f)
 	}
 	return r
 }
 
 // Shutdown stops the HTTP server.
-func (r *Runner) Shutdown(ctx context.Context) error {
-	if r.Server == nil {
-		return fmt.Errorf("the server has not been started")
+func (r *Runner) Shutdown(ctx context.Context) (err error) {
+	start := time.Now()
+	if err = r.Server.Shutdown(ctx); err == nil {
+		if diff := time.Second - time.Now().Sub(start); diff > 0 {
+			time.Sleep(diff)
+		}
+
+		select {
+		case <-r.done:
+		default:
+			close(r.done)
+		}
 	}
-	err := r.Server.Shutdown(ctx)
-	r.stop.Run()
-	return err
+	return
 }
 
 // Stop is the same as r.Shutdown(context.Background()).
-func (r *Runner) Stop() { r.shut.Run() }
-
-func (r *Runner) runShutdown() { r.Shutdown(context.Background()) }
-func (r *Runner) runStopfs() {
-	defer close(r.done)
-	for _len := len(r.stopfs) - 1; _len >= 0; _len-- {
-		if f := r.stopfs[_len]; f != nil {
-			f.Run()
-		}
-	}
-}
+func (r *Runner) Stop()     { r.shut.Run() }
+func (r *Runner) shutdown() { r.Shutdown(context.Background()) }
 
 // Wait waits until all the registered shutdown functions have finished.
-func (r *Runner) Wait() {
-	<-r.done
-}
+func (r *Runner) Wait() { <-r.done }
 
 // Start starts a HTTP server with addr and ends when the server is closed.
 //
@@ -138,6 +137,7 @@ func (r *Runner) handleSignals() {
 
 func (r *Runner) startServer(certFile, keyFile string) {
 	defer r.Stop()
+	name := r.Name
 	server := r.Server
 	logger := r.Logger
 
@@ -146,29 +146,32 @@ func (r *Runner) startServer(certFile, keyFile string) {
 	}
 
 	if logger != nil {
-		if r.Name == "" {
+		if name == "" {
 			logger.Infof("The HTTP Server is running on %s", server.Addr)
 		} else {
-			logger.Infof("The HTTP Server [%s] is running on %s", r.Name, server.Addr)
+			logger.Infof("The HTTP Server [%s] is running on %s", name, server.Addr)
 		}
 	}
 
 	var err error
-	server.RegisterOnShutdown(r.Stop)
+	// server.RegisterOnShutdown(r.Stop)
 	r.RegisterOnShutdown(func() {
 		if logger == nil {
 			return
 		}
 
-		msg := "The HTTP Server [%s] is shutdown"
-		if r.Name == "" {
-			msg = "The HTTP Server is shutdown"
-		}
-
 		if err == nil || err == http.ErrServerClosed {
-			logger.Infof(msg)
+			if name == "" {
+				logger.Infof("")
+			} else {
+				logger.Infof("The HTTP Server [%s] is shutdown", name)
+			}
 		} else {
-			logger.Errorf(msg+": %s", err)
+			if name == "" {
+				logger.Errorf("The HTTP Server is shutdown: %s", err)
+			} else {
+				logger.Errorf("The HTTP Server [%s] is shutdown: %s", name, err)
+			}
 		}
 	})
 
