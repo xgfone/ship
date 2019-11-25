@@ -882,12 +882,7 @@ func (c *Context) Text(code int, format string, args ...interface{}) error {
 }
 
 // Error sends an error response with status code.
-//
-// If the status code is equal to 0, err must be an error of HTTPError.
 func (c *Context) Error(code int, err error) HTTPError {
-	if code == 0 {
-		return err.(HTTPError)
-	}
 	return HTTPError{Code: code, Err: err}
 }
 
