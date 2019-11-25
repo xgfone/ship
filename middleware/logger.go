@@ -44,7 +44,7 @@ func Logger(now ...func() time.Time) Middleware {
 				if !ctx.IsResponded() {
 					code = e.Code
 				}
-				if e.Code >= 500 {
+				if e.Code >= 400 {
 					errmsg = e.Error()
 				}
 			default:
@@ -55,10 +55,10 @@ func Logger(now ...func() time.Time) Middleware {
 			}
 
 			if errmsg == "" {
-				ctx.Logger().Infof("addr=%s, code=%d, method=%s, url=%q, starttime=%d, cost=%s",
+				ctx.Logger().Infof("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost)
 			} else {
-				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, url=%q, starttime=%d, cost=%s, err=%s",
+				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s, err=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost, errmsg)
 			}
 

@@ -56,7 +56,7 @@ func TestLogger(t *testing.T) {
 		t.Fail()
 	}
 	if s := strings.Join(strings.Split(ss[1], ", ")[1:5], ", "); s !=
-		`code=200, method=GET, url="/test", starttime=1543846200` {
+		`code=200, method=GET, url=/test, starttime=1543846200` {
 		t.Error(s)
 	}
 }
