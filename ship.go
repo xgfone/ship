@@ -130,6 +130,44 @@ func Default() *Ship {
 	return s
 }
 
+// Clone clones itself to a new one without routes, middlewares and the server.
+func (s *Ship) Clone() *Ship {
+	newShip := new(Ship)
+
+	// Private
+	newShip.handler = newShip.handleRoute
+	newShip.routes = make([]RouteInfo, 0, 32)
+	newShip.nhosts = make(map[string]string, 32)
+	newShip.hrouters = make(map[string]router.Router, 4)
+	newShip.contextPool.New = func() interface{} { return newShip.NewContext() }
+
+	// Public
+	newShip.CtxDataSize = s.CtxDataSize
+	newShip.Prefix = s.Prefix
+	newShip.NotFound = s.NotFound
+	newShip.RouteFilter = s.RouteFilter
+	newShip.RouteModifier = s.RouteModifier
+	newShip.MethodMapping = s.MethodMapping
+	newShip.MiddlewareMaxNum = s.MiddlewareMaxNum
+	newShip.Binder = s.Binder
+	newShip.Session = s.Session
+	newShip.Renderer = s.Renderer
+	newShip.BindQuery = s.BindQuery
+	newShip.Responder = s.Responder
+	newShip.HandleError = s.HandleError
+
+	newShip.SetBufferSize(2048)
+	newShip.SetNewRouter(s.newRouter)
+
+	if s.Runner != nil {
+		newShip.Runner = NewRunner(s.Runner.Name, s.Runner.Handler)
+		newShip.Runner.ConnState = s.Runner.ConnState
+	}
+
+	newShip.SetLogger(s.Logger)
+	return newShip
+}
+
 //----------------------------------------------------------------------------
 // Settings
 //----------------------------------------------------------------------------
