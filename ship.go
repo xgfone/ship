@@ -161,7 +161,7 @@ func (s *Ship) Clone() *Ship {
 	newShip.SetNewRouter(s.newRouter)
 
 	if s.Runner != nil {
-		newShip.Runner = NewRunner(s.Runner.Name, s.Runner.Handler)
+		newShip.Runner = NewRunner(s.Runner.Name, newShip)
 		newShip.Runner.ConnState = s.Runner.ConnState
 		newShip.Runner.Signals = nil
 	}
