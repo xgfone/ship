@@ -883,16 +883,12 @@ func (c *Context) Text(code int, format string, args ...interface{}) error {
 
 // Error sends an error response with status code.
 //
-// If the error is the type of HTTPError, it will extract the fields of code
-// and ct from it as the status code and the content-type.
-func (c *Context) Error(code int, err error) error {
-	if he, ok := err.(HTTPError); ok {
-		if he.CT == "" {
-			return c.Text(he.Code, err.Error())
-		}
-		return c.BlobText(he.Code, he.CT, err.Error())
+// If the status code is equal to 0, err must be an error of HTTPError.
+func (c *Context) Error(code int, err error) HTTPError {
+	if code == 0 {
+		return err.(HTTPError)
 	}
-	return c.Text(code, err.Error())
+	return HTTPError{Code: code, Err: err}
 }
 
 // JSON sends a JSON response with status code.
