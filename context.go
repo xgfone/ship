@@ -42,7 +42,7 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 var contenttypes = map[string][]string{}
 
 // AddContentTypeToSlice add a rule to convert contentType to contentTypeSlice.
-// So you can call SetContextType to set the Content-Type to contentTypeSlice
+// So you can call SetContentType to set the Content-Type to contentTypeSlice
 // by contentType to avoid to allocate the memory.
 func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
@@ -54,8 +54,8 @@ func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
 	contenttypes[contentType] = contentTypeSlice
 }
 
-// SetContextType sets the Content-Type header of resp to ct.
-func SetContextType(res http.ResponseWriter, ct string) {
+// SetHeaderContentType sets the Content-Type header to ct.
+func SetHeaderContentType(header http.Header, ct string) {
 	var cts []string
 	switch ct {
 	case MIMEApplicationJSON:
@@ -96,11 +96,16 @@ func SetContextType(res http.ResponseWriter, ct string) {
 		if ss := contenttypes[ct]; ss != nil {
 			cts = ss
 		} else {
-			res.Header().Set(HeaderContentType, ct)
+			header.Set(HeaderContentType, ct)
 			return
 		}
 	}
-	res.Header()[HeaderContentType] = cts
+	header[HeaderContentType] = cts
+}
+
+// SetContentType is equal to SetHeaderContentType(res.Header(), ct).
+func SetContentType(res http.ResponseWriter, ct string) {
+	SetHeaderContentType(res.Header(), ct)
 }
 
 // Context represetns a request and response context.
@@ -812,7 +817,7 @@ func (c *Context) SetConnectionClose() {
 // but does nothing if contentType is "".
 func (c *Context) SetContentType(ct string) {
 	if ct != "" {
-		SetContextType(c.res, ct)
+		SetContentType(c.res, ct)
 	}
 }
 
@@ -840,21 +845,21 @@ func (c *Context) Redirect(code int, toURL string) error {
 	return c.NoContent(code)
 }
 
-func (c *Context) setContextTypeAndCode(code int, ct string) {
+func (c *Context) setContentTypeAndCode(code int, ct string) {
 	c.SetContentType(ct)
 	c.res.WriteHeader(code)
 }
 
 // Stream sends a streaming response with status code and content type.
 func (c *Context) Stream(code int, contentType string, r io.Reader) (err error) {
-	c.setContextTypeAndCode(code, contentType)
+	c.setContentTypeAndCode(code, contentType)
 	_, err = io.CopyBuffer(c.res, r, make([]byte, 2048))
 	return
 }
 
 // Blob sends a blob response with status code and content type.
 func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
-	c.setContextTypeAndCode(code, contentType)
+	c.setContentTypeAndCode(code, contentType)
 	_, err = c.res.Write(b)
 	return
 }
@@ -862,7 +867,7 @@ func (c *Context) Blob(code int, contentType string, b []byte) (err error) {
 // BlobText sends a string blob response with status code and content type.
 func (c *Context) BlobText(code int, contentType string, format string,
 	args ...interface{}) (err error) {
-	c.setContextTypeAndCode(code, contentType)
+	c.setContentTypeAndCode(code, contentType)
 	if len(args) > 0 {
 		_, err = fmt.Fprintf(c.res, format, args...)
 	} else {
@@ -892,13 +897,13 @@ func (c *Context) Error(code int, err error) error {
 
 // JSON sends a JSON response with status code.
 func (c *Context) JSON(code int, v interface{}) error {
-	c.setContextTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
+	c.setContentTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
 	return json.NewEncoder(c.res).Encode(v)
 }
 
 // JSONPretty sends a pretty-print JSON with status code.
 func (c *Context) JSONPretty(code int, v interface{}, indent string) error {
-	c.setContextTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
+	c.setContentTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
 	enc := json.NewEncoder(c.res)
 	enc.SetIndent("", indent)
 	return enc.Encode(v)
@@ -937,7 +942,7 @@ func (c *Context) JSONPBlob(code int, callback string, b []byte) (err error) {
 
 // XML sends an XML response with status code.
 func (c *Context) XML(code int, v interface{}) error {
-	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	c.setContentTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
 	if _, err := c.res.WriteString(xml.Header); err != nil {
 		return err
 	}
@@ -946,7 +951,7 @@ func (c *Context) XML(code int, v interface{}) error {
 
 // XMLPretty sends a pretty-print XML with status code.
 func (c *Context) XMLPretty(code int, v interface{}, indent string) error {
-	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	c.setContentTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
 	if _, err := c.res.WriteString(xml.Header); err != nil {
 		return err
 	}
@@ -957,7 +962,7 @@ func (c *Context) XMLPretty(code int, v interface{}, indent string) error {
 
 // XMLBlob sends an XML blob response with status code.
 func (c *Context) XMLBlob(code int, b []byte) (err error) {
-	c.setContextTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+	c.setContentTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
 	if _, err = c.res.WriteString(xml.Header); err != nil {
 		return
 	}
