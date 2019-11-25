@@ -48,12 +48,12 @@ type kvalues struct {
 
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
-	Name    string
-	Host    string
-	Path    string
-	Method  string
-	Handler Handler
-	Router  router.Router
+	Name    string        `json:"name" xml:"name"`
+	Host    string        `json:"host" xml:"host"`
+	Path    string        `json:"path" xml:"path"`
+	Method  string        `json:"method" xml:"method"`
+	Handler Handler       `json:"-" xml:"-"`
+	Router  router.Router `json:"-" xml:"-"`
 }
 
 // Route represents a route information.
