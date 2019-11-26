@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 // DefaultSignals is a set of default signals.
@@ -43,8 +42,10 @@ type Runner struct {
 	Signals   []os.Signal
 	ConnState func(net.Conn, http.ConnState)
 
-	shut *OnceRunner
-	done chan struct{}
+	done   chan struct{}
+	shut   *OnceRunner
+	stop   *OnceRunner
+	stopfs []*OnceRunner
 }
 
 // NewRunner returns a new Runner.
@@ -56,7 +57,8 @@ func NewRunner(name string, handler http.Handler) *Runner {
 		Handler: handler, done: make(chan struct{}),
 	}
 
-	r.shut = NewOnceRunner(r.shutdown)
+	r.shut = NewOnceRunner(r.runShutdown)
+	r.stop = NewOnceRunner(r.runStopfs)
 	return r
 }
 
@@ -71,31 +73,27 @@ func (r *Runner) Link(other *Runner) *Runner {
 // shut down.
 func (r *Runner) RegisterOnShutdown(functions ...func()) *Runner {
 	for _, f := range functions {
-		r.Server.RegisterOnShutdown(f)
+		r.stopfs = append(r.stopfs, NewOnceRunner(f))
 	}
 	return r
 }
 
 // Shutdown stops the HTTP server.
 func (r *Runner) Shutdown(ctx context.Context) (err error) {
-	start := time.Now()
-	if err = r.Server.Shutdown(ctx); err == nil {
-		if diff := time.Second - time.Now().Sub(start); diff > 0 {
-			time.Sleep(diff)
-		}
-
-		select {
-		case <-r.done:
-		default:
-			close(r.done)
-		}
-	}
+	err = r.Server.Shutdown(ctx)
+	r.stop.Run()
 	return
 }
 
 // Stop is the same as r.Shutdown(context.Background()).
-func (r *Runner) Stop()     { r.shut.Run() }
-func (r *Runner) shutdown() { r.Shutdown(context.Background()) }
+func (r *Runner) Stop()        { r.shut.Run() }
+func (r *Runner) runShutdown() { r.Shutdown(context.Background()) }
+func (r *Runner) runStopfs() {
+	defer close(r.done)
+	for _, f := range r.stopfs {
+		f.Run()
+	}
+}
 
 // Wait waits until all the registered shutdown functions have finished.
 func (r *Runner) Wait() { <-r.done }
@@ -169,7 +167,7 @@ func (r *Runner) startServer(certFile, keyFile string) {
 
 		if err == nil || err == http.ErrServerClosed {
 			if name == "" {
-				logger.Infof("")
+				logger.Infof("The HTTP Server is shutdown")
 			} else {
 				logger.Infof("The HTTP Server [%s] is shutdown", name)
 			}

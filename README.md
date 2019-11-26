@@ -27,7 +27,7 @@ func main() {
 	})
 
 	// Start the HTTP server.
-	router.Start(":8080")
+	router.Start(":8080").Wait()
 	// or
 	// http.ListenAndServe(":8080", router)
 }
@@ -58,7 +58,7 @@ func main() {
     router.Route("/path/delete").DELETE(deleteHandler)
     router.Route("/path/option").OPTIONS(optionHandler)
     router.Route("/path/connect").CONNECT(connectHandler)
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -72,7 +72,7 @@ Notice: you can register the same handler with more than one method by `Route(pa
 func main() {
     router := ship.New()
     router.R("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -86,7 +86,7 @@ func main() {
         "POST": postHandler,
         "DELETE": deleteHandler,
     })
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -99,7 +99,7 @@ func main() {
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
         fmt.Println(ctx.URL("get_url", ctx.URLParam("id")))
     })
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -110,7 +110,7 @@ func main() {
     router := ship.New()
     handler := func(ctx *ship.Context) error { return nil }
     router.R("/path2").HasHeader("Content-Type", "application/json").POST(handler)
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -137,7 +137,7 @@ func (t TestType) NotHandler()              {}
 func main() {
     router := ship.New()
     router.Route("/v1").MapType(TestType{})
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -171,7 +171,7 @@ func main() {
     v2 := router.Group("/v2").NoMiddlewares().Use(MyAuthMiddleware())
     v2.Route("/post/path").POST(postHandler)
 
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -268,7 +268,7 @@ func main() {
     router.Use(middleware.Recover())
 
     router.Route("/url/path").GET(handler)
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -289,7 +289,7 @@ func main() {
 	vhost2 := router.Host("host2.example.com")
 	vhost2.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
 
-	router.Start(":8080")
+	router.Start(":8080").Wait()
 }
 ```
 
@@ -342,7 +342,7 @@ func main() {
 	app.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
 	app.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
 	app.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
-	app.Start(":8080")
+	app.Start(":8080").Wait()
 }
 ```
 
@@ -367,7 +367,7 @@ func main() {
         ...
     })
 
-    router.Start(":8080")
+    router.Start(":8080").Wait()
 }
 ```
 
@@ -409,7 +409,7 @@ func main() {
 	// ...
 
 	// Start the HTTP server.
-	router.Start(":8080")
+	router.Start(":8080").Wait()
 }
 ```
 

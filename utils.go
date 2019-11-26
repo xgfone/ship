@@ -17,12 +17,13 @@ package ship
 import (
 	"bytes"
 	"io"
-	"sync"
+	"sync/atomic"
 )
 
-// OnceRunner is used to run the task only once.
+// OnceRunner is used to run the task only once, which is different from
+// sync.Once, the second calling does not wait until the first calling finishes.
 type OnceRunner struct {
-	once sync.Once
+	done uint32
 	task func()
 }
 
@@ -30,7 +31,11 @@ type OnceRunner struct {
 func NewOnceRunner(task func()) *OnceRunner { return &OnceRunner{task: task} }
 
 // Run runs the task.
-func (r *OnceRunner) Run() { r.once.Do(r.task) }
+func (r *OnceRunner) Run() {
+	if atomic.CompareAndSwapUint32(&r.done, 0, 1) {
+		r.task()
+	}
+}
 
 // ReadNWriter reads n bytes to the writer w from the reader r.
 //
