@@ -60,6 +60,13 @@ func NewRunner(name string, handler http.Handler) *Runner {
 	return r
 }
 
+// Link registers the shutdown function between itself and other,
+// then returns itself.
+func (r *Runner) Link(other *Runner) *Runner {
+	other.RegisterOnShutdown(r.Stop)
+	return r.RegisterOnShutdown(other.Stop)
+}
+
 // RegisterOnShutdown registers some functions to run when the http server is
 // shut down.
 func (r *Runner) RegisterOnShutdown(functions ...func()) *Runner {

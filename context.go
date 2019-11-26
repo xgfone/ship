@@ -189,11 +189,11 @@ func (c *Context) Reset() {
 	// c.buffer = nil
 	// c.router = nil
 	// c.binder = nil
+	// c.session = nil
+	// c.renderer = nil
 	// c.getURL = nil
 	// c.qbinder = nil
-	// c.renderer = nil
-	// c.session = nil
-	// c.handler = nil
+	// c.responder = nil
 	// c.notFound = nil
 }
 
@@ -204,6 +204,9 @@ func (c *Context) SetRouter(r router.Router) { c.router = r }
 func (c *Context) Router() router.Router { return c.router }
 
 // Execute finds the route and calls the handler.
+//
+// SetRouter must be called before calling Execute, which be done
+// by the framework.
 func (c *Context) Execute(notFound Handler) error {
 	if notFound == nil && c.notFound != nil {
 		notFound = c.notFound
