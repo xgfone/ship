@@ -15,7 +15,9 @@
 package ship
 
 import (
+	"bufio"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 )
@@ -87,3 +89,35 @@ func (r *Response) Reset(w http.ResponseWriter) {
 
 // SetWriter resets the writer to w and return itself.
 func (r *Response) SetWriter(w http.ResponseWriter) { r.ResponseWriter = w }
+
+// Hijack implements the http.Hijacker interface to allow an HTTP handler to
+// take over the connection.
+//
+// See [http.Hijacker](https://golang.org/pkg/net/http/#Hijacker)
+func (r *Response) Hijack() (rwc net.Conn, buf *bufio.ReadWriter, err error) {
+	return r.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+// Push implements the http.Pusher interface to support HTTP/2 server push.
+//
+// See [http.Pusher](https://golang.org/pkg/net/http/#Pusher)
+func (r *Response) Push(target string, opts *http.PushOptions) error {
+	return r.ResponseWriter.(http.Pusher).Push(target, opts)
+}
+
+// ReadFrom implements the io.ReaderFrom interface to reads data from src,
+// which may be used to optimize copying from an *os.File regular file
+// to a *net.TCPConn with sendfile.
+func (r *Response) ReadFrom(src io.Reader) (n int64, err error) {
+	return r.ResponseWriter.(io.ReaderFrom).ReadFrom(src)
+}
+
+// Flush implements the http.Flusher interface to allow an HTTP handler to flush
+// buffered data to the client.
+//
+// See [http.Flusher](https://golang.org/pkg/net/http/#Flusher)
+func (r *Response) Flush() {
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}

@@ -987,13 +987,17 @@ func (c *Context) File(file string) (err error) {
 	}
 	defer f.Close()
 
+	var res http.ResponseWriter = c.res
+	if _, ok := c.res.ResponseWriter.(io.ReaderFrom); !ok {
+		res = c.res.ResponseWriter
+	}
+
 	fi, err := f.Stat()
 	if err != nil {
 		return ErrInternalServerError.NewError(err)
 	} else if fi.IsDir() {
 		f, err := os.Open(filepath.Join(file, "index.html"))
 		if err != nil {
-			fmt.Println("----------")
 			return ErrNotFound
 		}
 		defer f.Close()
@@ -1002,9 +1006,9 @@ func (c *Context) File(file string) (err error) {
 			return ErrInternalServerError.NewError(err)
 		}
 
-		http.ServeContent(c.res, c.req, fi.Name(), fi.ModTime(), f)
+		http.ServeContent(res, c.req, fi.Name(), fi.ModTime(), f)
 	} else {
-		http.ServeContent(c.res, c.req, fi.Name(), fi.ModTime(), f)
+		http.ServeContent(res, c.req, fi.Name(), fi.ModTime(), f)
 	}
 
 	return
