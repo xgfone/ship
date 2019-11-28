@@ -64,7 +64,7 @@ func main() {
 
 Notice: you can register the same handler with more than one method by `Route(path string).Method(handler Handler, method ...string)`.
 
-`R` is the alias of `Route`, you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
+`R` is the alias of `Route`, and you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
 #### Cascade the registered routes
 
@@ -109,6 +109,9 @@ func main() {
 func main() {
     router := ship.New()
     handler := func(ctx *ship.Context) error { return nil }
+
+    // The Content-Type header of the request to /path2 must be application/json,
+    // Or it will return 404.
     router.R("/path2").HasHeader("Content-Type", "application/json").POST(handler)
     router.Start(":8080").Wait()
 }
@@ -177,7 +180,7 @@ func main() {
 
 #### Filter the unacceptable route
 ```go
-func filter(ri RouteInfo) bool {
+func filter(ri ship.RouteInfo) bool {
     if ri.Name == "" {
         return true
     } else if !strings.HasPrefix(ri.Path, "/prefix/") {
@@ -199,7 +202,7 @@ func main() {
 
 #### Modify the registered route
 ```go
-func modifier(ri RouteInfo) RouteInfo {
+func modifier(ri ship.RouteInfo) ship.RouteInfo {
     ri.Path = "/prefix" + ri.Path
     return ri
 }
@@ -283,10 +286,10 @@ func main() {
 	router := ship.New()
 	router.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "default") })
 
-	vhost1 := router.Host("host1.example.com")
+	vhost1 := router.Host("host1.example.com") // It is a RouteGroup with the host.
 	vhost1.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost1") })
 
-	vhost2 := router.Host("host2.example.com")
+	vhost2 := router.Host("host2.example.com") // It is a RouteGroup with the host.
 	vhost2.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
 
 	router.Start(":8080").Wait()
@@ -357,7 +360,7 @@ type Login struct {
 }
 
 func main() {
-    router := ship.New()
+    router := ship.Default()
 
     router.Route("/login").POST(func(ctx *ship.Context) error {
         var login Login
@@ -379,7 +382,7 @@ package main
 import "github.com/xgfone/ship/v2"
 
 func main() {
-	router := ship.New()
+	router := ship.Default()
 
 	// For JSON
 	router.Route("/json").GET(func(ctx *ship.Context) error {
@@ -509,7 +512,7 @@ func main() {
 
 ## Route Management
 
-`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route, which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://godoc.org/github.com/xgfone/ship/router/echo#NewRouter).
+`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://godoc.org/github.com/xgfone/ship/router/echo#NewRouter).
 
 You can appoint your own implementation by implementing the interface [`Router`](https://godoc.org/github.com/xgfone/ship/router#Router).
 
