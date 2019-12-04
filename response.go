@@ -105,13 +105,6 @@ func (r *Response) Push(target string, opts *http.PushOptions) error {
 	return r.ResponseWriter.(http.Pusher).Push(target, opts)
 }
 
-// ReadFrom implements the io.ReaderFrom interface to reads data from src,
-// which may be used to optimize copying from an *os.File regular file
-// to a *net.TCPConn with sendfile.
-func (r *Response) ReadFrom(src io.Reader) (n int64, err error) {
-	return r.ResponseWriter.(io.ReaderFrom).ReadFrom(src)
-}
-
 // Flush implements the http.Flusher interface to allow an HTTP handler to flush
 // buffered data to the client.
 //
