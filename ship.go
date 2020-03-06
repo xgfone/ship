@@ -329,9 +329,26 @@ func (s *Ship) URL(name string, params ...interface{}) string {
 }
 
 func (s *Ship) addRoute(name, host, path, method string, handler Handler) {
-	method = strings.ToUpper(method)
-	ri := RouteInfo{Name: name, Host: host, Path: path, Method: method, Handler: handler}
+	ri := RouteInfo{
+		Name:    name,
+		Host:    host,
+		Path:    path,
+		Method:  method,
+		Handler: handler,
+	}
+	s.AddRoute(ri)
+}
 
+// AddRoutes registers a set of the routes.
+func (s *Ship) AddRoutes(ris ...RouteInfo) {
+	for _, ri := range ris {
+		s.AddRoute(ri)
+	}
+}
+
+// AddRoute registers the route.
+func (s *Ship) AddRoute(ri RouteInfo) {
+	ri.Method = strings.ToUpper(ri.Method)
 	if s.RouteModifier != nil {
 		ri = s.RouteModifier(ri)
 	}
