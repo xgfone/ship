@@ -347,6 +347,9 @@ func (s *Ship) AddRoutes(ris ...RouteInfo) {
 }
 
 // AddRoute registers the route.
+//
+// Notice: "Name" and "Host" are optional, "Router" will be ignored.
+// and others are mandatory.
 func (s *Ship) AddRoute(ri RouteInfo) {
 	ri.Method = strings.ToUpper(ri.Method)
 	if s.RouteModifier != nil {
