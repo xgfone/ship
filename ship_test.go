@@ -1103,3 +1103,12 @@ func TestMiddleware(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestShipAddRoutes(t *testing.T) {
+	app := New()
+	app.RouteModifier = func(ri RouteInfo) RouteInfo {
+		ri.Host = "www.example.com"
+		return ri
+	}
+	app.AddRoutes(HTTPPprofToRouteInfo()...)
+}
