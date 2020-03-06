@@ -360,8 +360,13 @@ func (s *Ship) AddRoute(ri RouteInfo) {
 		return
 	}
 
-	if ri.Name != "" {
-		if _, ok := s.nhosts[ri.Name]; ok {
+	for _, r := range s.routes {
+		if r.Host == ri.Host && r.Path == ri.Path && r.Method == ri.Method {
+			panic(fmt.Errorf("the route has been added: host=%s, path=%s, method=%s",
+				ri.Host, ri.Path, ri.Method))
+		}
+
+		if ri.Name != "" && r.Name == ri.Name && r.Path != ri.Path {
 			panic(fmt.Errorf("the route named '%s' has been added", ri.Name))
 		}
 	}
