@@ -63,7 +63,7 @@ func HTTPPprofToRouteInfo() []RouteInfo {
 	return []RouteInfo{
 		RouteInfo{
 			Name:    "pprof_index",
-			Path:    "/debug/pprof",
+			Path:    "/debug/pprof/*",
 			Method:  http.MethodGet,
 			Handler: FromHTTPHandlerFunc(pprof.Index),
 		},
