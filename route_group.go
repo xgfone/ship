@@ -72,3 +72,10 @@ func (g *RouteGroup) R(path string) *Route { return g.Route(path) }
 
 // NoMiddlewares clears all the middlewares and returns itself.
 func (g *RouteGroup) NoMiddlewares() *RouteGroup { g.mdwares = nil; return g }
+
+// AddRoutes adds the routes by RouteInfo.
+func (g *RouteGroup) AddRoutes(ris ...RouteInfo) {
+	for _, ri := range ris {
+		g.Route(ri.Path).Name(ri.Name).Host(ri.Host).Method(ri.Handler, ri.Method)
+	}
+}
