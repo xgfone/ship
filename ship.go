@@ -328,6 +328,23 @@ func (s *Ship) URL(name string, params ...interface{}) string {
 	return s.router.URL(name, params...)
 }
 
+// AddRoutes registers a set of the routes.
+func (s *Ship) AddRoutes(ris ...RouteInfo) {
+	for _, ri := range ris {
+		s.AddRoute(ri)
+	}
+}
+
+// AddRoute registers the route, which uses the global middlewares to wrap
+// the handler. If you don't want to use any middleware, you can do it by
+//    s.Group("").NoMiddlewares().AddRoutes(ri)
+//
+// Notice: "Name" and "Host" are optional, "Router" will be ignored.
+// and others are mandatory.
+func (s *Ship) AddRoute(ri RouteInfo) {
+	s.Route(ri.Path).Name(ri.Name).Host(ri.Host).Method(ri.Handler, ri.Method)
+}
+
 func (s *Ship) addRoute(name, host, path, method string, handler Handler) {
 	ri := RouteInfo{
 		Name:    name,
@@ -336,21 +353,7 @@ func (s *Ship) addRoute(name, host, path, method string, handler Handler) {
 		Method:  method,
 		Handler: handler,
 	}
-	s.AddRoute(ri)
-}
 
-// AddRoutes registers a set of the routes.
-func (s *Ship) AddRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		s.AddRoute(ri)
-	}
-}
-
-// AddRoute registers the route.
-//
-// Notice: "Name" and "Host" are optional, "Router" will be ignored.
-// and others are mandatory.
-func (s *Ship) AddRoute(ri RouteInfo) {
 	ri.Method = strings.ToUpper(ri.Method)
 	if s.RouteModifier != nil {
 		ri = s.RouteModifier(ri)

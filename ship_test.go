@@ -1110,5 +1110,22 @@ func TestShipAddRoutes(t *testing.T) {
 		ri.Host = "www.example.com"
 		return ri
 	}
-	app.AddRoutes(HTTPPprofToRouteInfo()...)
+	app.Group("/test").AddRoutes(HTTPPprofToRouteInfo()...)
+
+	for _, ri := range app.Routes() {
+		switch ri.Path {
+		case "/test/debug/pprof/*":
+		case "/test/debug/pprof/cmdline":
+		case "/test/debug/pprof/profile":
+		case "/test/debug/pprof/symbol":
+			switch ri.Method {
+			case http.MethodGet, http.MethodPost:
+			default:
+				t.Error(ri)
+			}
+		case "/test/debug/pprof/trace":
+		default:
+			t.Error(ri)
+		}
+	}
 }
