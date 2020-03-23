@@ -24,6 +24,9 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"runtime"
+	rpprof "runtime/pprof"
+	"strconv"
 	"strings"
 
 	"github.com/xgfone/ship/v2/router"
@@ -57,15 +60,51 @@ type RouteInfo struct {
 	Router  router.Router `json:"-" xml:"-"`
 }
 
+type pprofHandler string
+
+func (name pprofHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	p := rpprof.Lookup(string(name))
+	if p == nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Go-Pprof", "1")
+		w.Header().Del("Content-Disposition")
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintln(w, "Unknown profile")
+		return
+	}
+	gc, _ := strconv.Atoi(r.FormValue("gc"))
+	if name == "heap" && gc > 0 {
+		runtime.GC()
+	}
+	debug, _ := strconv.Atoi(r.FormValue("debug"))
+	if debug != 0 {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	}
+	p.WriteTo(w, debug)
+}
+
 // HTTPPprofToRouteInfo converts http pprof handler to RouteInfo,
 // so that you can register them and get runtime profiling data by HTTP server.
 func HTTPPprofToRouteInfo() []RouteInfo {
 	return []RouteInfo{
 		RouteInfo{
-			Name:    "pprof_index",
-			Path:    "/debug/pprof/*",
-			Method:  http.MethodGet,
-			Handler: FromHTTPHandlerFunc(pprof.Index),
+			Name:   "pprof_index",
+			Path:   "/debug/pprof/*",
+			Method: http.MethodGet,
+			Handler: func(ctx *Context) error {
+				path := ctx.Path()
+				i := strings.Index(path, "/debug/pprof/")
+				if _len := i + 13; len(path) > _len {
+					pprofHandler(path[_len:]).ServeHTTP(ctx.Response(), ctx.Request())
+					return nil
+				}
+				pprof.Index(ctx.Response(), ctx.Request())
+				return nil
+			},
 		},
 		RouteInfo{
 			Name:    "pprof_cmdline",
