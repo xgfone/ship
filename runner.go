@@ -90,8 +90,8 @@ func (r *Runner) Stop()        { r.shut.Run() }
 func (r *Runner) runShutdown() { r.Shutdown(context.Background()) }
 func (r *Runner) runStopfs() {
 	defer close(r.done)
-	for _, f := range r.stopfs {
-		f.Run()
+	for i := len(r.stopfs) - 1; i >= 0; i-- {
+		r.stopfs[i].Run()
 	}
 }
 
