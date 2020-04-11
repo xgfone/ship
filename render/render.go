@@ -99,6 +99,7 @@ func SimpleRenderer(name string, contentType string, marshaler Marshaler) Render
 		if name != n {
 			panic(fmt.Errorf("the renderer name '%s' is not '%s'", n, name))
 		}
+		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(c)
 		return marshaler(w, v)
 	})
