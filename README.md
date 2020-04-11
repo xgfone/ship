@@ -376,24 +376,51 @@ func main() {
 
 ### Render JSON, XML, HTML or other format data
 
+In the directory `/path/to/templates`, there is a template file named `index.tmpl` as follow:
+```html
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        This is the body content: </pre>{{ . }}</pre>
+    </body>
+</html>
+```
+So we load it as the template by the stdlib `html/template`, and render it as the HTML content.
+
 ```go
 package main
 
-import "github.com/xgfone/ship/v2"
+import (
+	"fmt"
+
+	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v2/render"
+	"github.com/xgfone/ship/v2/render/template"
+)
 
 func main() {
+	// It will recursively load all the files in the directory as the templates.
+	loader := template.NewDirLoader("/path/to/templates")
+	tmplRender, err := template.NewHTMLRender(loader, false)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	router := ship.Default()
+	router.Renderer.(*render.MuxRenderer).Add(".tmpl", tmplRender)
 
 	// For JSON
 	router.Route("/json").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.JSONPretty(200, map[string]interface{}{"msg": "json"}, "    ")
 			// Or
-			// return ctx.Render("jsonpretty", 200, map[string]interface{}{"msg": "json"})
+			// return ctx.RenderOk("jsonpretty", map[string]interface{}{"msg": "json"})
 		}
 		return ctx.JSON(200, map[string]interface{}{"msg": "json"})
 		// Or
-		// return ctx.Render("json", 200, map[string]interface{}{"msg": "json"})
+		// return ctx.RenderOk("json", map[string]interface{}{"msg": "json"})
 	})
 
 	// For XML
@@ -401,19 +428,32 @@ func main() {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.XMLPretty(200, []string{"msg", "xml"}, "    ")
 			// Or
-			// return ctx.Render("xmlpretty", 200, []string{"msg", "xml"})
+			// return ctx.RenderOk("xmlpretty", []string{"msg", "xml"})
 		}
 		return ctx.XML(200, []string{"msg", "xml"})
 		// Or
-		// return ctx.Render("xml", 200, []string{"msg", "xml"})
+		// return ctx.RenderOk("xml", []string{"msg", "xml"})
 	})
 
-	// For others
-	// ...
+	// For HTML
+	router.Route("/html").GET(func(ctx *ship.Context) error {
+		return ctx.RenderOk("index.tmpl", "Hello World")
+	})
 
 	// Start the HTTP server.
 	router.Start(":8080").Wait()
 }
+```
+
+When accessing `http://127.0.0.1:8080/html`, it returns
+```html
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        This is the body content: </pre>Hello World</pre>
+    </body>
+</html>
 ```
 
 ### Prometheus Metric

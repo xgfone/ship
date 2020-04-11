@@ -31,13 +31,13 @@ func TestRoute(t *testing.T) {
 	s := New()
 	handler := OkHandler()
 	routes := []RouteInfo{
-		RouteInfo{"name", "", "/path", http.MethodGet, handler, nil},
-		RouteInfo{"name1", "host1", "/path1", http.MethodGet, handler, nil},
-		RouteInfo{"name2", "host1", "/path2", http.MethodGet, handler, nil},
-		RouteInfo{"name3", "host1", "/path3", http.MethodGet, handler, nil},
-		RouteInfo{"name4", "host2", "/path4", http.MethodGet, handler, nil},
-		RouteInfo{"name5", "host2", "/path5", http.MethodGet, handler, nil},
-		RouteInfo{"name6", "host2", "/path6", http.MethodGet, handler, nil},
+		{"name", "", "/path", http.MethodGet, handler, nil},
+		{"name1", "host1", "/path1", http.MethodGet, handler, nil},
+		{"name2", "host1", "/path2", http.MethodGet, handler, nil},
+		{"name3", "host1", "/path3", http.MethodGet, handler, nil},
+		{"name4", "host2", "/path4", http.MethodGet, handler, nil},
+		{"name5", "host2", "/path5", http.MethodGet, handler, nil},
+		{"name6", "host2", "/path6", http.MethodGet, handler, nil},
 	}
 
 	for _, r := range routes {

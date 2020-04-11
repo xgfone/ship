@@ -91,7 +91,7 @@ func (name pprofHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // so that you can register them and get runtime profiling data by HTTP server.
 func HTTPPprofToRouteInfo() []RouteInfo {
 	return []RouteInfo{
-		RouteInfo{
+		{
 			Name:   "pprof_index",
 			Path:   "/debug/pprof/*",
 			Method: http.MethodGet,
@@ -106,31 +106,31 @@ func HTTPPprofToRouteInfo() []RouteInfo {
 				return nil
 			},
 		},
-		RouteInfo{
+		{
 			Name:    "pprof_cmdline",
 			Path:    "/debug/pprof/cmdline",
 			Method:  http.MethodGet,
 			Handler: FromHTTPHandlerFunc(pprof.Cmdline),
 		},
-		RouteInfo{
+		{
 			Name:    "pprof_profile",
 			Path:    "/debug/pprof/profile",
 			Method:  http.MethodGet,
 			Handler: FromHTTPHandlerFunc(pprof.Profile),
 		},
-		RouteInfo{
+		{
 			Name:    "pprof_symbol",
 			Path:    "/debug/pprof/symbol",
 			Method:  http.MethodGet,
 			Handler: FromHTTPHandlerFunc(pprof.Symbol),
 		},
-		RouteInfo{
+		{
 			Name:    "pprof_symbol",
 			Path:    "/debug/pprof/symbol",
 			Method:  http.MethodPost,
 			Handler: FromHTTPHandlerFunc(pprof.Symbol),
 		},
-		RouteInfo{
+		{
 			Name:    "pprof_trace",
 			Path:    "/debug/pprof/trace",
 			Method:  http.MethodGet,
