@@ -807,6 +807,11 @@ func (c *Context) Render(name string, code int, data interface{}) error {
 	return c.renderer.Render(c, name, code, data)
 }
 
+// RenderOk is short for c.Render(name, http.StatusOK, data).
+func (c *Context) RenderOk(name string, data interface{}) error {
+	return c.Render(name, http.StatusOK, data)
+}
+
 //----------------------------------------------------------------------------
 // Set Repsonse
 //----------------------------------------------------------------------------
