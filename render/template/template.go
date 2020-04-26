@@ -143,16 +143,37 @@ func (l tmplLoader) loadFile(prefix, filename string) (File, error) {
 }
 
 // NewHTMLRender returns a new Renderer to render the html template.
+//
+// If debug is true, it will reload all the templates automatically
+// each time the template is rendered.
+//
+// The returned Renderer has a method `Reload() error` to reload
+// all the templates, and you can use as follow:
+//
+//    htmlRender, _ := NewHTMLRender(loader, false)
+//    err := htmlRender.(interface{ Reload() error }).Reload()
+//    // ...
+//
 func NewHTMLRender(loader Loader, debug bool) (render.Renderer, error) {
+	return newHTMLRender(loader, debug, false)
+}
+
+// NewSafeHTMLRender is the same as NewHTMLRender, but you can reload
+// all the templates safely and concurrently.
+func NewSafeHTMLRender(loader Loader, debug bool) (render.Renderer, error) {
+	return newHTMLRender(loader, debug, true)
+}
+
+func newHTMLRender(loader Loader, debug, safe bool) (render.Renderer, error) {
 	r := &htmlRender{
 		loader: loader,
 		bufs:   sync.Pool{New: func() interface{} { return new(bytes.Buffer) }},
 	}
-	if debug {
+	if safe {
 		r.lock = new(sync.RWMutex)
 	}
 
-	if err := r.load(); err != nil {
+	if err := r.reload(); err != nil {
 		return nil, err
 	}
 	return r, nil
@@ -161,19 +182,18 @@ func NewHTMLRender(loader Loader, debug bool) (render.Renderer, error) {
 // HTMLRender is used to render a html/template.
 type htmlRender struct {
 	loader Loader
+	debug  bool
 	lock   *sync.RWMutex
 	tmpl   *template.Template
 	bufs   sync.Pool
 }
 
-func (r *htmlRender) reload() (err error) {
-	if r.lock != nil {
-		err = r.load()
-	}
-	return
+// Reload reloads all the templates.
+func (r *htmlRender) Reload() error {
+	return r.reload()
 }
 
-func (r *htmlRender) load() error {
+func (r *htmlRender) reload() error {
 	files, err := r.loader.LoadAll()
 	if err != nil {
 		return err
@@ -187,7 +207,9 @@ func (r *htmlRender) load() error {
 	tmpl := template.New("__DEFAULT_HTML_TEMPLATE__")
 	for _, file := range files {
 		t := tmpl.New(file.Name())
-		template.Must(t.Parse(string(file.Data())))
+		if _, err = t.Parse(string(file.Data())); err != nil {
+			return err
+		}
 	}
 	r.tmpl = tmpl
 	return nil
@@ -203,8 +225,10 @@ func (r *htmlRender) execute(w io.Writer, name string, data interface{}) error {
 
 func (r *htmlRender) Render(w http.ResponseWriter, name string, code int,
 	data interface{}) (err error) {
-	if err = r.reload(); err != nil {
-		return
+	if r.debug {
+		if err = r.reload(); err != nil {
+			return
+		}
 	}
 
 	buf := r.bufs.Get().(*bytes.Buffer)
