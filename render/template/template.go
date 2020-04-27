@@ -24,8 +24,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/xgfone/ship/v2/render"
 )
 
 // File represents a template file.
@@ -142,58 +140,77 @@ func (l tmplLoader) loadFile(prefix, filename string) (File, error) {
 	return NewFile(name, ext, data), nil
 }
 
-// NewHTMLRender returns a new Renderer to render the html template.
-//
-// If debug is true, it will reload all the templates automatically
-// each time the template is rendered.
-//
-// The returned Renderer has a method `Reload() error` to reload
-// all the templates, and you can use as follow:
-//
-//    htmlRender, _ := NewHTMLRender(loader, false)
-//    err := htmlRender.(interface{ Reload() error }).Reload()
-//    // ...
-//
-func NewHTMLRender(loader Loader, debug bool) (render.Renderer, error) {
-	return newHTMLRender(loader, debug, false)
-}
-
-// NewSafeHTMLRender is the same as NewHTMLRender, but you can reload
-// all the templates safely and concurrently.
-func NewSafeHTMLRender(loader Loader, debug bool) (render.Renderer, error) {
-	return newHTMLRender(loader, debug, true)
-}
-
-func newHTMLRender(loader Loader, debug, safe bool) (render.Renderer, error) {
-	r := &htmlRender{
+// NewHTMLTemplateRender returns a new Renderer to render the html template.
+func NewHTMLTemplateRender(loader Loader) *HTMLTemplateRender {
+	r := &HTMLTemplateRender{
 		loader: loader,
 		bufs:   sync.Pool{New: func() interface{} { return new(bytes.Buffer) }},
 	}
-	if safe {
-		r.lock = new(sync.RWMutex)
-	}
-
-	if err := r.reload(); err != nil {
-		return nil, err
-	}
-	return r, nil
+	return r
 }
 
-// HTMLRender is used to render a html/template.
-type htmlRender struct {
+// HTMLTemplateRender is used to render a html/template.
+type HTMLTemplateRender struct {
 	loader Loader
+	funcs  []template.FuncMap
 	debug  bool
-	lock   *sync.RWMutex
-	tmpl   *template.Template
-	bufs   sync.Pool
+	right  string
+	left   string
+
+	load sync.Once
+	lock *sync.RWMutex
+	tmpl *template.Template
+	bufs sync.Pool
+}
+
+// Debug sets the debug model and returns itself.
+//
+// If debug is true, it will reload all the templates automatically each time
+// the template is rendered.
+func (r *HTMLTemplateRender) Debug(debug bool) *HTMLTemplateRender {
+	r.debug = debug
+	return r
+}
+
+// Lock enables the lock to reload the templates safely and concurrently,
+// then returns itself.
+//
+// Notice: There is no need to enable the lock when no reloading the templates
+// during rendering the templates.
+func (r *HTMLTemplateRender) Lock(lock bool) *HTMLTemplateRender {
+	if lock && r.lock == nil {
+		r.lock = new(sync.RWMutex)
+	} else if !lock && r.lock != nil {
+		r.lock = nil
+	}
+	return r
+}
+
+// Delims resets the left and right delimiter and returns itself.
+//
+// The default delimiters are "{{" and "}}".
+//
+// Notice: it must be set before rendering the html template.
+func (r *HTMLTemplateRender) Delims(left, right string) *HTMLTemplateRender {
+	r.left = left
+	r.right = right
+	return r
+}
+
+// Funcs appends the FuncMap and returns itself.
+//
+// Notice: it must be set before rendering the html template.
+func (r *HTMLTemplateRender) Funcs(funcs template.FuncMap) *HTMLTemplateRender {
+	r.funcs = append(r.funcs, funcs)
+	return r
 }
 
 // Reload reloads all the templates.
-func (r *htmlRender) Reload() error {
+func (r *HTMLTemplateRender) Reload() error {
 	return r.reload()
 }
 
-func (r *htmlRender) reload() error {
+func (r *HTMLTemplateRender) reload() error {
 	files, err := r.loader.LoadAll()
 	if err != nil {
 		return err
@@ -205,8 +222,12 @@ func (r *htmlRender) reload() error {
 	}
 
 	tmpl := template.New("__DEFAULT_HTML_TEMPLATE__")
+	tmpl.Delims(r.left, r.right)
 	for _, file := range files {
 		t := tmpl.New(file.Name())
+		for _, funcs := range r.funcs {
+			t.Funcs(funcs)
+		}
 		if _, err = t.Parse(string(file.Data())); err != nil {
 			return err
 		}
@@ -215,7 +236,7 @@ func (r *htmlRender) reload() error {
 	return nil
 }
 
-func (r *htmlRender) execute(w io.Writer, name string, data interface{}) error {
+func (r *HTMLTemplateRender) execute(w io.Writer, name string, data interface{}) error {
 	if r.lock != nil {
 		r.lock.RLock()
 		defer r.lock.RUnlock()
@@ -223,10 +244,16 @@ func (r *htmlRender) execute(w io.Writer, name string, data interface{}) error {
 	return r.tmpl.ExecuteTemplate(w, name, data)
 }
 
-func (r *htmlRender) Render(w http.ResponseWriter, name string, code int,
+// Render implements the interface render.Renderer.
+func (r *HTMLTemplateRender) Render(w http.ResponseWriter, name string, code int,
 	data interface{}) (err error) {
 	if r.debug {
 		if err = r.reload(); err != nil {
+			return
+		}
+	} else {
+		r.load.Do(func() { err = r.reload() })
+		if err != nil {
 			return
 		}
 	}

@@ -65,7 +65,7 @@ var htmpresp = `<!DOCTYPE html>
 </html>
 `
 
-func TestNewHTMLRender(t *testing.T) {
+func TestNewHTMLTemplateRender(t *testing.T) {
 	err := ioutil.WriteFile(tmplname, []byte(htmlTmpl), 0600)
 	if err != nil {
 		t.Error(err)
@@ -94,12 +94,7 @@ func TestNewHTMLRender(t *testing.T) {
 		}
 	}
 
-	r, err := NewHTMLRender(loader, false)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
+	r := NewHTMLTemplateRender(loader)
 	rec := httptest.NewRecorder()
 	err = r.Render(rec, tmplname, 200, "This is the content.")
 	if err != nil {

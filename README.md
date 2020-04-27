@@ -402,11 +402,7 @@ import (
 func main() {
 	// It will recursively load all the files in the directory as the templates.
 	loader := template.NewDirLoader("/path/to/templates")
-	tmplRender, err := template.NewHTMLRender(loader, false)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	tmplRender := template.NewHTMLTemplateRender(loader)
 
 	router := ship.Default()
 	router.Renderer.(*render.MuxRenderer).Add(".tmpl", tmplRender)
