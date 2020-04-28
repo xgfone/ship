@@ -135,6 +135,7 @@ func (l tmplLoader) loadFile(prefix, filename string) (File, error) {
 	}
 
 	name := strings.TrimPrefix(filename, prefix)
+	name = strings.Replace(name, "\\", "/", -1)
 	ext := filepath.Ext(name)
 	// name = strings.TrimSuffix(name, ext)
 	return NewFile(name, ext, data), nil
