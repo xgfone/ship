@@ -17,6 +17,7 @@ package ship
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"sync/atomic"
 )
 
@@ -62,4 +63,11 @@ func ReadNWriter(w io.Writer, r io.Reader, n int64) (err error) {
 		return io.EOF
 	}
 	return nil
+}
+
+// DisalbeRedirect is used to disalbe the default redirect behavior
+// of http.Client, that's, http.Client won't handle the redirect response
+// and just return it to the caller.
+func DisalbeRedirect(req *http.Request, via []*http.Request) error {
+	return http.ErrUseLastResponse
 }
