@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,6 +45,9 @@ func newRouteGroup(s *Ship, pprefix, prefix, host string, mws ...Middleware) *Ro
 // Ship returns the ship that the current group belongs to.
 func (g *RouteGroup) Ship() *Ship { return g.ship }
 
+// Clone clones itself and returns a new one.
+func (g *RouteGroup) Clone() *RouteGroup { var rg RouteGroup; rg = *g; return &rg }
+
 // Host sets the host of the route group to host.
 func (g *RouteGroup) Host(host string) *RouteGroup { g.host = host; return g }
 
@@ -74,8 +77,19 @@ func (g *RouteGroup) R(path string) *Route { return g.Route(path) }
 func (g *RouteGroup) NoMiddlewares() *RouteGroup { g.mdwares = nil; return g }
 
 // AddRoutes adds the routes by RouteInfo.
-func (g *RouteGroup) AddRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		g.Route(ri.Path).Name(ri.Name).Host(ri.Host).Method(ri.Handler, ri.Method)
+func (g *RouteGroup) AddRoutes(ris ...RouteInfo) *RouteGroup {
+	for i, ri := range ris {
+		ris[i].Path = g.Route(ri.Path).path
 	}
+	g.ship.AddRoutes(ris...)
+	return g
+}
+
+// DelRoutes deletes the routes by RouteInfo.
+func (g *RouteGroup) DelRoutes(ris ...RouteInfo) *RouteGroup {
+	for i, ri := range ris {
+		ris[i].Path = g.Route(ri.Path).path
+	}
+	g.ship.DelRoutes(ris...)
+	return g
 }

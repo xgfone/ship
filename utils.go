@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package ship
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -38,31 +37,33 @@ func (r *OnceRunner) Run() {
 	}
 }
 
-// ReadNWriter reads n bytes to the writer w from the reader r.
+// CopyNBuffer is the same as io.CopyN, but uses the given buf as the buffer.
 //
-// It will return io.EOF if the length of the data from r is less than n.
-// But the data has been read into w.
-func ReadNWriter(w io.Writer, r io.Reader, n int64) (err error) {
-	buf := make([]byte, 4096)
-	if n < 1 {
-		_, err := io.CopyBuffer(w, r, buf)
-		return err
+// If buf is nil or empty, it will make a new one with 2048.
+func CopyNBuffer(dst io.Writer, src io.Reader, n int64, buf []byte) (written int64, err error) {
+	if len(buf) == 0 {
+		buf = make([]byte, 2048)
 	}
 
-	if buf, ok := w.(*bytes.Buffer); ok {
+	// For like byte.Buffer, we maybe grow its capacity to avoid allocating
+	// the memory more times.
+	if b, ok := dst.(interface{ Grow(int) }); ok {
 		if n < 32768 { // 32KB
-			buf.Grow(int(n))
+			b.Grow(int(n))
 		} else {
-			buf.Grow(32768)
+			b.Grow(32768)
 		}
 	}
 
-	if m, err := io.CopyBuffer(w, io.LimitReader(r, n), buf); err != nil {
-		return err
-	} else if m < n {
-		return io.EOF
+	written, err = io.CopyBuffer(dst, io.LimitReader(src, n), buf)
+	if written == n {
+		return n, nil
+	} else if written < n && err == nil {
+		// src stopped early; must have been EOF.
+		err = io.EOF
 	}
-	return nil
+
+	return
 }
 
 // DisalbeRedirect is used to disalbe the default redirect behavior

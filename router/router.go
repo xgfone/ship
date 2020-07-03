@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,30 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package router supplies a router interface ane some implementations.
 package router
+
+import "fmt"
+
+// Route represents the information of the registered route.
+type Route struct {
+	Name    string
+	Path    string
+	Method  string
+	Handler interface{}
+}
+
+func (r Route) String() string {
+	if r.Name == "" {
+		return fmt.Sprintf("Route(method=%s, path=%s)", r.Method, r.Path)
+	}
+	return fmt.Sprintf("Route(name=%s, method=%s, path=%s)", r.Name, r.Method, r.Path)
+}
 
 // Router stands for a router management.
 type Router interface {
-	// Generate a URL by the url name and parameters.
+	// Routes returns the list of all the routes.
+	Routes() []Route
+
+	// URL generates a URL by the url name and parameters.
 	URL(name string, params ...interface{}) string
 
-	// Add a route with name, path, method and handler, and return the number
-	// of the parameters if there are the parameters in the route. Or return 0.
+	// Add adds a route and returns the number of the parameters
+	// if there are the parameters in the route.
 	//
-	// If there is any error, it should panic.
-	//
-	// Notice: for keeping consistent, the parameter should start with ":"
-	// or "*". ":" stands for a single parameter, and "*" stands for
-	// a wildcard parameter.
-	Add(name, method, path string, handler interface{}) (paramNum int)
+	// For keeping consistent, the parameter should start with ":" or "*".
+	// ":" stands for the single parameter, and "*" stands for the wildcard.
+	Add(name, method, path string, handler interface{}) (paramNum int, err error)
 
-	// Find a route handler by the method and path of the request.
+	// Del deletes the given route.
 	//
-	// Return defaultHandler instead if the route does not exist.
+	// If name is not empty, it deletes the route by the name.
+	// Or delete it by the path.
 	//
-	// If the route has parameters, the name and value of the parameters
-	// should be stored `pnames` and `pvalues` respectively, which has
-	// the enough capacity to store the paramether names and values.
-	Find(method, path string, pnames, pvalues []string,
-		defaultHandler interface{}) (handler interface{})
+	// If the method is not empty, it only deletes the given method
+	// for the route path.
+	Del(name, method, path string) (err error)
+
+	// Find searchs the handler and the number of the url path paramethers.
+	// For the url path paramethers, they are put into pnames and pvalues.
+	//
+	// Return (nil, 0) if not found the route handler.
+	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
 }

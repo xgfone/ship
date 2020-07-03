@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import (
 	rpprof "runtime/pprof"
 	"strconv"
 	"strings"
-
-	"github.com/xgfone/ship/v2/router"
 )
 
 // AllMethods represents all HTTP methods.
@@ -39,25 +37,40 @@ var AllMethods = []string{
 	http.MethodPatch,
 }
 
-// RouteFilter is used to filter the registering route if it returns true.
-type RouteFilter func(RouteInfo) bool
-
-// RouteModifier is used to modify the registering route.
-type RouteModifier func(RouteInfo) RouteInfo
-
-type kvalues struct {
-	Key    string
-	Values []string
-}
-
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
-	Name    string        `json:"name" xml:"name"`
-	Host    string        `json:"host" xml:"host"`
-	Path    string        `json:"path" xml:"path"`
-	Method  string        `json:"method" xml:"method"`
-	Handler Handler       `json:"-" xml:"-"`
-	Router  router.Router `json:"-" xml:"-"`
+	Host    string  `json:"host" xml:"host"`
+	Name    string  `json:"name" xml:"name"`
+	Path    string  `json:"path" xml:"path"`
+	Method  string  `json:"method" xml:"method"`
+	Handler Handler `json:"-" xml:"-"`
+}
+
+func (ri RouteInfo) String() string {
+	if ri.Host == "" {
+		if ri.Name == "" {
+			return fmt.Sprintf("RouteInfo(method=%s, path=%s)", ri.Method, ri.Path)
+		}
+		return fmt.Sprintf("RouteInfo(name=%s, method=%s, path=%s)",
+			ri.Name, ri.Method, ri.Path)
+	} else if ri.Name == "" {
+		return fmt.Sprintf("RouteInfo(host=%s, method=%s, path=%s)",
+			ri.Host, ri.Method, ri.Path)
+	}
+	return fmt.Sprintf("RouteInfo(host=%s, name=%s, method=%s, path=%s)",
+		ri.Host, ri.Name, ri.Method, ri.Path)
+}
+
+func (ri RouteInfo) checkPath() error {
+	if len(ri.Path) == 0 || ri.Path[0] != '/' {
+		return fmt.Errorf("path '%s' must start with '/'", ri.Path)
+	}
+
+	if i := strings.Index(ri.Path, "//"); i != -1 {
+		return fmt.Errorf("bad path '%s' contains duplicate // at index:%d", ri.Path, i)
+	}
+
+	return nil
 }
 
 type pprofHandler string
@@ -139,6 +152,11 @@ func HTTPPprofToRouteInfo() []RouteInfo {
 	}
 }
 
+type kvalues struct {
+	Key    string
+	Values []string
+}
+
 // Route represents a route information.
 type Route struct {
 	ship    *Ship
@@ -189,6 +207,9 @@ func (r *Route) Ship() *Ship { return r.ship }
 // Notice: it will return nil if the route is from ship.Route.
 func (r *Route) Group() *RouteGroup { return r.group }
 
+// Clone closes itself and returns a new one.
+func (r *Route) Clone() *Route { var nr Route; nr = *r; return &nr }
+
 // NoMiddlewares clears all the middlewares and returns itself.
 func (r *Route) NoMiddlewares() *Route { r.mdwares = nil; return r }
 
@@ -228,19 +249,21 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 	return func(next Handler) Handler {
 		return func(ctx *Context) error {
 			for _, kv := range r.headers {
-				value := ctx.GetHeader(kv.Key)
 				if len(kv.Values) == 0 {
-					if value == "" {
+					if ctx.GetHeader(kv.Key) == "" {
 						err := fmt.Errorf("missing the header '%s'", kv.Key)
 						return ErrBadRequest.NewError(err)
 					}
 				} else {
+					values := ctx.ReqHeader()[kv.Key]
 					for _, v := range kv.Values {
-						if v == value {
-							return next(ctx)
+						for _, rv := range values {
+							if v == rv {
+								return next(ctx)
+							}
 						}
 					}
-					err := fmt.Errorf("invalid header '%s: %s'", kv.Key, value)
+					err := fmt.Errorf("invalid header '%s: %v'", kv.Key, values)
 					return ErrBadRequest.NewError(err)
 				}
 			}
@@ -249,22 +272,9 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 	}
 }
 
-func (r *Route) addRoute(name, host, path string, handler Handler,
-	methods ...string) *Route {
-	if handler == nil {
-		panic(errors.New("handler must not be nil"))
-	}
-
-	if len(methods) == 0 {
+func (r *Route) addRoute(name, host, path string, h Handler, ms ...string) {
+	if len(ms) == 0 {
 		panic(errors.New("the route requires methods"))
-	}
-
-	if len(path) == 0 || path[0] != '/' {
-		panic(fmt.Errorf("path '%s' must start with '/'", path))
-	}
-
-	if i := strings.Index(path, "//"); i != -1 {
-		panic(fmt.Errorf("bad path '%s' contains duplicate // at index:%d", path, i))
 	}
 
 	middlewares := r.mdwares
@@ -281,14 +291,13 @@ func (r *Route) addRoute(name, host, path string, handler Handler,
 	}
 
 	for i := middlewaresLen - 1; i >= 0; i-- {
-		handler = middlewares[i](handler)
+		h = middlewares[i](h)
 	}
 
-	for _, method := range methods {
-		r.ship.addRoute(name, host, path, method, handler)
+	for _, m := range ms {
+		ri := RouteInfo{Name: name, Host: host, Path: path, Method: m, Handler: h}
+		r.ship.AddRoutes(ri)
 	}
-
-	return r
 }
 
 // Method sets the methods and registers the route.
@@ -549,3 +558,48 @@ type notDirFile struct {
 func (f notDirFile) Readdir(count int) ([]os.FileInfo, error) {
 	return nil, nil
 }
+
+/// ----------------------------------------------------------------------- ///
+
+// Remove removes the route.
+//
+// If the method is "", it will remove all the routes associated with the path.
+func (r *Route) Remove(method string) *Route {
+	r.ship.DelRoutes(RouteInfo{
+		Host:   r.host,
+		Name:   r.name,
+		Path:   r.path,
+		Method: method,
+	})
+	return r
+}
+
+// RemoveAny is equal to r.Remove("").
+func (r *Route) RemoveAny() *Route { return r.Remove("") }
+
+// RemoveGET is equal to r.Remove(http.MethodGet).
+func (r *Route) RemoveGET() *Route { return r.Remove(http.MethodGet) }
+
+// RemovePUT is equal to r.Remove(http.MethodPut).
+func (r *Route) RemovePUT() *Route { return r.Remove(http.MethodPut) }
+
+// RemovePOST is equal to r.Remove(http.MethodPost).
+func (r *Route) RemovePOST() *Route { return r.Remove(http.MethodPost) }
+
+// RemoveHEAD is equal to r.Remove(http.MethodHead).
+func (r *Route) RemoveHEAD() *Route { return r.Remove(http.MethodHead) }
+
+// RemovePATCH is equal to r.Remove(http.MethodPatch).
+func (r *Route) RemovePATCH() *Route { return r.Remove(http.MethodPatch) }
+
+// RemoveDELETE is equal to r.Remove(http.MethodDelete).
+func (r *Route) RemoveDELETE() *Route { return r.Remove(http.MethodDelete) }
+
+// RemoveCONNECT is equal to r.Remove(http.MethodConnect).
+func (r *Route) RemoveCONNECT() *Route { return r.Remove(http.MethodConnect) }
+
+// RemoveOPTIONS is equal to r.Remove(http.MethodOptions).
+func (r *Route) RemoveOPTIONS() *Route { return r.Remove(http.MethodOptions) }
+
+// RemoveTRACE is equal to r.Remove(http.MethodTrace).
+func (r *Route) RemoveTRACE() *Route { return r.Remove(http.MethodTrace) }

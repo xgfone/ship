@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,13 +31,13 @@ func TestRoute(t *testing.T) {
 	s := New()
 	handler := OkHandler()
 	routes := []RouteInfo{
-		{"name", "", "/path", http.MethodGet, handler, nil},
-		{"name1", "host1", "/path1", http.MethodGet, handler, nil},
-		{"name2", "host1", "/path2", http.MethodGet, handler, nil},
-		{"name3", "host1", "/path3", http.MethodGet, handler, nil},
-		{"name4", "host2", "/path4", http.MethodGet, handler, nil},
-		{"name5", "host2", "/path5", http.MethodGet, handler, nil},
-		{"name6", "host2", "/path6", http.MethodGet, handler, nil},
+		{Host: "", Name: "name", Path: "/path", Method: http.MethodGet, Handler: handler},
+		{Host: "host1", Name: "name1", Path: "/path1", Method: http.MethodGet, Handler: handler},
+		{Host: "host1", Name: "name2", Path: "/path2", Method: http.MethodGet, Handler: handler},
+		{Host: "host1", Name: "name3", Path: "/path3", Method: http.MethodGet, Handler: handler},
+		{Host: "host2", Name: "name4", Path: "/path4", Method: http.MethodGet, Handler: handler},
+		{Host: "host2", Name: "name5", Path: "/path5", Method: http.MethodGet, Handler: handler},
+		{Host: "host2", Name: "name6", Path: "/path6", Method: http.MethodGet, Handler: handler},
 	}
 
 	for _, r := range routes {
@@ -47,12 +47,22 @@ func TestRoute(t *testing.T) {
 	if rs := s.Routes(); len(rs) != 7 {
 		t.Errorf("the number of the registered routes is %d, not 7\n", len(rs))
 	} else {
-		for i := range rs {
-			if rs[i].Name != routes[i].Name ||
-				rs[i].Host != routes[i].Host ||
-				rs[i].Path != routes[i].Path ||
-				rs[i].Method != routes[i].Method {
-				t.Errorf("%dth: expected %v, got %v\n", i, routes[i], rs[i])
+		for _, r := range rs {
+			switch r.Name {
+			case "name":
+			case "name1":
+			case "name2":
+			case "name3":
+			case "name4":
+			case "name5":
+			case "name6":
+				route := routes[6]
+				if r.Name != route.Name || r.Host != route.Host ||
+					r.Path != route.Path || r.Method != route.Method {
+					t.Errorf("expected %v, got %v\n", route, r)
+				}
+			default:
+				t.Errorf("unknown route: %v", r)
 			}
 		}
 	}
@@ -64,7 +74,7 @@ func TestRoute(t *testing.T) {
 	sort.Strings(hosts)
 
 	if len(hosts) != 3 {
-		t.Errorf("the number of routers is %d, not 3", len(hosts))
+		t.Errorf("the number of routers is not 3: %v", hosts)
 	} else {
 		_hosts := []string{"", "host1", "host2"}
 		for i := range hosts {
@@ -384,7 +394,7 @@ func TestRouterAPI(t *testing.T) {
 
 func TestMethodNotAllowed(t *testing.T) {
 	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(MethodNotAllowedHandler())
+		return echo.NewRouter(nil, MethodNotAllowedHandler())
 	})
 
 	p.Route("/home").PUT(defaultHandler)
@@ -421,7 +431,7 @@ func TestMethodNotAllowed(t *testing.T) {
 
 func TestMethodNotAllowed2(t *testing.T) {
 	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(MethodNotAllowedHandler())
+		return echo.NewRouter(nil, MethodNotAllowedHandler())
 	})
 
 	p.Route("/home").GET(defaultHandler)
@@ -969,16 +979,14 @@ func TestSetRouteFilter(t *testing.T) {
 	app.Group("/group").R("/name").Name("test").GET(handler)
 	app.R("/noname").GET(handler)
 
-	noRoute := true
-	for _, ri := range app.Routes() {
-		noRoute = false
-		if ri.Name != "test" {
-			t.Error(ri.Name)
-		}
+	routes := app.Routes()
+	if len(routes) == 0 {
+		t.Error("no routes")
 	}
-
-	if noRoute {
-		t.Fail()
+	for _, ri := range routes {
+		if ri.Name != "test" {
+			t.Error(ri)
+		}
 	}
 }
 
@@ -1112,7 +1120,12 @@ func TestShipAddRoutes(t *testing.T) {
 	}
 	app.Group("/test").AddRoutes(HTTPPprofToRouteInfo()...)
 
-	for _, ri := range app.Routes() {
+	routes := app.Routes()
+	if len(routes) == 0 {
+		t.Errorf("no routes")
+	}
+
+	for _, ri := range routes {
 		switch ri.Path {
 		case "/test/debug/pprof/*":
 		case "/test/debug/pprof/cmdline":
@@ -1127,5 +1140,28 @@ func TestShipAddRoutes(t *testing.T) {
 		default:
 			t.Error(ri)
 		}
+	}
+
+	rs := HTTPPprofToRouteInfo()
+	for i := range rs {
+		rs[i].Handler = nil
+	}
+	app.Group("/test").DelRoutes(rs...)
+	if routes := app.Routes(); len(routes) > 0 {
+		t.Error(routes)
+	}
+}
+
+func TestRoute_RemoveAny(t *testing.T) {
+	h := OkHandler()
+	app := New()
+	app.Route("/path1").GET(h).POST(h).DELETE(h)
+	if routes := app.Routes(); len(routes) != 3 {
+		t.Error(routes)
+	}
+
+	app.Route("/path1").RemoveAny()
+	if routes := app.Routes(); len(routes) != 0 {
+		t.Error(routes)
 	}
 }

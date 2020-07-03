@@ -17,11 +17,21 @@ package router
 import "sync"
 
 // NewLockRouter returns a new lock Router based on the original router r.
+// So you can access and modify the routes concurrently and safely.
+//
+// Notice: the wrapped router must not panic.
 func NewLockRouter(r Router) Router { return &lockRouter{router: r} }
 
 type lockRouter struct {
 	lock   sync.RWMutex
 	router Router
+}
+
+func (r *lockRouter) Routes() []Route {
+	r.lock.RLock()
+	routes := r.router.Routes()
+	r.lock.RUnlock()
+	return routes
 }
 
 func (r *lockRouter) URL(name string, params ...interface{}) string {
@@ -31,16 +41,23 @@ func (r *lockRouter) URL(name string, params ...interface{}) string {
 	return url
 }
 
-func (r *lockRouter) Add(name, method, path string, handler interface{}) int {
+func (r *lockRouter) Add(name, method, path string, handler interface{}) (int, error) {
 	r.lock.Lock()
-	num := r.router.Add(name, method, path, handler)
+	num, err := r.router.Add(name, method, path, handler)
 	r.lock.Unlock()
-	return num
+	return num, err
 }
 
-func (r *lockRouter) Find(m, p string, ns, vs []string, h interface{}) interface{} {
+func (r *lockRouter) Del(name, method, path string) (err error) {
+	r.lock.Lock()
+	err = r.router.Del(name, method, path)
+	r.lock.Unlock()
+	return
+}
+
+func (r *lockRouter) Find(m, p string, ns, vs []string) (interface{}, int) {
 	r.lock.RLock()
-	handler := r.router.Find(m, p, ns, vs, h)
+	h, n := r.router.Find(m, p, ns, vs)
 	r.lock.RUnlock()
-	return handler
+	return h, n
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@ package ship
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/xgfone/ship/v2/binder"
 	"github.com/xgfone/ship/v2/render"
@@ -51,10 +52,16 @@ type Ship struct {
 	/// Route, Handler and Middleware
 	Prefix           string
 	NotFound         Handler
-	RouteFilter      RouteFilter
-	RouteModifier    RouteModifier
+	RouteFilter      func(RouteInfo) bool
+	RouteModifier    func(RouteInfo) RouteInfo
 	MethodMapping    map[string]string // The default is DefaultMethodMapping.
 	MiddlewareMaxNum int               // Default is 256
+
+	// If not nil, it will be locked and unlocked during access the routers.
+	// So you can modify the routes concurrently and safely during running.
+	//
+	// Notice: if using the lock, you should also use the locked Router.
+	Lock *sync.RWMutex
 
 	// Others
 	Logger      Logger
@@ -65,15 +72,13 @@ type Ship struct {
 	Responder   func(c *Context, args ...interface{}) error
 	HandleError func(c *Context, err error)
 
-	urlMaxNum   int
+	urlMaxNum   int32
 	bufferPool  sync.Pool
 	contextPool sync.Pool
 
 	router    router.Router
 	newRouter func() router.Router
 	hrouters  map[string]router.Router
-	nhosts    map[string]string
-	routes    []RouteInfo
 
 	handler        Handler
 	middlewares    []Middleware
@@ -92,12 +97,10 @@ func New() *Ship {
 
 	s.SetBufferSize(2048)
 	s.SetLogger(NewLoggerFromWriter(os.Stderr, ""))
-	s.SetNewRouter(func() router.Router { return echo.NewRouter(nil) })
+	s.SetNewRouter(func() router.Router { return echo.NewRouter(nil, nil) })
 
 	s.contextPool.New = func() interface{} { return s.NewContext() }
 	s.hrouters = make(map[string]router.Router, 4)
-	s.nhosts = make(map[string]string, 32)
-	s.routes = make([]RouteInfo, 0, 32)
 	s.handler = s.handleRoute
 
 	return s
@@ -137,8 +140,6 @@ func (s *Ship) Clone() *Ship {
 
 	// Private
 	newShip.handler = newShip.handleRoute
-	newShip.routes = make([]RouteInfo, 0, 32)
-	newShip.nhosts = make(map[string]string, 32)
 	newShip.hrouters = make(map[string]router.Router, 4)
 	newShip.contextPool.New = func() interface{} { return newShip.NewContext() }
 
@@ -168,6 +169,30 @@ func (s *Ship) Clone() *Ship {
 
 	newShip.SetLogger(s.Logger)
 	return newShip
+}
+
+func (s *Ship) lock() {
+	if s.Lock != nil {
+		s.Lock.Lock()
+	}
+}
+
+func (s *Ship) unlock() {
+	if s.Lock != nil {
+		s.Lock.Unlock()
+	}
+}
+
+func (s *Ship) rlock() {
+	if s.Lock != nil {
+		s.Lock.RLock()
+	}
+}
+
+func (s *Ship) runlock() {
+	if s.Lock != nil {
+		s.Lock.RUnlock()
+	}
 }
 
 //----------------------------------------------------------------------------
@@ -206,7 +231,7 @@ func (s *Ship) SetLogger(logger Logger) *Ship {
 
 // NewContext news a Context.
 func (s *Ship) NewContext() *Context {
-	c := NewContext(s.urlMaxNum, s.CtxDataSize)
+	c := NewContext(s.URLParamsMaxNum(), s.CtxDataSize)
 	c.SetSessionManagement(s.Session)
 	c.SetNotFoundHandler(s.NotFound)
 	c.SetBufferAllocator(s)
@@ -215,7 +240,6 @@ func (s *Ship) NewContext() *Context {
 	c.SetRenderer(s.Renderer)
 	c.SetBinder(s.Binder)
 	c.SetLogger(s.Logger)
-	c.SetGetURL(s.URL)
 	return c
 }
 
@@ -223,6 +247,11 @@ func (s *Ship) NewContext() *Context {
 func (s *Ship) AcquireContext(r *http.Request, w http.ResponseWriter) *Context {
 	c := s.contextPool.Get().(*Context)
 	c.SetReqRes(r, w)
+	num := s.URLParamsMaxNum()
+	if len(c.pnames) < num {
+		c.pnames = make([]string, num)
+		c.pvalues = make([]string, num)
+	}
 	return c
 }
 
@@ -288,50 +317,63 @@ func (s *Ship) R(path string) *Route { return s.Route(path) }
 // URLParamsMaxNum reports the maximum number of the parameters of all the URLs.
 //
 // Notice: it should be only called after adding all the urls.
-func (s *Ship) URLParamsMaxNum() int { return s.urlMaxNum }
+func (s *Ship) URLParamsMaxNum() int {
+	return int(atomic.LoadInt32(&s.urlMaxNum))
+}
 
 // Routes returns the inforatiom of all the routes.
-func (s *Ship) Routes() []RouteInfo {
-	ris := make([]RouteInfo, 0, len(s.routes))
-	for _, ri := range s.routes {
-		ris = append(ris, ri)
+func (s *Ship) Routes() (routes []RouteInfo) {
+	routes = make([]RouteInfo, 0, 64)
+	for _, r := range s.router.Routes() {
+		routes = append(routes, RouteInfo{
+			Name:    r.Name,
+			Path:    r.Path,
+			Method:  r.Method,
+			Handler: r.Handler.(Handler),
+		})
 	}
-	return ris
+
+	s.rlock()
+	defer s.runlock()
+	for host, router := range s.hrouters {
+		for _, r := range router.Routes() {
+			routes = append(routes, RouteInfo{
+				Host:    host,
+				Name:    r.Name,
+				Path:    r.Path,
+				Method:  r.Method,
+				Handler: r.Handler.(Handler),
+			})
+		}
+	}
+
+	return
 }
 
 // Routers returns the routers with their host.
 //
 // For the main router, the host is "".
-func (s *Ship) Routers() map[string]router.Router {
-	_len := len(s.hrouters)
-	if _len == 0 {
-		return map[string]router.Router{"": s.router}
+func (s *Ship) Routers() (routers map[string]router.Router) {
+	s.rlock()
+	if _len := len(s.hrouters); _len == 0 {
+		routers = map[string]router.Router{"": s.router}
+	} else {
+		routers = make(map[string]router.Router, _len*2)
+		routers[""] = s.router
+		for host, router := range s.hrouters {
+			routers[host] = router
+		}
 	}
-
-	routers := make(map[string]router.Router, _len*2)
-	routers[""] = s.router
-	for host, router := range s.hrouters {
-		routers[host] = router
-	}
-	return routers
-}
-
-// URL generates an URL from route name and provided parameters.
-func (s *Ship) URL(name string, params ...interface{}) string {
-	if name == "" {
-		panic("the url name must not be empty")
-	}
-
-	if host, ok := s.nhosts[name]; ok && host != "" {
-		return s.hrouters[host].URL(name, params...)
-	}
-	return s.router.URL(name, params...)
+	s.runlock()
+	return
 }
 
 // AddRoutes registers a set of the routes.
 func (s *Ship) AddRoutes(ris ...RouteInfo) {
 	for _, ri := range ris {
-		s.AddRoute(ri)
+		if err := s.AddRoute(ri); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -341,38 +383,18 @@ func (s *Ship) AddRoutes(ris ...RouteInfo) {
 //
 // Notice: "Name" and "Host" are optional, "Router" will be ignored.
 // and others are mandatory.
-func (s *Ship) AddRoute(ri RouteInfo) {
-	s.Route(ri.Path).Name(ri.Name).Host(ri.Host).Method(ri.Handler, ri.Method)
-}
-
-func (s *Ship) addRoute(name, host, path, method string, handler Handler) {
-	ri := RouteInfo{
-		Name:    name,
-		Host:    host,
-		Path:    path,
-		Method:  method,
-		Handler: handler,
-	}
-
-	ri.Method = strings.ToUpper(ri.Method)
-	if s.RouteModifier != nil {
-		ri = s.RouteModifier(ri)
-	}
-
-	if s.RouteFilter != nil && s.RouteFilter(ri) {
+func (s *Ship) AddRoute(ri RouteInfo) (err error) {
+	ok, err := s.checkRouteInfo(&ri)
+	if !ok || err != nil {
 		return
+	} else if ri.Handler == nil {
+		return errors.New("handler must not be nil")
+	} else if ri.Method == "" {
+		return errors.New("the route requires methods")
 	}
 
-	for _, r := range s.routes {
-		if r.Host == ri.Host && r.Path == ri.Path && r.Method == ri.Method {
-			panic(fmt.Errorf("the route has been added: host=%s, path=%s, method=%s",
-				ri.Host, ri.Path, ri.Method))
-		}
-
-		if ri.Name != "" && r.Name == ri.Name && r.Path != ri.Path {
-			panic(fmt.Errorf("the route named '%s' has been added", ri.Name))
-		}
-	}
+	s.lock()
+	defer s.unlock()
 
 	router := s.router
 	if ri.Host != "" {
@@ -384,14 +406,67 @@ func (s *Ship) addRoute(name, host, path, method string, handler Handler) {
 		}
 	}
 
-	if n := router.Add(ri.Name, ri.Method, ri.Path, ri.Handler); n > s.urlMaxNum {
-		s.urlMaxNum = n
+	num, err := router.Add(ri.Name, ri.Method, ri.Path, ri.Handler)
+	if err != nil {
+		err = RouteError{RouteInfo: ri, Err: err}
+	} else if maxnum := s.URLParamsMaxNum(); num > maxnum {
+		atomic.StoreInt32(&s.urlMaxNum, int32(num))
 	}
 
-	ri.Router = router
-	s.routes = append(s.routes, ri)
-	if ri.Name != "" && ri.Host != "" {
-		s.nhosts[ri.Name] = ri.Host
+	return
+}
+
+func (s *Ship) checkRouteInfo(ri *RouteInfo) (ok bool, err error) {
+	ri.Method = strings.ToUpper(ri.Method)
+	if s.RouteModifier != nil {
+		*ri = s.RouteModifier(*ri)
+	}
+
+	if s.RouteFilter != nil && s.RouteFilter(*ri) {
+		return
+	}
+
+	if err = ri.checkPath(); err == nil {
+		ok = true
+	}
+
+	return
+}
+
+// DelRoute deletes the registered route.
+//
+// Only need "Name", "Path", "Method", but only "Path" is required.
+// Others are ignored.
+//
+// If Name is not empty, lookup the path by it instead of Path.
+// If Method is empty, deletes all the routes associated with the path.
+func (s *Ship) DelRoute(ri RouteInfo) (err error) {
+	ok, err := s.checkRouteInfo(&ri)
+	if !ok || err != nil {
+		return
+	}
+
+	s.lock()
+	defer s.unlock()
+
+	router := s.router
+	if ri.Host != "" {
+		router = s.hrouters[ri.Host]
+	}
+
+	if router != nil {
+		err = router.Del(ri.Name, ri.Method, ri.Path)
+	}
+
+	return
+}
+
+// DelRoutes deletes a set of the registered routes.
+func (s *Ship) DelRoutes(ris ...RouteInfo) {
+	for _, ri := range ris {
+		if err := s.DelRoute(ri); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -414,7 +489,7 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 	}
 }
 
-func (s *Ship) handleRoute(c *Context) error { return c.Execute(s.NotFound) }
+func (s *Ship) handleRoute(c *Context) error { return c.Execute() }
 
 func (s *Ship) routing(router router.Router, w http.ResponseWriter, r *http.Request) {
 	ctx := s.AcquireContext(r, w)
@@ -429,11 +504,11 @@ func (s *Ship) routing(router router.Router, w http.ResponseWriter, r *http.Requ
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if len(s.hrouters) > 0 {
-		if router, ok := s.hrouters[r.Host]; ok {
-			s.routing(router, w, r)
-			return
-		}
+	router := s.router
+	s.rlock()
+	if r, ok := s.hrouters[r.Host]; ok {
+		router = r
 	}
-	s.routing(s.router, w, r)
+	s.runlock()
+	s.routing(router, w, r)
 }

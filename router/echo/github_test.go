@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,33 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package echo_test
+package echo
 
 import (
 	"strings"
 	"testing"
-
-	"github.com/xgfone/ship/v2"
-	"github.com/xgfone/ship/v2/router/echo"
 )
 
 func TestGithubAPI(t *testing.T) {
 	var maxParamNum int
-	handler := ship.OkHandler()
-	router := echo.NewRouter(nil)
+	var handler bool
+	router := NewRouter(nil, nil)
 	for _, r := range githubAPI {
-		if n := router.Add("", r.Method, r.Path, handler); n > maxParamNum {
+		if n, _ := router.Add(r.Path, r.Method, r.Path, handler); n > maxParamNum {
 			maxParamNum = n
 		}
 	}
 
-	pnames := make([]string, maxParamNum)
-	pvalues := make([]string, maxParamNum)
+	if _len := len(router.Routes()); _len != 203 {
+		t.Errorf("expected 203 routes, but got '%d'", _len)
+	}
+
 	for _, r := range githubAPI {
-		h := router.Find(r.Method, r.Path, pnames, pvalues, nil)
-		if h == nil || (strings.IndexByte(r.Path, ':') > 0 && (len(pnames) == 0 || len(pvalues) == 0)) {
+		pnames := make([]string, 8)
+		pvalues := make([]string, 8)
+
+		if h, n := router.Find(r.Method, r.Path, pnames, pvalues); h == nil {
+			t.Error("no found handler", r.Path)
+		} else if strings.IndexByte(r.Path, ':') > 0 && n == 0 {
 			t.Fail()
 		}
+	}
+
+	for _, r := range githubAPI {
+		router.Del("", r.Method, r.Path)
+	}
+	if _len := len(router.Routes()); _len != 0 {
+		t.Errorf("expected no route, but got '%d'", _len)
+	}
+	if len(router.routes) > 0 {
+		t.Error(router.routes)
 	}
 }
 
@@ -52,8 +65,6 @@ var githubAPI = []route{
 	{"GET", "/authorizations"},
 	{"GET", "/authorizations/:id"},
 	{"POST", "/authorizations"},
-	//{"PUT", "/authorizations/clients/:client_id"},
-	//{"PATCH", "/authorizations/:id"},
 	{"DELETE", "/authorizations/:id"},
 	{"GET", "/applications/:client_id/tokens/:access_token"},
 	{"DELETE", "/applications/:client_id/tokens"},
@@ -75,7 +86,6 @@ var githubAPI = []route{
 	{"PUT", "/notifications"},
 	{"PUT", "/repos/:owner/:repo/notifications"},
 	{"GET", "/notifications/threads/:id"},
-	//{"PATCH", "/notifications/threads/:id"},
 	{"GET", "/notifications/threads/:id/subscription"},
 	{"PUT", "/notifications/threads/:id/subscription"},
 	{"DELETE", "/notifications/threads/:id/subscription"},
@@ -98,11 +108,8 @@ var githubAPI = []route{
 	// Gists
 	{"GET", "/users/:user/gists"},
 	{"GET", "/gists"},
-	//{"GET", "/gists/public"},
-	//{"GET", "/gists/starred"},
 	{"GET", "/gists/:id"},
 	{"POST", "/gists"},
-	//{"PATCH", "/gists/:id"},
 	{"PUT", "/gists/:id/star"},
 	{"DELETE", "/gists/:id/star"},
 	{"GET", "/gists/:id/star"},
@@ -114,11 +121,8 @@ var githubAPI = []route{
 	{"POST", "/repos/:owner/:repo/git/blobs"},
 	{"GET", "/repos/:owner/:repo/git/commits/:sha"},
 	{"POST", "/repos/:owner/:repo/git/commits"},
-	//{"GET", "/repos/:owner/:repo/git/refs/*ref"},
 	{"GET", "/repos/:owner/:repo/git/refs"},
 	{"POST", "/repos/:owner/:repo/git/refs"},
-	//{"PATCH", "/repos/:owner/:repo/git/refs/*ref"},
-	//{"DELETE", "/repos/:owner/:repo/git/refs/*ref"},
 	{"GET", "/repos/:owner/:repo/git/tags/:sha"},
 	{"POST", "/repos/:owner/:repo/git/tags"},
 	{"GET", "/repos/:owner/:repo/git/trees/:sha"},
@@ -131,22 +135,14 @@ var githubAPI = []route{
 	{"GET", "/repos/:owner/:repo/issues"},
 	{"GET", "/repos/:owner/:repo/issues/:number"},
 	{"POST", "/repos/:owner/:repo/issues"},
-	//{"PATCH", "/repos/:owner/:repo/issues/:number"},
 	{"GET", "/repos/:owner/:repo/assignees"},
 	{"GET", "/repos/:owner/:repo/assignees/:assignee"},
 	{"GET", "/repos/:owner/:repo/issues/:number/comments"},
-	//{"GET", "/repos/:owner/:repo/issues/comments"},
-	//{"GET", "/repos/:owner/:repo/issues/comments/:id"},
 	{"POST", "/repos/:owner/:repo/issues/:number/comments"},
-	//{"PATCH", "/repos/:owner/:repo/issues/comments/:id"},
-	//{"DELETE", "/repos/:owner/:repo/issues/comments/:id"},
 	{"GET", "/repos/:owner/:repo/issues/:number/events"},
-	//{"GET", "/repos/:owner/:repo/issues/events"},
-	//{"GET", "/repos/:owner/:repo/issues/events/:id"},
 	{"GET", "/repos/:owner/:repo/labels"},
 	{"GET", "/repos/:owner/:repo/labels/:name"},
 	{"POST", "/repos/:owner/:repo/labels"},
-	//{"PATCH", "/repos/:owner/:repo/labels/:name"},
 	{"DELETE", "/repos/:owner/:repo/labels/:name"},
 	{"GET", "/repos/:owner/:repo/issues/:number/labels"},
 	{"POST", "/repos/:owner/:repo/issues/:number/labels"},
@@ -157,7 +153,6 @@ var githubAPI = []route{
 	{"GET", "/repos/:owner/:repo/milestones"},
 	{"GET", "/repos/:owner/:repo/milestones/:number"},
 	{"POST", "/repos/:owner/:repo/milestones"},
-	//{"PATCH", "/repos/:owner/:repo/milestones/:number"},
 	{"DELETE", "/repos/:owner/:repo/milestones/:number"},
 
 	// Miscellaneous
@@ -173,7 +168,6 @@ var githubAPI = []route{
 	{"GET", "/users/:user/orgs"},
 	{"GET", "/user/orgs"},
 	{"GET", "/orgs/:org"},
-	//{"PATCH", "/orgs/:org"},
 	{"GET", "/orgs/:org/members"},
 	{"GET", "/orgs/:org/members/:user"},
 	{"DELETE", "/orgs/:org/members/:user"},
@@ -184,7 +178,6 @@ var githubAPI = []route{
 	{"GET", "/orgs/:org/teams"},
 	{"GET", "/teams/:id"},
 	{"POST", "/orgs/:org/teams"},
-	//{"PATCH", "/teams/:id"},
 	{"DELETE", "/teams/:id"},
 	{"GET", "/teams/:id/members"},
 	{"GET", "/teams/:id/members/:user"},
@@ -200,17 +193,12 @@ var githubAPI = []route{
 	{"GET", "/repos/:owner/:repo/pulls"},
 	{"GET", "/repos/:owner/:repo/pulls/:number"},
 	{"POST", "/repos/:owner/:repo/pulls"},
-	//{"PATCH", "/repos/:owner/:repo/pulls/:number"},
 	{"GET", "/repos/:owner/:repo/pulls/:number/commits"},
 	{"GET", "/repos/:owner/:repo/pulls/:number/files"},
 	{"GET", "/repos/:owner/:repo/pulls/:number/merge"},
 	{"PUT", "/repos/:owner/:repo/pulls/:number/merge"},
 	{"GET", "/repos/:owner/:repo/pulls/:number/comments"},
-	//{"GET", "/repos/:owner/:repo/pulls/comments"},
-	//{"GET", "/repos/:owner/:repo/pulls/comments/:number"},
 	{"PUT", "/repos/:owner/:repo/pulls/:number/comments"},
-	//{"PATCH", "/repos/:owner/:repo/pulls/comments/:number"},
-	//{"DELETE", "/repos/:owner/:repo/pulls/comments/:number"},
 
 	// Repositories
 	{"GET", "/user/repos"},
@@ -220,7 +208,6 @@ var githubAPI = []route{
 	{"POST", "/user/repos"},
 	{"POST", "/orgs/:org/repos"},
 	{"GET", "/repos/:owner/:repo"},
-	//{"PATCH", "/repos/:owner/:repo"},
 	{"GET", "/repos/:owner/:repo/contributors"},
 	{"GET", "/repos/:owner/:repo/languages"},
 	{"GET", "/repos/:owner/:repo/teams"},
@@ -236,19 +223,13 @@ var githubAPI = []route{
 	{"GET", "/repos/:owner/:repo/commits/:sha/comments"},
 	{"POST", "/repos/:owner/:repo/commits/:sha/comments"},
 	{"GET", "/repos/:owner/:repo/comments/:id"},
-	//{"PATCH", "/repos/:owner/:repo/comments/:id"},
 	{"DELETE", "/repos/:owner/:repo/comments/:id"},
 	{"GET", "/repos/:owner/:repo/commits"},
 	{"GET", "/repos/:owner/:repo/commits/:sha"},
 	{"GET", "/repos/:owner/:repo/readme"},
-	//{"GET", "/repos/:owner/:repo/contents/*path"},
-	//{"PUT", "/repos/:owner/:repo/contents/*path"},
-	//{"DELETE", "/repos/:owner/:repo/contents/*path"},
-	//{"GET", "/repos/:owner/:repo/:archive_format/:ref"},
 	{"GET", "/repos/:owner/:repo/keys"},
 	{"GET", "/repos/:owner/:repo/keys/:id"},
 	{"POST", "/repos/:owner/:repo/keys"},
-	//{"PATCH", "/repos/:owner/:repo/keys/:id"},
 	{"DELETE", "/repos/:owner/:repo/keys/:id"},
 	{"GET", "/repos/:owner/:repo/downloads"},
 	{"GET", "/repos/:owner/:repo/downloads/:id"},
@@ -258,14 +239,12 @@ var githubAPI = []route{
 	{"GET", "/repos/:owner/:repo/hooks"},
 	{"GET", "/repos/:owner/:repo/hooks/:id"},
 	{"POST", "/repos/:owner/:repo/hooks"},
-	//{"PATCH", "/repos/:owner/:repo/hooks/:id"},
 	{"POST", "/repos/:owner/:repo/hooks/:id/tests"},
 	{"DELETE", "/repos/:owner/:repo/hooks/:id"},
 	{"POST", "/repos/:owner/:repo/merges"},
 	{"GET", "/repos/:owner/:repo/releases"},
 	{"GET", "/repos/:owner/:repo/releases/:id"},
 	{"POST", "/repos/:owner/:repo/releases"},
-	//{"PATCH", "/repos/:owner/:repo/releases/:id"},
 	{"DELETE", "/repos/:owner/:repo/releases/:id"},
 	{"GET", "/repos/:owner/:repo/releases/:id/assets"},
 	{"GET", "/repos/:owner/:repo/stats/contributors"},
@@ -289,7 +268,6 @@ var githubAPI = []route{
 	// Users
 	{"GET", "/users/:user"},
 	{"GET", "/user"},
-	//{"PATCH", "/user"},
 	{"GET", "/users"},
 	{"GET", "/user/emails"},
 	{"POST", "/user/emails"},
@@ -306,6 +284,5 @@ var githubAPI = []route{
 	{"GET", "/user/keys"},
 	{"GET", "/user/keys/:id"},
 	{"POST", "/user/keys"},
-	//{"PATCH", "/user/keys/:id"},
 	{"DELETE", "/user/keys/:id"},
 }

@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,11 @@
 
 package ship
 
-import "github.com/xgfone/ship/v2/herror"
+import (
+	"fmt"
+
+	"github.com/xgfone/ship/v2/herror"
+)
 
 // Re-export some errors.
 var (
@@ -57,3 +61,14 @@ type HTTPError = herror.HTTPError
 
 // NewHTTPError is the alias of herror.NewHTTPError.
 var NewHTTPError = herror.NewHTTPError
+
+// RouteError represents a route error when adding a route.
+type RouteError struct {
+	RouteInfo
+	Err error
+}
+
+func (re RouteError) Error() string {
+	return fmt.Sprintf("%s: name=%s, path=%s, method=%s, host=%s",
+		re.Err, re.Name, re.Path, re.Method, re.Host)
+}

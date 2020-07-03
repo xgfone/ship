@@ -1,4 +1,4 @@
-// Copyright 2019 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -126,9 +126,10 @@ type Context struct {
 	res *Response
 	req *http.Request
 
-	query          url.Values
-	urlParamNames  []string
-	urlParamValues []string
+	query   url.Values
+	pnames  []string
+	pvalues []string
+	plen    int
 
 	logger    Logger
 	buffer    BufferAllocator
@@ -136,7 +137,6 @@ type Context struct {
 	binder    binder.Binder
 	session   session.Session
 	renderer  render.Renderer
-	getURL    func(string, ...interface{}) string
 	qbinder   func(interface{}, url.Values) error
 	responder func(*Context, ...interface{}) error
 	notFound  Handler
@@ -151,17 +151,10 @@ func NewContext(urlParamMaxNum, dataSize int) *Context {
 	}
 
 	return &Context{
-		res:  NewResponse(nil),
-		Data: make(map[string]interface{}, dataSize),
-
-		urlParamNames:  pnames,
-		urlParamValues: pvalues,
-	}
-}
-
-func (c *Context) resetURLParam() {
-	for i := range c.urlParamNames {
-		c.urlParamNames[i] = ""
+		res:     NewResponse(nil),
+		Data:    make(map[string]interface{}, dataSize),
+		pnames:  pnames,
+		pvalues: pvalues,
 	}
 }
 
@@ -182,7 +175,7 @@ func (c *Context) Reset() {
 	c.req = nil
 	c.res.Reset(nil)
 	c.query = nil
-	c.resetURLParam()
+	c.plen = 0
 
 	// (xgfone) Maybe do it??
 	// c.logger = nil
@@ -191,7 +184,6 @@ func (c *Context) Reset() {
 	// c.binder = nil
 	// c.session = nil
 	// c.renderer = nil
-	// c.getURL = nil
 	// c.qbinder = nil
 	// c.responder = nil
 	// c.notFound = nil
@@ -207,13 +199,13 @@ func (c *Context) Router() router.Router { return c.router }
 //
 // SetRouter must be called before calling Execute, which be done
 // by the framework.
-func (c *Context) Execute(notFound Handler) error {
-	if notFound == nil && c.notFound != nil {
-		notFound = c.notFound
+func (c *Context) Execute() error {
+	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	c.plen = n
+	if h == nil {
+		h = c.notFound
 	}
-
-	return c.router.Find(c.req.Method, c.req.URL.Path, c.urlParamNames,
-		c.urlParamValues, notFound).(Handler)(c)
+	return h.(Handler)(c)
 }
 
 // SetNotFoundHandler sets the NotFound handler.
@@ -227,16 +219,11 @@ func (c *Context) NotFoundHandler() Handler { return c.notFound }
 // URL
 //----------------------------------------------------------------------------
 
-// SetGetURL sets the url getter to getURL.
-func (c *Context) SetGetURL(getURL func(name string, params ...interface{}) string) {
-	c.getURL = getURL
-}
-
 // URL generates an URL by route name and provided parameters.
 //
 // Return "" if there is no the route named name.
 func (c *Context) URL(name string, params ...interface{}) string {
-	return c.getURL(name, params...)
+	return c.router.URL(name, params...)
 }
 
 //----------------------------------------------------------------------------
@@ -355,12 +342,9 @@ func (c *Context) ReleaseBuffer(buf *bytes.Buffer) { c.buffer.ReleaseBuffer(buf)
 
 // URLParam returns the parameter value in the url path by name.
 func (c *Context) URLParam(name string) string {
-	for i, n := range c.urlParamNames {
-		switch n {
-		case "":
-			return ""
-		case name:
-			return c.urlParamValues[i]
+	for i := 0; i < c.plen; i++ {
+		if c.pnames[i] == name {
+			return c.pvalues[i]
 		}
 	}
 	return ""
@@ -368,44 +352,18 @@ func (c *Context) URLParam(name string) string {
 
 // URLParams returns all the parameters as the key-value map in the url path.
 func (c *Context) URLParams() map[string]string {
-	_len := len(c.urlParamNames)
-	ms := make(map[string]string, _len)
-	for i, name := range c.urlParamNames {
-		if name == "" {
-			break
-		}
-		ms[name] = c.urlParamValues[i]
+	ms := make(map[string]string, c.plen)
+	for i := 0; i < c.plen; i++ {
+		ms[c.pnames[i]] = c.pvalues[i]
 	}
 	return ms
 }
 
 // URLParamNames returns the names of all the URL parameters.
-func (c *Context) URLParamNames() []string {
-	if len(c.urlParamNames) == 0 || c.urlParamNames[0] == "" {
-		return nil
-	}
-
-	for i, name := range c.urlParamNames {
-		if name == "" {
-			return c.urlParamNames[:i]
-		}
-	}
-	return c.urlParamNames
-}
+func (c *Context) URLParamNames() []string { return c.pnames[:c.plen] }
 
 // URLParamValues returns the values of all the URL parameters.
-func (c *Context) URLParamValues() []string {
-	if len(c.urlParamNames) == 0 || c.urlParamNames[0] == "" {
-		return nil
-	}
-
-	for i, name := range c.urlParamNames {
-		if name == "" {
-			return c.urlParamValues[:i]
-		}
-	}
-	return c.urlParamValues
-}
+func (c *Context) URLParamValues() []string { return c.pvalues[:c.plen] }
 
 //----------------------------------------------------------------------------
 // Header
@@ -528,7 +486,7 @@ func (c *Context) Body() io.ReadCloser { return c.req.Body }
 // GetBody reads all the contents from the body and returns it as string.
 func (c *Context) GetBody() (string, error) {
 	buf := c.AcquireBuffer()
-	err := ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	_, err := CopyNBuffer(buf, c.req.Body, c.req.ContentLength, nil)
 	body := buf.String()
 	c.ReleaseBuffer(buf)
 	return body, err
@@ -539,7 +497,7 @@ func (c *Context) GetBody() (string, error) {
 // Notice: You should call ReleaseBuffer(buf) to release the buffer at last.
 func (c *Context) GetBodyReader() (buf *bytes.Buffer, err error) {
 	buf = c.AcquireBuffer()
-	err = ReadNWriter(buf, c.req.Body, c.req.ContentLength)
+	_, err = CopyNBuffer(buf, c.req.Body, c.req.ContentLength, nil)
 	if err != nil {
 		c.ReleaseBuffer(buf)
 		return nil, err
