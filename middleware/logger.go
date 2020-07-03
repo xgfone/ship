@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,17 +22,12 @@ import (
 )
 
 // Logger returns a new logger middleware that will log the request.
-func Logger(now ...func() time.Time) Middleware {
-	_now := time.Now
-	if len(now) > 0 && now[0] != nil {
-		_now = now[0]
-	}
-
+func Logger() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {
-			start := _now()
+			start := time.Now()
 			err = next(ctx)
-			cost := _now().Sub(start).String()
+			cost := time.Now().Sub(start).String()
 
 			req := ctx.Request()
 			code := ctx.StatusCode()

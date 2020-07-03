@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/xgfone/ship/v2"
 )
@@ -80,7 +81,8 @@ func GenerateToken(n int, charsets ...string) func() string {
 
 // IsNoTokenError reports whether the error is that there is no token.
 func IsNoTokenError(err error) bool {
-	if err == ErrTokenFromForm || err == ErrTokenFromHeader || err == ErrTokenFromQuery {
+	switch err {
+	case ErrTokenFromForm, ErrTokenFromHeader, ErrTokenFromQuery:
 		return true
 	}
 	return false
@@ -101,7 +103,8 @@ func getTokenFromHeaderWithType(header, _type string) TokenFunc {
 		token := ctx.GetHeader(header)
 		if token == "" {
 			return "", ErrTokenFromHeader
-		} else if len(token) > typelen+1 && token[:typelen] == _type {
+		} else if len(token) > typelen+1 && token[:typelen] == _type &&
+			unicode.IsSpace(rune(token[typelen])) {
 			return token[typelen+1:], nil
 		}
 		return "", ErrTokenFromHeader

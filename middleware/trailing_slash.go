@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,14 +28,9 @@ func RemoveTrailingSlash() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {
 			req := ctx.Request()
-			path := req.URL.Path
-			if path != "" && path != "/" && path[len(path)-1] == '/' {
-				path = strings.TrimRight(path, "/")
-				if path == "" {
-					req.URL.Path = "/"
-				} else {
-					req.URL.Path = path
-				}
+			req.URL.Path = strings.TrimRight(req.URL.Path, "/")
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
 			}
 			return next(ctx)
 		}

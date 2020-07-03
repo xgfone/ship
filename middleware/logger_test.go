@@ -1,4 +1,4 @@
-// Copyright 2018 xgfone
+// Copyright 2020 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,26 +20,17 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/xgfone/ship/v2"
 )
 
 func TestLogger(t *testing.T) {
-	// We fix the timestamp.
-	startTime := time.Date(2018, time.December, 3, 14, 10, 0, 0, time.UTC)
-	addTime := time.Duration(60)
-	getNow := func() time.Time {
-		startTime = startTime.Add(addTime)
-		return startTime
-	}
-
 	bs := bytes.NewBuffer(nil)
 	logger := ship.NewLoggerFromWriter(bs, "", 0)
 
 	router := ship.New()
 	router.Logger = logger
-	router.Use(Logger(getNow))
+	router.Use(Logger())
 
 	router.Route("/test").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Infof("handler")
@@ -50,13 +41,14 @@ func TestLogger(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	// We removes the cost string, which is uncontrollable.
+	// Remove the starttime and the cost, which is uncontrollable.
 	ss := strings.Split(strings.TrimSpace(bs.String()), "\n")
-	if ss[0] != "[I] handler" {
-		t.Fail()
-	}
-	if s := strings.Join(strings.Split(ss[1], ", ")[1:5], ", "); s !=
-		`code=200, method=GET, url=/test, starttime=1543846200` {
+	if len(ss) != 2 {
+		t.Errorf("expected two lines, but got '%d'", len(ss))
+	} else if ss[0] != "[I] handler" {
+		t.Errorf("expected '[I] handler', but got '%s'", ss[0])
+	} else if s := strings.Join(strings.Split(ss[1], ", ")[1:4], ", "); s !=
+		`code=200, method=GET, url=/test` {
 		t.Error(s)
 	}
 }
