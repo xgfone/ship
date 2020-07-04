@@ -272,9 +272,10 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 	}
 }
 
-func (r *Route) addRoute(name, host, path string, h Handler, ms ...string) {
-	if len(ms) == 0 {
-		panic(errors.New("the route requires methods"))
+func (r *Route) toRouteInfo(name, host, path string, handler Handler,
+	methods ...string) []RouteInfo {
+	if len(methods) == 0 {
+		return nil
 	}
 
 	middlewares := r.mdwares
@@ -291,13 +292,29 @@ func (r *Route) addRoute(name, host, path string, h Handler, ms ...string) {
 	}
 
 	for i := middlewaresLen - 1; i >= 0; i-- {
-		h = middlewares[i](h)
+		handler = middlewares[i](handler)
 	}
 
-	for _, m := range ms {
-		ri := RouteInfo{Name: name, Host: host, Path: path, Method: m, Handler: h}
-		r.ship.AddRoutes(ri)
+	routes := make([]RouteInfo, len(methods))
+	for i, method := range methods {
+		routes[i] = RouteInfo{
+			Host:    host,
+			Name:    name,
+			Path:    path,
+			Method:  method,
+			Handler: handler,
+		}
 	}
+	return routes
+}
+
+func (r *Route) addRoute(name, host, path string, h Handler, ms ...string) {
+	r.ship.AddRoutes(r.toRouteInfo(name, host, path, h, ms...)...)
+}
+
+// RouteInfo converts the context routes to []RouteInfo.
+func (r *Route) RouteInfo(handler Handler, methods ...string) []RouteInfo {
+	return r.toRouteInfo(r.name, r.host, r.path, handler, methods...)
 }
 
 // Method sets the methods and registers the route.
@@ -306,7 +323,7 @@ func (r *Route) addRoute(name, host, path string, h Handler, ms ...string) {
 //
 // Notice: The method must be called at last.
 func (r *Route) Method(handler Handler, methods ...string) *Route {
-	r.addRoute(r.name, r.host, r.path, handler, methods...)
+	r.ship.AddRoutes(r.RouteInfo(handler, methods...)...)
 	return r
 }
 
