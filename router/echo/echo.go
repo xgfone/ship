@@ -404,6 +404,12 @@ func (r *Router) getRoutes(n *node, routes []router.Route) []router.Route {
 
 // Add registers a new route for method and path with matching handler.
 func (r *Router) Add(name, method, path string, h interface{}) (n int, err error) {
+	if method == "" {
+		return 0, fmt.Errorf("route method must not be empty")
+	} else if h == nil {
+		return 0, fmt.Errorf("route handler must not be nil")
+	}
+
 	// Validate path
 	if path == "" {
 		path = "/"

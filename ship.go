@@ -435,8 +435,8 @@ func (s *Ship) checkRouteInfo(ri *RouteInfo) (ok bool, err error) {
 
 // DelRoute deletes the registered route.
 //
-// Only need "Name", "Path", "Method", but only "Path" is required.
-// Others are ignored.
+// Only need "Name", "Path", "Method", but only "Path" is required
+// and others are ignored.
 //
 // If Name is not empty, lookup the path by it instead of Path.
 // If Method is empty, deletes all the routes associated with the path.

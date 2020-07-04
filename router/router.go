@@ -49,11 +49,10 @@ type Router interface {
 
 	// Del deletes the given route.
 	//
-	// If name is not empty, it deletes the route by the name.
-	// Or delete it by the path.
+	// If name is not empty, lookup the path by it instead.
 	//
-	// If the method is not empty, it only deletes the given method
-	// for the route path.
+	// If method is empty, deletes all the routes associated with the path.
+	// Or only delete the given method for the path.
 	Del(name, method, path string) (err error)
 
 	// Find searchs the handler and the number of the url path paramethers.
