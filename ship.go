@@ -24,11 +24,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/xgfone/ship/v2/binder"
-	"github.com/xgfone/ship/v2/render"
-	"github.com/xgfone/ship/v2/router"
-	"github.com/xgfone/ship/v2/router/echo"
-	"github.com/xgfone/ship/v2/session"
+	"github.com/xgfone/ship/v3/binder"
+	"github.com/xgfone/ship/v3/render"
+	"github.com/xgfone/ship/v3/router"
+	"github.com/xgfone/ship/v3/router/echo"
+	"github.com/xgfone/ship/v3/session"
 )
 
 // DefaultMethodMapping is the default method mapping of the route.

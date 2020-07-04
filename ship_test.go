@@ -23,8 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship/v2/router"
-	"github.com/xgfone/ship/v2/router/echo"
+	"github.com/xgfone/ship/v3/router"
+	"github.com/xgfone/ship/v3/router/echo"
 )
 
 func TestRoute(t *testing.T) {

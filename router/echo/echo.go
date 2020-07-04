@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xgfone/ship/v2/router"
+	"github.com/xgfone/ship/v3/router"
 )
 
 // PROPFIND Method can be used on collection and property resources.

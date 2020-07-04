@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // MaxRequests returns a Middleware to allow the maximum number of the requests

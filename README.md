@@ -1,14 +1,14 @@
-# ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](https://pkg.go.dev/github.com/xgfone/ship/v2) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
+# ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](https://pkg.go.dev/github.com/xgfone/ship/v3) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
 `ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
-`ship` has been stable, and the current version is `v2` and support Go `1.11+`.
+`ship` has been stable, and the current version is `v3` and support Go `1.11+`.
 
 
 ## Install
 
 ```shell
-go get -u github.com/xgfone/ship/v2
+go get -u github.com/xgfone/ship/v3
 ```
 
 
@@ -18,7 +18,7 @@ go get -u github.com/xgfone/ship/v2
 // example.go
 package main
 
-import "github.com/xgfone/ship/v2"
+import "github.com/xgfone/ship/v3"
 
 func main() {
 	router := ship.New()
@@ -126,7 +126,7 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship/v2"
+    "github.com/xgfone/ship/v3"
 )
 
 type TestType struct{}
@@ -225,8 +225,8 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship/v2"
-    "github.com/xgfone/ship/v2/middleware"
+    "github.com/xgfone/ship/v3"
+    "github.com/xgfone/ship/v3/middleware"
 )
 
 func main() {
@@ -246,8 +246,8 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship/v2"
-    "github.com/xgfone/ship/v2/middleware"
+    "github.com/xgfone/ship/v3"
+    "github.com/xgfone/ship/v3/middleware"
 )
 
 func RemovePathPrefix(prefix string) ship.Middleware {
@@ -281,7 +281,7 @@ func main() {
 ```go
 package main
 
-import "github.com/xgfone/ship/v2"
+import "github.com/xgfone/ship/v3"
 
 func main() {
 	router := ship.New()
@@ -316,7 +316,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 func responder(ctx *ship.Context, args ...interface{}) error {
@@ -395,9 +395,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/xgfone/ship/v2"
-	"github.com/xgfone/ship/v2/render"
-	"github.com/xgfone/ship/v2/render/template"
+	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v3/render"
+	"github.com/xgfone/ship/v3/render/template"
 )
 
 func main() {
@@ -459,7 +459,7 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 func main() {
@@ -476,7 +476,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -501,7 +501,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -549,9 +549,9 @@ func main() {
 
 ## Route Management
 
-`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v2/router/echo?tab=doc#NewRouter).
+`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v3/router/echo?tab=doc#NewRouter).
 
-You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v2/router?tab=doc#Router).
+You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v3/router?tab=doc#Router).
 
 ```go
 type Router interface {

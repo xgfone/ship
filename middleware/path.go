@@ -6,7 +6,7 @@
 package middleware
 
 import (
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // CleanPath returns a new middleware to clean the request path.

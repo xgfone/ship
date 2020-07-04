@@ -21,7 +21,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 const (

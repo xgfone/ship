@@ -17,7 +17,7 @@ package ship
 import (
 	"fmt"
 
-	"github.com/xgfone/ship/v2/herror"
+	"github.com/xgfone/ship/v3/herror"
 )
 
 // Re-export some errors.

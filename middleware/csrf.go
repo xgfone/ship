@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // CSRFConfig is used to configure the CSRF middleware.

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 func TestGzip(t *testing.T) {

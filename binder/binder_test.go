@@ -37,7 +37,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xgfone/ship/v2/herror"
+	"github.com/xgfone/ship/v3/herror"
 )
 
 var testMuxBinder = NewMuxBinder()

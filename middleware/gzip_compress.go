@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // Gzip returns a middleware to compress the response body by GZIP.

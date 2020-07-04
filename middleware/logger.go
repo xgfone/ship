@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship/v2"
+	"github.com/xgfone/ship/v3"
 )
 
 // Logger returns a new logger middleware that will log the request.
