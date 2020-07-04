@@ -98,6 +98,7 @@ func main() {
     router := ship.New()
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
         fmt.Println(ctx.URL("get_url", ctx.URLParam("id")))
+        return nil
     })
     router.Start(":8080").Wait()
 }
@@ -554,28 +555,32 @@ You can appoint your own implementation by implementing the interface [`Router`]
 
 ```go
 type Router interface {
-	// Generate a URL by the url name and parameters.
+	// Routes returns the list of all the routes.
+	Routes() []Route
+
+	// URL generates a URL by the url name and parameters.
 	URL(name string, params ...interface{}) string
 
-	// Add a route with name, path, method and handler, and return the number
-	// of the parameters if there are the parameters in the route. Or return 0.
+	// Add adds a route and returns the number of the parameters
+	// if there are the parameters in the route.
 	//
-	// If there is any error, it should panic.
-	//
-	// Notice: for keeping consistent, the parameter should start with ":"
-	// or "*". ":" stands for a single parameter, and "*" stands for
-	// a wildcard parameter.
-	Add(name, method, path string, handler interface{}) (paramNum int)
+	// For keeping consistent, the parameter should start with ":" or "*".
+	// ":" stands for the single parameter, and "*" stands for the wildcard.
+	Add(name, method, path string, handler interface{}) (paramNum int, err error)
 
-	// Find a route handler by the method and path of the request.
+	// Del deletes the given route.
 	//
-	// Return defaultHandler instead if the route does not exist.
+	// If name is not empty, lookup the path by it instead.
 	//
-	// If the route has parameters, the name and value of the parameters
-	// should be stored `pnames` and `pvalues` respectively, which has
-	// the enough capacity to store the paramether names and values.
-	Find(method, path string, pnames, pvalues []string,
-		defaultHandler interface{}) (handler interface{})
+	// If method is empty, deletes all the routes associated with the path.
+	// Or only delete the given method for the path.
+	Del(name, method, path string) (err error)
+
+	// Find searchs the handler and the number of the url path paramethers.
+	// For the url path paramethers, they are put into pnames and pvalues.
+	//
+	// Return (nil, 0) if not found the route handler.
+	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
 }
 ```
 
