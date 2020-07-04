@@ -368,6 +368,20 @@ func (s *Ship) Routers() (routers map[string]router.Router) {
 	return
 }
 
+// Router returns the Router implementation by the host name.
+//
+// If host is empty, return the main router.
+func (s *Ship) Router(host string) router.Router {
+	if host == "" {
+		return s.router
+	}
+
+	s.rlock()
+	r := s.hrouters[host]
+	s.runlock()
+	return r
+}
+
 // AddRoutes registers a set of the routes.
 func (s *Ship) AddRoutes(ris ...RouteInfo) {
 	for _, ri := range ris {
