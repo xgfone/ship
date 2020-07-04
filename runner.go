@@ -16,7 +16,6 @@ package ship
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -118,10 +117,8 @@ func (r *Runner) Start(addr string, tlsFiles ...string) *Runner {
 		r.Server.Handler = r.Handler
 	}
 
-	if r.Server.Addr == "" {
+	if addr != "" {
 		r.Server.Addr = addr
-	} else if r.Server.Addr != addr {
-		panic(fmt.Errorf("Runner.Server.Addr is not set to '%s'", addr))
 	}
 
 	r.startServer(cert, key)
@@ -141,14 +138,16 @@ func (r *Runner) handleSignals() {
 }
 
 func (r *Runner) startServer(certFile, keyFile string) {
+	if r.Server.Addr == "" {
+		panic("Runner: Server.Addr is empty")
+	} else if r.Server.Handler == nil {
+		panic("Runner: Server.Handler is nil")
+	}
+
 	defer r.Stop()
 	name := r.Name
 	server := r.Server
 	logger := r.Logger
-
-	if server.Handler == nil {
-		panic("Runner: Server.Handler is nil")
-	}
 
 	if logger != nil {
 		if name == "" {
@@ -181,7 +180,7 @@ func (r *Runner) startServer(certFile, keyFile string) {
 	})
 
 	go r.handleSignals()
-	if server.TLSConfig != nil || certFile != "" && keyFile != "" {
+	if certFile != "" && keyFile != "" {
 		err = server.ListenAndServeTLS(certFile, keyFile)
 	} else {
 		err = server.ListenAndServe()
