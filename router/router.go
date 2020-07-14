@@ -55,8 +55,8 @@ type Router interface {
 	// Or only delete the given method for the path.
 	Del(name, method, path string) (err error)
 
-	// Find searchs the handler and the number of the url path paramethers.
-	// For the url path paramethers, they are put into pnames and pvalues.
+	// Find searchs and returns the handler and the number of the url path
+	// paramethers. For the paramethers, they are put into pnames and pvalues.
 	//
 	// Return (nil, 0) if not found the route handler.
 	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
