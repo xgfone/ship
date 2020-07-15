@@ -43,6 +43,9 @@ type Router interface {
 	// Add adds a route and returns the number of the parameters
 	// if there are the parameters in the route.
 	//
+	// If method is empty, the implementation should add the handler
+	// for all the methods that it supports.
+	//
 	// For keeping consistent, the parameter should start with ":" or "*".
 	// ":" stands for the single parameter, and "*" stands for the wildcard.
 	Add(name, method, path string, handler interface{}) (paramNum int, err error)

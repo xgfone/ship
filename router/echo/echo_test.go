@@ -66,3 +66,37 @@ func TestRouter(t *testing.T) {
 		t.Errorf("ParamValue: expected dir 'path/to/file', but got '%s'", pvalues[0])
 	}
 }
+
+func TestRouterAnyMethod(t *testing.T) {
+	handler1 := 1
+	handler2 := 2
+	handler3 := 3
+	handler4 := 4
+
+	router := NewRouter(nil, nil)
+	router.Add("", "GET", "/path1", handler1)
+	router.Add("", "PUT", "/path2", handler2)
+	router.Add("", "POST", "/path2", handler3)
+	router.Add("", "", "/path2", handler4)
+
+	if rs := router.Routes(); len(rs) != 12 {
+		t.Error(rs)
+	}
+
+	router.Del("", "POST", "/path2")
+	if rs := router.Routes(); len(rs) != 11 {
+		t.Error(rs)
+	} else {
+		for _, r := range rs {
+			switch r.Method {
+			case "POST":
+				t.Error(r)
+			}
+		}
+	}
+
+	router.Del("", "", "/path2")
+	if rs := router.Routes(); len(rs) != 1 || rs[0].Path != "/path1" {
+		t.Error(rs)
+	}
+}

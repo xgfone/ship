@@ -34,20 +34,6 @@ const PROPFIND = "PROPFIND"
 // REPORT Method can be used to get information about a resource, see rfc 3253
 const REPORT = "REPORT"
 
-var methods = [...]string{
-	http.MethodConnect,
-	http.MethodDelete,
-	http.MethodGet,
-	http.MethodHead,
-	http.MethodOptions,
-	http.MethodPatch,
-	http.MethodPost,
-	PROPFIND,
-	http.MethodPut,
-	http.MethodTrace,
-	REPORT,
-}
-
 type methodHandler struct {
 	get      interface{}
 	put      interface{}
@@ -114,6 +100,18 @@ func (mh *methodHandler) Methods() []string {
 func (mh *methodHandler) DelHandler(method string) { mh.AddHandler(method, nil) }
 func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 	switch method {
+	case "": // For Any Method
+		mh.get = handler
+		mh.put = handler
+		mh.post = handler
+		mh.head = handler
+		mh.patch = handler
+		mh.trace = handler
+		mh.delete = handler
+		mh.options = handler
+		mh.connect = handler
+		mh.propfind = handler
+		mh.report = handler
 	case http.MethodGet:
 		mh.get = handler
 	case http.MethodPut:
@@ -403,10 +401,11 @@ func (r *Router) getRoutes(n *node, routes []router.Route) []router.Route {
 /// ----------------------------------------------------------------------- ///
 
 // Add registers a new route for method and path with matching handler.
+//
+// If method is empty, it'll override the handlers of all the supported methods
+// with h.
 func (r *Router) Add(name, method, path string, h interface{}) (n int, err error) {
-	if method == "" {
-		return 0, fmt.Errorf("route method must not be empty")
-	} else if h == nil {
+	if h == nil {
 		return 0, fmt.Errorf("route handler must not be nil")
 	}
 
