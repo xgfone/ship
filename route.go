@@ -30,13 +30,6 @@ import (
 	"strings"
 )
 
-// AllMethods represents all HTTP methods.
-var AllMethods = []string{
-	http.MethodConnect, http.MethodHead, http.MethodOptions, http.MethodTrace,
-	http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete,
-	http.MethodPatch,
-}
-
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
 	Host    string  `json:"host" xml:"host"`
@@ -328,9 +321,9 @@ func (r *Route) Method(handler Handler, methods ...string) *Route {
 }
 
 // Any registers all the supported methods , which is short for
-// r.Method(handler, AllMethods...)
+// r.Method(handler, "")
 func (r *Route) Any(handler Handler) *Route {
-	return r.Method(handler, AllMethods...)
+	return r.Method(handler, "")
 }
 
 // CONNECT is the short for r.Method(handler, "CONNECT").
