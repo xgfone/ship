@@ -829,9 +829,9 @@ func TestRouteMapType(t *testing.T) {
 func TestShipHost(t *testing.T) {
 	s := New()
 	s.Route("/router").GET(func(c *Context) error { return c.Text(200, "default") })
-	s.Route("/router").Host("host1.example.com").
+	s.Route("/router").Host("*.host1.example.com").
 		GET(func(c *Context) error { return c.Text(200, "vhost1") })
-	s.Route("/router").Host("host2.example.com").
+	s.Route("/router").Host(`[a-zA-z0-9]+\.example\.com`).
 		GET(func(c *Context) error { return c.Text(200, "vhost2") })
 
 	req := httptest.NewRequest(http.MethodGet, "/router", nil)
@@ -845,7 +845,7 @@ func TestShipHost(t *testing.T) {
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/router", nil)
-	req.Host = "host1.example.com"
+	req.Host = "www.host1.example.com"
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

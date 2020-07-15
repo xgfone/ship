@@ -285,13 +285,23 @@ import "github.com/xgfone/ship/v3"
 
 func main() {
 	router := ship.New()
-	router.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "default") })
+	router.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "default") })
 
-	vhost1 := router.Host("host1.example.com") // It is a RouteGroup with the host.
-	vhost1.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost1") })
+	// Exact Match Host
+	vhost1 := router.Host("www.host1.example.com")
+	vhost1.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost1") })
 
-	vhost2 := router.Host("host2.example.com") // It is a RouteGroup with the host.
-	vhost2.Route("/router").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
+	// Suffix Match Host
+	vhost2 := router.Host("*.host2.example.com")
+	vhost2.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
+
+	// Prefix Match Host
+	vhost3 := router.Host("www.host3.*")
+	vhost3.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost3") })
+
+	// Regexp Match Host by using Go regexp package
+	vhost4 := router.Host(`www\.[a-zA-z0-9]+\.example\.com`)
+	vhost4.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost4") })
 
 	router.Start(":8080").Wait()
 }
@@ -301,11 +311,17 @@ func main() {
 $ curl http://127.0.0.1:8080/router
 default
 
-$ curl http://127.0.0.1:8080/router -H 'Host: host1.example.com'
+$ curl http://127.0.0.1:8080/router -H 'Host: www.host1.example.com' # Exact
 vhost1
 
-$ curl http://127.0.0.1:8080/router -H 'Host: host2.example.com'
+$ curl http://127.0.0.1:8080/router -H 'Host: www.host2.example.com' # Suffix
 vhost2
+
+$ curl http://127.0.0.1:8080/router -H 'Host: www.host3.example.com' # Prefix
+vhost3
+
+$ curl http://127.0.0.1:8080/router -H 'Host: www.host4.example.com' # Regexp
+vhost4
 ```
 
 ### Handle the complex response
