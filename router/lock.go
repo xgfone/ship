@@ -22,6 +22,8 @@ import "sync"
 // Notice: the wrapped router must not panic.
 func NewLockRouter(r Router) Router { return &lockRouter{router: r} }
 
+var _ Router = &lockRouter{}
+
 type lockRouter struct {
 	lock   sync.RWMutex
 	router Router

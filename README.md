@@ -580,6 +580,9 @@ type Router interface {
 	// Add adds a route and returns the number of the parameters
 	// if there are the parameters in the route.
 	//
+	// If method is empty, the implementation should add the handler
+	// for all the methods that it supports.
+	//
 	// For keeping consistent, the parameter should start with ":" or "*".
 	// ":" stands for the single parameter, and "*" stands for the wildcard.
 	Add(name, method, path string, handler interface{}) (paramNum int, err error)
@@ -622,18 +625,18 @@ Go 1.13.4
 
 |           Function          |  ops   | ns/op | bytes/opt | allocs/op
 |-----------------------------|--------|-------|-----------|-----------
-|BenchmarkGinStatic-4         |  23368 | 49788 |    8278   |   157
-|BenchmarkGinGitHubAPI-4      |  15684 | 75104 |   10849   |   203
-|BenchmarkGinGplusAPI-4       | 276224 |  4184 |     686   |    13
-|BenchmarkGinParseAPI-4       | 157810 |  7537 |    1357   |    26
-|BenchmarkEchoStatic-4        |  29432 | 39989 |    2432   |   157
-|BenchmarkEchoGitHubAPI-4     |  20527 | 56857 |    2468   |   203
-|BenchmarkEchoGplusAPI-4      | 387421 |  3179 |     193   |    13
-|BenchmarkEchoParseAPI-4      | 220273 |  5575 |     365   |    26
-|BenchmarkShipEchoStatic-4    |  34054 | 35548 |    1016   |     0
-|BenchmarkShipEchoGitHubAPI-4 |  21842 | 54962 |    1585   |     0
-|BenchmarkShipEchoGplusAPI-4  | 402898 |  2996 |      85   |     0
-|BenchmarkShipEchoParseAPI-4  | 223581 |  5478 |     154   |     0
+|Benchmark**Gin**Static-4         |  23368 | 49788 |    8278   |   157
+|Benchmark**Gin**GitHubAPI-4      |  15684 | 75104 |   10849   |   203
+|Benchmark**Gin**GplusAPI-4       | 276224 |  4184 |     686   |    13
+|Benchmark**Gin**ParseAPI-4       | 157810 |  7537 |    1357   |    26
+|Benchmark**Echo**Static-4        |  29432 | 39989 |    2432   |   157
+|Benchmark**Echo**GitHubAPI-4     |  20527 | 56857 |    2468   |   203
+|Benchmark**Echo**GplusAPI-4      | 387421 |  3179 |     193   |    13
+|Benchmark**Echo**ParseAPI-4      | 220273 |  5575 |     365   |    26
+|Benchmark**ShipEcho**Static-4    |  34054 | 35548 |    1016   | **0**
+|Benchmark**ShipEcho**GitHubAPI-4 |  21842 | 54962 |    1585   | **0**
+|Benchmark**ShipEcho**GplusAPI-4  | 402898 |  2996 |      85   | **0**
+|Benchmark**ShipEcho**ParseAPI-4  | 223581 |  5478 |     154   | **0**
 
 ### Test 2
 ```
@@ -646,15 +649,15 @@ Go 1.13.4
 
 |           Function          |  ops   | ns/op | bytes/opt | allocs/op
 |-----------------------------|--------|-------|-----------|-----------
-|BenchmarkGinStatic-4         |  18085 | 62380 |    8494   |   157
-|BenchmarkGinGitHubAPI-4      |  12646 | 93052 |   11115   |   203
-|BenchmarkGinGplusAPI-4       | 224404 |  5222 |     701   |    13
-|BenchmarkGinParseAPI-4       | 124138 |  9442 |    1387   |    26
-|BenchmarkEchoStatic-4        |  22624 | 47401 |    2021   |   157
-|BenchmarkEchoGitHubAPI-4     |  16822 | 69059 |    2654   |   203
-|BenchmarkEchoGplusAPI-4      | 326142 |  3759 |     157   |    13
-|BenchmarkEchoParseAPI-4      | 178182 |  6713 |     402   |    26
-|BenchmarkShipEchoStatic-4    |  27048 | 43713 |     640   |     0
-|BenchmarkShipEchoGitHubAPI-4 |  17545 | 66953 |     987   |     0
-|BenchmarkShipEchoGplusAPI-4  | 318595 |  3698 |      54   |     0
-|BenchmarkShipEchoParseAPI-4  | 175984 |  6807 |     196   |     0
+|Benchmark**Gin**Static-4         |  18085 | 62380 |    8494   |   157
+|Benchmark**Gin**GitHubAPI-4      |  12646 | 93052 |   11115   |   203
+|Benchmark**Gin**GplusAPI-4       | 224404 |  5222 |     701   |    13
+|Benchmark**Gin**ParseAPI-4       | 124138 |  9442 |    1387   |    26
+|Benchmark**Echo**Static-4        |  22624 | 47401 |    2021   |   157
+|Benchmark**Echo**GitHubAPI-4     |  16822 | 69059 |    2654   |   203
+|Benchmark**Echo**GplusAPI-4      | 326142 |  3759 |     157   |    13
+|Benchmark**Echo**ParseAPI-4      | 178182 |  6713 |     402   |    26
+|Benchmark**ShipEcho**Static-4    |  27048 | 43713 |     640   | **0**
+|Benchmark**ShipEcho**GitHubAPI-4 |  17545 | 66953 |     987   | **0**
+|Benchmark**ShipEcho**GplusAPI-4  | 318595 |  3698 |      54   | **0**
+|Benchmark**ShipEcho**ParseAPI-4  | 175984 |  6807 |     196   | **0**
