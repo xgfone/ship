@@ -40,14 +40,18 @@ func TestRoute(t *testing.T) {
 		{Host: "host2", Name: "name6", Path: "/path6", Method: http.MethodGet, Handler: handler},
 	}
 
-	for _, r := range routes {
-		s.Route(r.Path).Name(r.Name).Host(r.Host).Method(r.Handler, r.Method)
+	for i, r := range routes {
+		s.Route(r.Path).Name(r.Name).Host(r.Host).CtxData(i).Method(r.Handler, r.Method)
 	}
 
 	if rs := s.Routes(); len(rs) != 7 {
 		t.Errorf("the number of the registered routes is %d, not 7\n", len(rs))
 	} else {
-		for _, r := range rs {
+		for i, r := range rs {
+			if i != r.CtxData.(int) {
+				t.Errorf("%d: %+v", i, r)
+			}
+
 			switch r.Name {
 			case "name":
 			case "name1":

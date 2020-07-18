@@ -110,6 +110,9 @@ func SetContentType(res http.ResponseWriter, ct string) {
 
 // Context represetns a request and response context.
 type Context struct {
+	// RouteCtxData is the context data associated with the route.
+	RouteCtxData interface{}
+
 	// Data is used to store many key-value pairs about the context.
 	//
 	// Data maybe asks the system to allocate many memories.
@@ -202,10 +205,14 @@ func (c *Context) Router() router.Router { return c.router }
 func (c *Context) Execute() error {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
 	c.plen = n
-	if h == nil {
-		h = c.notFound
+	if ch, ok := h.(ctxHandler); ok {
+		c.RouteCtxData = ch.CtxData
+		return ch.Handler(c)
+	} else if h == nil {
+		return c.notFound(c)
+	} else {
+		return h.(Handler)(c)
 	}
-	return h.(Handler)(c)
 }
 
 // SetNotFoundHandler sets the NotFound handler.

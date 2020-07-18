@@ -25,6 +25,7 @@ type RouteGroup struct {
 	host    string
 	prefix  string
 	mdwares []Middleware
+	ctxdata interface{}
 }
 
 func newRouteGroup(s *Ship, pprefix, prefix, host string, mws ...Middleware) *RouteGroup {
@@ -63,11 +64,17 @@ func (g *RouteGroup) Group(prefix string, middlewares ...Middleware) *RouteGroup
 	return newRouteGroup(g.ship, g.prefix, prefix, g.host, append(g.mdwares, middlewares...)...)
 }
 
+// CtxData sets the context data on the route group.
+func (g *RouteGroup) CtxData(data interface{}) *RouteGroup {
+	g.ctxdata = data
+	return g
+}
+
 // Route returns a new route, then you can customize and register it.
 //
 // You must call Route.Method() or its short method.
 func (g *RouteGroup) Route(path string) *Route {
-	return newRoute(g.ship, g, g.prefix, g.host, path, g.mdwares...)
+	return newRoute(g.ship, g, g.prefix, g.host, path, g.ctxdata, g.mdwares...)
 }
 
 // R is short for Group#Route(path).

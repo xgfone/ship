@@ -32,11 +32,12 @@ import (
 
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
-	Host    string  `json:"host" xml:"host"`
-	Name    string  `json:"name" xml:"name"`
-	Path    string  `json:"path" xml:"path"`
-	Method  string  `json:"method" xml:"method"`
-	Handler Handler `json:"-" xml:"-"`
+	Host    string      `json:"host" xml:"host"`
+	Name    string      `json:"name" xml:"name"`
+	Path    string      `json:"path" xml:"path"`
+	Method  string      `json:"method" xml:"method"`
+	Handler Handler     `json:"-" xml:"-"`
+	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
 }
 
 func (ri RouteInfo) String() string {
@@ -159,10 +160,11 @@ type Route struct {
 	name    string
 	mdwares []Middleware
 	headers []kvalues
+	ctxdata interface{}
 }
 
 func newRoute(s *Ship, g *RouteGroup, prefix, host, path string,
-	ms ...Middleware) *Route {
+	ctxdata interface{}, ms ...Middleware) *Route {
 	if path == "" {
 		panic("the route path must not be empty")
 	} else if path[0] != '/' {
@@ -175,6 +177,7 @@ func newRoute(s *Ship, g *RouteGroup, prefix, host, path string,
 		host:    host,
 		path:    strings.TrimSuffix(prefix, "/") + path,
 		mdwares: append([]Middleware{}, ms...),
+		ctxdata: ctxdata,
 	}
 }
 
@@ -211,6 +214,9 @@ func (r *Route) Name(name string) *Route { r.name = name; return r }
 
 // Host sets the host of the route to host.
 func (r *Route) Host(host string) *Route { r.host = host; return r }
+
+// CtxData sets the context data on the route.
+func (r *Route) CtxData(data interface{}) *Route { r.ctxdata = data; return r }
 
 // Use adds some middlwares for the route.
 func (r *Route) Use(middlewares ...Middleware) *Route {
@@ -296,6 +302,7 @@ func (r *Route) toRouteInfo(name, host, path string, handler Handler,
 			Path:    path,
 			Method:  method,
 			Handler: handler,
+			CtxData: r.ctxdata,
 		}
 	}
 	return routes

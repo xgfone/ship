@@ -308,7 +308,7 @@ func (s *Ship) Group(prefix string) *RouteGroup {
 //
 // You must call Route.Method() or its short method.
 func (s *Ship) Route(path string) *Route {
-	return newRoute(s, nil, s.Prefix, "", path, s.middlewares...)
+	return newRoute(s, nil, s.Prefix, "", path, nil, s.middlewares...)
 }
 
 // R is short for Route(path).
@@ -323,12 +323,14 @@ func (s *Ship) URLParamsMaxNum() int {
 
 func (s *Ship) getRoutes(h string, r router.Router, rs []RouteInfo) []RouteInfo {
 	for _, r := range r.Routes() {
+		ch := r.Handler.(ctxHandler)
 		rs = append(rs, RouteInfo{
 			Host:    h,
 			Name:    r.Name,
 			Path:    r.Path,
 			Method:  r.Method,
-			Handler: r.Handler.(Handler),
+			Handler: ch.Handler,
+			CtxData: ch.CtxData,
 		})
 	}
 	return rs
@@ -438,7 +440,8 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 		return RouteError{RouteInfo: ri, Err: err}
 	}
 
-	num, err := router.Add(ri.Name, ri.Method, ri.Path, ri.Handler)
+	handler := ctxHandler{Handler: ri.Handler, CtxData: ri.CtxData}
+	num, err := router.Add(ri.Name, ri.Method, ri.Path, handler)
 	if err != nil {
 		err = RouteError{RouteInfo: ri, Err: err}
 	} else if maxnum := s.URLParamsMaxNum(); num > maxnum {
@@ -541,4 +544,9 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		s.routing(router, resp, req)
 	}
+}
+
+type ctxHandler struct {
+	Handler Handler
+	CtxData interface{}
 }
