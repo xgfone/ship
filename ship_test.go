@@ -27,6 +27,12 @@ import (
 	"github.com/xgfone/ship/v3/router/echo"
 )
 
+func sortRouteInfos(ris []RouteInfo) {
+	sort.Slice(ris, func(i, j int) bool {
+		return ris[i].CtxData.(int) < ris[j].CtxData.(int)
+	})
+}
+
 func TestRoute(t *testing.T) {
 	s := New()
 	handler := OkHandler()
@@ -47,6 +53,7 @@ func TestRoute(t *testing.T) {
 	if rs := s.Routes(); len(rs) != 7 {
 		t.Errorf("the number of the registered routes is %d, not 7\n", len(rs))
 	} else {
+		sortRouteInfos(rs)
 		for i, r := range rs {
 			if i != r.CtxData.(int) {
 				t.Errorf("%d: %+v", i, r)
