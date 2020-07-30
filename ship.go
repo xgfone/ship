@@ -71,6 +71,7 @@ type Ship struct {
 	BindQuery   func(interface{}, url.Values) error
 	Responder   func(c *Context, args ...interface{}) error
 	HandleError func(c *Context, err error)
+	SetDefault  func(v interface{}) error // Default: SetStructFieldToDefault
 	Validator   func(v interface{}) error // check whether v is valid.
 
 	urlMaxNum   int32
@@ -127,6 +128,7 @@ func Default() *Ship {
 	s := New()
 	s.Binder = mb
 	s.Renderer = mr
+	s.SetDefault = SetStructFieldToDefault
 	s.Validator = func(interface{}) error { return nil }
 	s.BindQuery = func(v interface{}, vs url.Values) error {
 		return binder.BindURLValues(v, vs, "query")
@@ -159,6 +161,7 @@ func (s *Ship) Clone() *Ship {
 	newShip.BindQuery = s.BindQuery
 	newShip.Validator = s.Validator
 	newShip.Responder = s.Responder
+	newShip.SetDefault = s.SetDefault
 	newShip.HandleError = s.HandleError
 
 	newShip.SetBufferSize(2048)
@@ -239,6 +242,7 @@ func (s *Ship) NewContext() *Context {
 	c.SetNotFoundHandler(s.NotFound)
 	c.SetBufferAllocator(s)
 	c.SetQueryBinder(s.BindQuery)
+	c.SetDefaulter(s.SetDefault)
 	c.SetValidator(s.Validator)
 	c.SetResponder(s.Responder)
 	c.SetRenderer(s.Renderer)

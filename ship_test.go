@@ -933,14 +933,14 @@ func TestRouteHasHeader(t *testing.T) {
 
 func TestContextBindQuery(t *testing.T) {
 	type V struct {
-		A string `query:"a"`
+		A string `query:"a" default:"xyz"`
 		B int    `query:"b"`
 	}
 	vs := V{}
 
 	s := Default()
 	s.Route("/path").GET(func(ctx *Context) error { return ctx.BindQuery(&vs) })
-	req := httptest.NewRequest(http.MethodGet, "/path?a=xyz&b=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/path?b=2", nil)
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

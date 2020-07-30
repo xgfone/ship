@@ -140,6 +140,7 @@ type Context struct {
 	binder    binder.Binder
 	session   session.Session
 	renderer  render.Renderer
+	defaulter func(interface{}) error
 	validate  func(interface{}) error
 	qbinder   func(interface{}, url.Values) error
 	responder func(*Context, ...interface{}) error
@@ -189,6 +190,7 @@ func (c *Context) Reset() {
 	// c.session = nil
 	// c.renderer = nil
 	// c.validate = nil
+	// c.defaulter = nil
 	// c.qbinder = nil
 	// c.responder = nil
 	// c.notFound = nil
@@ -751,6 +753,16 @@ func (c *Context) SetValidator(v func(interface{}) error) { c.validate = v }
 func (c *Context) Validate(v interface{}) error { return c.validate(v) }
 
 //----------------------------------------------------------------------------
+// SetDefault
+//----------------------------------------------------------------------------
+
+// SetDefaulter sets the default setter to v set the default value.
+func (c *Context) SetDefaulter(v func(interface{}) error) { c.defaulter = v }
+
+// SetDefault calls the default setter to set the default value of v.
+func (c *Context) SetDefault(v interface{}) error { return c.defaulter(v) }
+
+//----------------------------------------------------------------------------
 // Binder
 //----------------------------------------------------------------------------
 
@@ -762,7 +774,9 @@ func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
 // The default binder does it based on Content-Type header.
 func (c *Context) Bind(v interface{}) (err error) {
 	if err = c.binder.Bind(c.req, v); err == nil {
-		err = c.validate(v)
+		if err = c.defaulter(v); err == nil {
+			err = c.validate(v)
+		}
 	}
 	return
 }
@@ -773,7 +787,9 @@ func (c *Context) SetQueryBinder(f func(interface{}, url.Values) error) { c.qbin
 // BindQuery binds the request URL query into the provided value v.
 func (c *Context) BindQuery(v interface{}) (err error) {
 	if err = c.qbinder(v, c.QueryParams()); err == nil {
-		err = c.validate(v)
+		if err = c.defaulter(v); err == nil {
+			err = c.validate(v)
+		}
 	}
 	return
 }
