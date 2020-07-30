@@ -140,6 +140,7 @@ type Context struct {
 	binder    binder.Binder
 	session   session.Session
 	renderer  render.Renderer
+	validate  func(interface{}) error
 	qbinder   func(interface{}, url.Values) error
 	responder func(*Context, ...interface{}) error
 	notFound  Handler
@@ -187,6 +188,7 @@ func (c *Context) Reset() {
 	// c.binder = nil
 	// c.session = nil
 	// c.renderer = nil
+	// c.validate = nil
 	// c.qbinder = nil
 	// c.responder = nil
 	// c.notFound = nil
@@ -739,6 +741,16 @@ func (c *Context) DelSession(id string) (err error) {
 }
 
 //----------------------------------------------------------------------------
+// Validator
+//----------------------------------------------------------------------------
+
+// SetValidator sets the validator to v to validate the argument when Binding.
+func (c *Context) SetValidator(v func(interface{}) error) { c.validate = v }
+
+// Validate validates whether the argument v is valid.
+func (c *Context) Validate(v interface{}) error { return c.validate(v) }
+
+//----------------------------------------------------------------------------
 // Binder
 //----------------------------------------------------------------------------
 
@@ -748,13 +760,23 @@ func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
 // Bind binds the request information into the provided value v.
 //
 // The default binder does it based on Content-Type header.
-func (c *Context) Bind(v interface{}) error { return c.binder.Bind(c.req, v) }
+func (c *Context) Bind(v interface{}) (err error) {
+	if err = c.binder.Bind(c.req, v); err == nil {
+		err = c.validate(v)
+	}
+	return
+}
 
 // SetQueryBinder sets the query binder to f to bind the url query to an object.
 func (c *Context) SetQueryBinder(f func(interface{}, url.Values) error) { c.qbinder = f }
 
 // BindQuery binds the request URL query into the provided value v.
-func (c *Context) BindQuery(v interface{}) error { return c.qbinder(v, c.QueryParams()) }
+func (c *Context) BindQuery(v interface{}) (err error) {
+	if err = c.qbinder(v, c.QueryParams()); err == nil {
+		err = c.validate(v)
+	}
+	return
+}
 
 //----------------------------------------------------------------------------
 // Renderer
