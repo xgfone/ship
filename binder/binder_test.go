@@ -240,13 +240,14 @@ func TestBindQueryParamsCaseSensitivePrioritized(t *testing.T) {
 
 func TestBindUnmarshalBind(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet,
-		"/?ts=2016-12-06T19:09:05Z&sa=one,two,three&ta=2016-12-06T19:09:05Z&ta=2016-12-06T19:09:05Z&ST=baz",
+		"/?ts=2016-12-06T19:09:05Z&sa=one,two,three&ta=2016-12-06T19:09:05Z&ta=2016-12-06T19:09:05Z&ST=baz&NO=123",
 		nil)
 	result := struct {
 		T  Timestamp   `query:"ts"`
 		TA []Timestamp `query:"ta"`
 		SA StringArray `query:"sa"`
 		ST Struct
+		NO int `query:" - "`
 	}{}
 
 	ts := Timestamp(time.Date(2016, 12, 6, 19, 9, 5, 0, time.UTC))
@@ -258,6 +259,8 @@ func TestBindUnmarshalBind(t *testing.T) {
 		t.Fail()
 	} else if result.ST.Foo != "baz" {
 		t.Errorf("expect '%v', got '%v'", result.ST.Foo, "baz")
+	} else if result.NO != 0 {
+		t.Errorf("expect '0', got '%v'", result.NO)
 	}
 }
 

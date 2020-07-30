@@ -39,6 +39,7 @@ type BindUnmarshaler interface {
 // BindURLValues parses the data and assign to the pointer ptr to a struct.
 //
 // Notice: tag is the name of the struct tag. such as "form", "query", etc.
+// If the tag value is equal to "-", ignore this field.
 func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 	typ := reflect.TypeOf(ptr).Elem()
 	val := reflect.ValueOf(ptr).Elem()
@@ -55,6 +56,9 @@ func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 		}
 		structFieldKind := structField.Kind()
 		inputFieldName := typeField.Tag.Get(tag)
+		if inputFieldName = strings.TrimSpace(inputFieldName); inputFieldName == "-" {
+			continue
+		}
 
 		if inputFieldName == "" {
 			inputFieldName = typeField.Name
