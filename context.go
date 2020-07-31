@@ -772,6 +772,11 @@ func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
 // Bind binds the request information into the provided value v.
 //
 // The default binder does it based on Content-Type header.
+//
+// Notice: it will call the interfaces or functions in turn as follow:
+//   1. Binder
+//   2. SetDefault
+//   3. Validator
 func (c *Context) Bind(v interface{}) (err error) {
 	if err = c.binder.Bind(c.req, v); err == nil {
 		if err = c.defaulter(v); err == nil {
@@ -785,6 +790,11 @@ func (c *Context) Bind(v interface{}) (err error) {
 func (c *Context) SetQueryBinder(f func(interface{}, url.Values) error) { c.qbinder = f }
 
 // BindQuery binds the request URL query into the provided value v.
+//
+// Notice: it will call the interfaces or functions in turn as follow:
+//   1. QueryBinder
+//   2. SetDefault
+//   3. Validator
 func (c *Context) BindQuery(v interface{}) (err error) {
 	if err = c.qbinder(v, c.QueryParams()); err == nil {
 		if err = c.defaulter(v); err == nil {

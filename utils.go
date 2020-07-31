@@ -77,12 +77,17 @@ func DisalbeRedirect(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
+var (
+	errInvalidTagValue    = errors.New("invalid tag value")
+	errNotPointerToStruct = errors.New("the argument must be a pointer to struct")
+)
+
 // SetStructFieldToDefault sets the default value of the fields of the struct v
 // to the value of the tag "default" of the fields when the field value is ZERO.
 //
 // If v is not a struct, it does nothing; and not a pointer to struct, panic.
 //
-// For the type of the field, it only support:
+// For the type of the field, it only supports some base types as follow:
 //   string
 //   float32
 //   float64
@@ -97,17 +102,20 @@ func DisalbeRedirect(req *http.Request, via []*http.Request) error {
 //   uint32
 //   uint64
 //
+// Notice: If the tag value starts with ".", it represents a field name and
+// the default value of current field is set to the value of that field.
+// But their types must be consistent, or panic.
 func SetStructFieldToDefault(v interface{}) (err error) {
 	vf := reflect.ValueOf(v)
 	switch kind := vf.Kind(); kind {
 	case reflect.Ptr:
 		vf = vf.Elem()
 		if vf.Kind() != reflect.Struct {
-			return errors.New("the argument must be a pointer to struct")
+			return errNotPointerToStruct
 		}
 		err = setDefault(vf)
 	case reflect.Struct:
-		return errors.New("the argument must be a pointer to struct")
+		return errNotPointerToStruct
 	}
 
 	return
@@ -128,31 +136,31 @@ func setDefault(vf reflect.Value) (err error) {
 				fieldv.SetString(tag)
 			}
 		case int:
-			err = setFieldInt(fieldv, int64(v), tag)
+			err = setFieldInt(vf, fieldv, int64(v), tag)
 		case int8:
-			err = setFieldInt(fieldv, int64(v), tag)
+			err = setFieldInt(vf, fieldv, int64(v), tag)
 		case int16:
-			err = setFieldInt(fieldv, int64(v), tag)
+			err = setFieldInt(vf, fieldv, int64(v), tag)
 		case int32:
-			err = setFieldInt(fieldv, int64(v), tag)
+			err = setFieldInt(vf, fieldv, int64(v), tag)
 		case int64:
-			err = setFieldInt(fieldv, v, tag)
+			err = setFieldInt(vf, fieldv, v, tag)
 		case uint:
-			err = setFieldUint(fieldv, uint64(v), tag)
+			err = setFieldUint(vf, fieldv, uint64(v), tag)
 		case uint8:
-			err = setFieldUint(fieldv, uint64(v), tag)
+			err = setFieldUint(vf, fieldv, uint64(v), tag)
 		case uint16:
-			err = setFieldUint(fieldv, uint64(v), tag)
+			err = setFieldUint(vf, fieldv, uint64(v), tag)
 		case uint32:
-			err = setFieldUint(fieldv, uint64(v), tag)
+			err = setFieldUint(vf, fieldv, uint64(v), tag)
 		case uint64:
-			err = setFieldUint(fieldv, v, tag)
+			err = setFieldUint(vf, fieldv, v, tag)
 		case uintptr:
-			err = setFieldUint(fieldv, uint64(v), tag)
+			err = setFieldUint(vf, fieldv, uint64(v), tag)
 		case float32:
-			err = setFieldFloat(fieldv, float64(v), tag)
+			err = setFieldFloat(vf, fieldv, float64(v), tag)
 		case float64:
-			err = setFieldFloat(fieldv, v, tag)
+			err = setFieldFloat(vf, fieldv, v, tag)
 		}
 
 		if err != nil {
@@ -163,27 +171,42 @@ func setDefault(vf reflect.Value) (err error) {
 	return
 }
 
-func setFieldInt(fieldv reflect.Value, v int64, tag string) (err error) {
+func setFieldInt(structv, fieldv reflect.Value, v int64, tag string) (err error) {
 	if v == 0 {
-		if v, err = strconv.ParseInt(tag, 10, 64); err == nil {
+		if tag[0] == '.' {
+			if tag = tag[1:]; tag == "" {
+				return errInvalidTagValue
+			}
+			fieldv.Set(structv.FieldByName(tag))
+		} else if v, err = strconv.ParseInt(tag, 10, 64); err == nil {
 			fieldv.SetInt(v)
 		}
 	}
 	return
 }
 
-func setFieldUint(fieldv reflect.Value, v uint64, tag string) (err error) {
+func setFieldUint(structv, fieldv reflect.Value, v uint64, tag string) (err error) {
 	if v == 0 {
-		if v, err = strconv.ParseUint(tag, 10, 64); err == nil {
+		if tag[0] == '.' {
+			if tag = tag[1:]; tag == "" {
+				return errInvalidTagValue
+			}
+			fieldv.Set(structv.FieldByName(tag))
+		} else if v, err = strconv.ParseUint(tag, 10, 64); err == nil {
 			fieldv.SetUint(v)
 		}
 	}
 	return
 }
 
-func setFieldFloat(fieldv reflect.Value, v float64, tag string) (err error) {
+func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err error) {
 	if v == 0 {
-		if v, err = strconv.ParseFloat(tag, 64); err == nil {
+		if tag[0] == '.' {
+			if tag = tag[1:]; tag == "" {
+				return errInvalidTagValue
+			}
+			fieldv.Set(structv.FieldByName(tag))
+		} else if v, err = strconv.ParseFloat(tag, 64); err == nil {
 			fieldv.SetFloat(v)
 		}
 	}

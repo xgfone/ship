@@ -32,6 +32,7 @@ func ExampleSetStructFieldToDefault() {
 		Uintptr uintptr `default:"123"`
 		Float32 float32 `default:"1.2"`
 		Float64 float64 `default:"1.2"`
+		FloatN  float64 `default:".Float64"` // Set the default value to other field
 		String  string  `default:"abc"`
 	}
 
@@ -53,6 +54,7 @@ func ExampleSetStructFieldToDefault() {
 	fmt.Println(s.Uintptr)
 	fmt.Println(s.Float32)
 	fmt.Println(s.Float64)
+	fmt.Println(s.FloatN)
 	fmt.Println(s.String)
 
 	// Output:
@@ -69,6 +71,7 @@ func ExampleSetStructFieldToDefault() {
 	// 123
 	// 123
 	// 123
+	// 1.2
 	// 1.2
 	// 1.2
 	// abc
