@@ -180,7 +180,17 @@ func (r *Runner) startServer(certFile, keyFile string) {
 	})
 
 	go r.handleSignals()
+
+	var isTLS bool
 	if certFile != "" && keyFile != "" {
+		isTLS = true
+	} else if server.TLSConfig != nil &&
+		(len(server.TLSConfig.Certificates) > 0 ||
+			server.TLSConfig.GetCertificate != nil) {
+		isTLS = true
+	}
+
+	if isTLS {
 		err = server.ListenAndServeTLS(certFile, keyFile)
 	} else {
 		err = server.ListenAndServe()
