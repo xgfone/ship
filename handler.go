@@ -22,6 +22,13 @@ import (
 // Handler is a handler of the HTTP request.
 type Handler func(*Context) error
 
+// HTTPHandler converts itself to http.Handler.
+//
+// s may be nil.
+func (h Handler) HTTPHandler(s *Ship) http.Handler {
+	return ToHTTPHandler(s, h)
+}
+
 // Middleware represents a middleware.
 type Middleware func(Handler) Handler
 
