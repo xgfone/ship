@@ -31,10 +31,11 @@ type httpHandlerBridge struct {
 }
 
 func newHTTPHandlerBridge(s *Ship, h Handler) httpHandlerBridge {
-	if s == nil {
-		panic(errors.New("ship must not be nil"))
-	} else if h == nil {
+	if h == nil {
 		panic(errors.New("Handler must not be nil"))
+	}
+	if s == nil {
+		s = New()
 	}
 	return httpHandlerBridge{ship: s, Handler: h}
 }
