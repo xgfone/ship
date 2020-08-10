@@ -562,6 +562,200 @@ func main() {
 }
 ```
 
+### OpenTracing
+```go
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	"github.com/xgfone/ship/v3"
+)
+
+// OpenTracingOption is used to configure the OpenTracingServer.
+type OpenTracingOption struct {
+	Tracer        opentracing.Tracer // Default: opentracing.GlobalTracer()
+	ComponentName string             // Default: "net/http"
+
+	// URLTagFunc is used to get the value of the tag "http.url".
+	// Default: url.String()
+	URLTagFunc func(*url.URL) string
+
+	// SpanFilter is used to filter the span if returning true.
+	// Default: return false
+	SpanFilter func(*http.Request) bool
+
+	// OperationNameFunc is used to the operation name.
+	// Default: fmt.Sprintf("HTTP %s %s", r.Method, r.URL.Path)
+	OperationNameFunc func(*http.Request) string
+
+	// SpanObserver is used to do extra things of the span for the request.
+	//
+	// For example,
+	//    OpenTracingOption {
+	//        SpanObserver: func(*http.Request, opentracing.Span) {
+	//            ext.PeerHostname.Set(span, req.Host)
+	//        },
+	//    }
+	//
+	// Default: Do nothing.
+	SpanObserver func(*http.Request, opentracing.Span)
+}
+
+// Init initializes the OpenTracingOption.
+func (o *OpenTracingOption) Init() {
+	if o.ComponentName == "" {
+		o.ComponentName = "net/http"
+	}
+	if o.URLTagFunc == nil {
+		o.URLTagFunc = func(u *url.URL) string { return u.String() }
+	}
+	if o.SpanFilter == nil {
+		o.SpanFilter = func(r *http.Request) bool { return false }
+	}
+	if o.SpanObserver == nil {
+		o.SpanObserver = func(*http.Request, opentracing.Span) {}
+	}
+	if o.OperationNameFunc == nil {
+		o.OperationNameFunc = func(r *http.Request) string {
+			return fmt.Sprintf("HTTP %s %s", r.Method, r.URL.Path)
+		}
+	}
+}
+
+// GetTracer returns the OpenTracing tracker.
+func (o *OpenTracingOption) GetTracer() opentracing.Tracer {
+	if o.Tracer == nil {
+		return opentracing.GlobalTracer()
+	}
+	return o.Tracer
+}
+
+// NewOpenTracingRoundTripper returns a new OpenTracingRoundTripper.
+func NewOpenTracingRoundTripper(rt http.RoundTripper, opt *OpenTracingOption) *OpenTracingRoundTripper {
+	var o OpenTracingOption
+	if opt != nil {
+		o = *opt
+	}
+	o.Init()
+	return &OpenTracingRoundTripper{RoundTripper: rt, OpenTracingOption: o}
+}
+
+// WrappedRoundTripper returns the wrapped http.RoundTripper.
+func (rt *OpenTracingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return rt.RoundTripper
+}
+
+func (rt *OpenTracingRoundTripper) roundTrip(req *http.Request) (*http.Response, error) {
+	if rt.RoundTripper == nil {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+	return rt.RoundTripper.RoundTrip(req)
+}
+
+// RoundTrip implements the interface http.RounderTripper.
+func (rt *OpenTracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if rt.SpanFilter(req) {
+		return rt.roundTrip(req)
+	}
+
+	operationName := rt.OperationNameFunc(req)
+	sp, ctx := opentracing.StartSpanFromContext(req.Context(), operationName)
+	ext.HTTPMethod.Set(sp, req.Method)
+	ext.Component.Set(sp, rt.ComponentName)
+	ext.HTTPUrl.Set(sp, rt.URLTagFunc(req.URL))
+	rt.SpanObserver(req, sp)
+	defer sp.Finish()
+
+	carrier := opentracing.HTTPHeadersCarrier(req.Header)
+	rt.GetTracer().Inject(sp.Context(), opentracing.HTTPHeaders, carrier)
+
+	return rt.roundTrip(req.WithContext(ctx))
+}
+
+// OpenTracing is a middleware to support the OpenTracing.
+func OpenTracing(opt *OpenTracingOption) Middleware {
+	var o OpenTracingOption
+	if opt != nil {
+		o = *opt
+	}
+	o.Init()
+
+	const format = opentracing.HTTPHeaders
+	return func(next ship.Handler) ship.Handler {
+		return func(ctx *ship.Context) (err error) {
+			req := ctx.Request()
+			if o.SpanFilter(req) {
+				return next(ctx)
+			}
+
+			tracer := o.GetTracer()
+			sc, _ := tracer.Extract(format, opentracing.HTTPHeadersCarrier(req.Header))
+			sp := tracer.StartSpan(o.OperationNameFunc(req), ext.RPCServerOption(sc))
+
+			ext.HTTPMethod.Set(sp, req.Method)
+			ext.Component.Set(sp, o.ComponentName)
+			ext.HTTPUrl.Set(sp, o.URLTagFunc(req.URL))
+			o.SpanObserver(req, sp)
+
+			req = req.WithContext(opentracing.ContextWithSpan(req.Context(), sp))
+			ctx.SetRequest(req)
+
+			defer func() {
+				if e := recover(); e != nil {
+					ext.Error.Set(sp, true)
+					sp.Finish()
+					panic(e)
+				}
+
+				statusCode := ctx.StatusCode()
+				if !ctx.IsResponded() {
+					switch e := err.(type) {
+					case nil:
+					case ship.HTTPError:
+						statusCode = e.Code
+					default:
+						statusCode = 500
+					}
+				}
+
+				ext.HTTPStatusCode.Set(sp, uint16(statusCode))
+				if statusCode >= 500 {
+					ext.Error.Set(sp, true)
+				}
+				sp.Finish()
+			}()
+
+			err = next(ctx)
+			return err
+		}
+	}
+}
+
+func init() {
+	// TODO: Initialize the global OpenTracing tracer.
+
+	// Replace the default global RoundTripper.
+	http.DefaultTransport = NewOpenTracingRoundTripper(http.DefaultTransport, nil)
+}
+
+func main() {
+	app := ship.Default()
+	app.Use(OpenTracing(nil))
+	app.Route("/").GET(func(c *ship.Context) error {
+		ctx := c.Request().Context() // ctx contains the parent span context
+		req, err := http.NewRequestWithContext(ctx, METHOD, URL, BODY)
+		if err != nil {
+			return
+		}
+		// TODO with req ...
+	})
+	app.Start(":8080").Wait()
+}
+```
+
 
 ## Route Management
 
