@@ -101,6 +101,7 @@ var (
 //   uint16
 //   uint32
 //   uint64
+//   interface{ SetDefault(_default interface{}) error }
 //
 // Notice: If the tag value starts with ".", it represents a field name and
 // the default value of current field is set to the value of that field.
@@ -119,6 +120,10 @@ func SetStructFieldToDefault(v interface{}) (err error) {
 	}
 
 	return
+}
+
+type setDefaulter interface {
+	SetDefault(_default interface{}) error
 }
 
 func setDefault(vf reflect.Value) (err error) {
@@ -161,6 +166,8 @@ func setDefault(vf reflect.Value) (err error) {
 			err = setFieldFloat(vf, fieldv, float64(v), tag)
 		case float64:
 			err = setFieldFloat(vf, fieldv, v, tag)
+		case setDefaulter:
+			err = v.SetDefault(tag)
 		}
 
 		if err != nil {
