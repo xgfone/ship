@@ -48,7 +48,7 @@ The route path supports the parameters like `:paramName`, `*` or `*restParamName
 - `/path/to/route` only matches the path `/path/to/route`.
 - `/path/:param1/to` matches the path `/path/abc/to`, `/path/xyz/to`, etc. And `:param1` is equal to `abc` or `xyz`.
 - `/path/:param1/to/:param2` matches the path `/path/p11/to/p21`, `/path/p12/to/p22`, etc. And `:parma1` is equal to `p11` or `p12`, and `:param2` is equal to `p12` or `p22`.
-- `/path/to/*` or `/path/to/*all` matches the path `/path/to/abc`, `/path/to/abc/efg`, `/path/to/xyz`, `/path/to/xyz/123`, etc. And `*` or `*all` is equal to `abc`, `abc/efg`, `xyz`, or `xzy/123`.
+- `/path/to/*` or `/path/to/*all` matches the path `/path/to/abc`, `/path/to/abc/efg`, `/path/to/xyz`, `/path/to/xyz/123`, etc. And `*` or `*all` is equal to `abc`, `abc/efg`, `xyz`, or `xzy/123`. **Notice:** `*` or `*restParamName` must be the last one of the route path.
 - `/path/:param/to/*` matches the path `/path/abc/to/efg`, `/path/abc/to/efg/123`, etc. And `:param` is equal to `abc`, and `*` is equal to `efg` or `efg/123`
 
 For the parameter, you can use `Context.URLParam(paramName)` to get it.
