@@ -774,12 +774,12 @@ func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
 // The default binder does it based on Content-Type header.
 //
 // Notice: it will call the interfaces or functions in turn as follow:
-//   1. Binder
-//   2. SetDefault
+//   1. SetDefault
+//   2. Binder
 //   3. Validator
 func (c *Context) Bind(v interface{}) (err error) {
-	if err = c.binder.Bind(c.req, v); err == nil {
-		if err = c.defaulter(v); err == nil {
+	if err = c.defaulter(v); err == nil {
+		if err = c.binder.Bind(c.req, v); err == nil {
 			err = c.validate(v)
 		}
 	}
