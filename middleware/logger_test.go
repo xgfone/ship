@@ -48,7 +48,7 @@ func TestLogger(t *testing.T) {
 	} else if ss[0] != "[I] handler" {
 		t.Errorf("expected '[I] handler', but got '%s'", ss[0])
 	} else if s := strings.Join(strings.Split(ss[1], ", ")[1:4], ", "); s !=
-		`code=200, method=GET, url=/test` {
+		`code=200, method=GET, path=/test` {
 		t.Error(s)
 	}
 }
