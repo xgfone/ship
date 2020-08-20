@@ -15,6 +15,8 @@
 package middleware
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"time"
 
@@ -50,14 +52,39 @@ func Logger() Middleware {
 			}
 
 			if errmsg == "" {
-				ctx.Logger().Infof("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s",
+				ctx.Logger().Infof("addr=%s, code=%d, method=%s, path=%s, starttime=%d, cost=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost)
 			} else {
-				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, url=%s, starttime=%d, cost=%s, err=%s",
+				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, path=%s, starttime=%d, cost=%s, err=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost, errmsg)
 			}
 
 			return
+		}
+	}
+}
+
+type bufferBody struct {
+	io.Closer
+	*bytes.Buffer
+}
+
+// ReqBodyLogger returns a middleware to log the request body.
+func ReqBodyLogger() Middleware {
+	return func(next ship.Handler) ship.Handler {
+		return func(ctx *ship.Context) (err error) {
+			if r := ctx.Request(); r.ContentLength > 0 {
+				body := bufferBody{Closer: r.Body, Buffer: new(bytes.Buffer)}
+				_, err = ship.CopyNBuffer(body.Buffer, r.Body, r.ContentLength, nil)
+				if err != nil {
+					return
+				}
+				ctx.Request().Body = body
+				ctx.Logger().Debugf("addr=%s, method=%s, path=%s, reqbody=%s",
+					r.RemoteAddr, r.Method, r.URL.RequestURI(), body.Buffer.String())
+			}
+
+			return next(ctx)
 		}
 	}
 }
