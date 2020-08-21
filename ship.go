@@ -281,6 +281,18 @@ func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 // Route & RouteGroup
 //----------------------------------------------------------------------------
 
+// ResetMiddlewares resets the global middlewares to mdws.
+func (s *Ship) ResetMiddlewares(mdws ...Middleware) *Ship {
+	s.middlewares = append([]Middleware{}, mdws...)
+	return s
+}
+
+// ResetPreMiddlewares resets the global pre-middlewares to mdws.
+func (s *Ship) ResetPreMiddlewares(mdws ...Middleware) *Ship {
+	s.premiddlewares = append([]Middleware{}, mdws...)
+	return s
+}
+
 // Pre registers the Pre-middlewares, which are executed before finding the route.
 // then returns the origin ship router to write the chained router.
 func (s *Ship) Pre(middlewares ...Middleware) *Ship {
