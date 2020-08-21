@@ -16,6 +16,27 @@ package echo
 
 import "testing"
 
+func TestRemoveTrailingSlash(t *testing.T) {
+	if path := removeTrailingSlash(""); path != "" {
+		t.Error(path)
+	}
+	if path := removeTrailingSlash("/"); path != "" {
+		t.Error(path)
+	}
+	if path := removeTrailingSlash("a"); path != "a" {
+		t.Error(path)
+	}
+	if path := removeTrailingSlash("abc//"); path != "abc" {
+		t.Error(path)
+	}
+	if path := removeTrailingSlash("/a/b/"); path != "/a/b" {
+		t.Error(path)
+	}
+	if path := removeTrailingSlash("/a/b"); path != "/a/b" {
+		t.Error(path)
+	}
+}
+
 func TestRouter(t *testing.T) {
 	var handler bool
 	var n int

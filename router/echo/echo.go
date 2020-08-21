@@ -34,6 +34,30 @@ const PROPFIND = "PROPFIND"
 // REPORT Method can be used to get information about a resource, see rfc 3253
 const REPORT = "REPORT"
 
+// RemoveTrailingSlash is used by Router to remove the trailing slash
+// of the route path if true.
+var RemoveTrailingSlash bool
+
+// removeTrailingSlash is used to replace the stdlib fucntion strings.TrimRight
+// to improve the performance when finding the handler by the route path.
+func removeTrailingSlash(path string) string {
+	_len := len(path) - 1
+
+	var i int
+	for i = _len; i >= 0; i-- {
+		if path[i] != '/' {
+			break
+		}
+	}
+
+	if i == _len {
+		return path
+	} else if i < 0 {
+		return ""
+	}
+	return path[:i+1]
+}
+
 type methodHandler struct {
 	get      interface{}
 	put      interface{}
@@ -410,6 +434,9 @@ func (r *Router) Add(name, method, path string, h interface{}) (n int, err error
 	}
 
 	// Validate path
+	if RemoveTrailingSlash {
+		path = strings.TrimRight(path, "/")
+	}
 	if path == "" {
 		path = "/"
 	}
@@ -589,6 +616,14 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 // Find lookups a handler registered for method and path,
 // which also parses the path for the parameters.
 func (r *Router) Find(method, path string, pnames, pvalues []string) (h interface{}, pn int) {
+	if RemoveTrailingSlash {
+		// path = strings.TrimRight(path, "/")
+		path = removeTrailingSlash(path)
+	}
+	if path == "" {
+		path = "/"
+	}
+
 	var (
 		cn     = r.tree
 		search = path
