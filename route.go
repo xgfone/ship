@@ -32,10 +32,10 @@ import (
 
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
-	Host    string      `json:"host" xml:"host"`
-	Name    string      `json:"name" xml:"name"`
-	Path    string      `json:"path" xml:"path"`
-	Method  string      `json:"method" xml:"method"`
+	Host    string      `json:"host,omitempty" xml:"host,omitempty"`
+	Name    string      `json:"name,omitempty" xml:"name,omitempty"`
+	Path    string      `json:"path,omitempty" xml:"path,omitempty"`
+	Method  string      `json:"method,omitempty" xml:"method,omitempty"`
 	Handler Handler     `json:"-" xml:"-"`
 	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
 }
