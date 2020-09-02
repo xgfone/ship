@@ -59,6 +59,9 @@ var (
 // HTTPError is the alias of herror.HTTPError.
 type HTTPError = herror.HTTPError
 
+// HTTPServerError is the alias of HTTPError.
+type HTTPServerError = HTTPError
+
 // NewHTTPError is the alias of herror.NewHTTPError.
 var NewHTTPError = herror.NewHTTPError
 
