@@ -75,3 +75,35 @@ func (re RouteError) Error() string {
 	return fmt.Sprintf("%s: name=%s, path=%s, method=%s, host=%s",
 		re.Err, re.Name, re.Path, re.Method, re.Host)
 }
+
+// HTTPClientError represents an error about the http client response.
+type HTTPClientError struct {
+	Code   int    `json:"code" xml:"code"`
+	Method string `json:"method" xml:"method"`
+	URL    string `json:"url" xml:"url"`
+	Data   string `json:"data" xml:"data"`
+	Err    error  `json:"err" xml:"err"`
+}
+
+// NewHTTPClientError returns a new HTTPClientError.
+func NewHTTPClientError(method, url string, code int, err error,
+	data ...string) HTTPClientError {
+	var d string
+	if len(data) > 0 {
+		d = data[0]
+	}
+
+	return HTTPClientError{Method: method, URL: url, Code: code, Data: d, Err: err}
+}
+
+func (e HTTPClientError) Unwrap() error  { return e.Err }
+func (e HTTPClientError) String() string { return e.Error() }
+func (e HTTPClientError) Error() string {
+	if e.Data == "" {
+		return fmt.Sprintf("method=%s, url=%s, code=%d, err=%s",
+			e.Method, e.URL, e.Code, e.Err)
+	}
+
+	return fmt.Sprintf("method=%s, url=%s, code=%d, data=%s, err=%s",
+		e.Method, e.URL, e.Code, e.Data, e.Err)
+}
