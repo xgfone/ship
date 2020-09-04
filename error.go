@@ -65,6 +65,9 @@ type HTTPServerError = HTTPError
 // NewHTTPError is the alias of herror.NewHTTPError.
 var NewHTTPError = herror.NewHTTPError
 
+// NewHTTPServerError is the alias of NewHTTPError.
+var NewHTTPServerError = NewHTTPError
+
 // RouteError represents a route error when adding a route.
 type RouteError struct {
 	RouteInfo
