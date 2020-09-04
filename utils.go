@@ -284,7 +284,7 @@ func RequestJSONWithContext(ctx context.Context, method, url string,
 		body = buf
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	req, err := NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return NewHTTPClientError(method, url, 0, err)
 	}
