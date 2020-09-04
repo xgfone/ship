@@ -15,14 +15,25 @@
 package ship
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
+
+var bufpool = sync.Pool{
+	New: func() interface{} { return bytes.NewBuffer(make([]byte, 0, 1024)) },
+}
+
+func getBuffer() *bytes.Buffer    { return bufpool.Get().(*bytes.Buffer) }
+func putBuffer(buf *bytes.Buffer) { buf.Reset(); bufpool.Put(buf) }
 
 // OnceRunner is used to run the task only once, which is different from
 // sync.Once, the second calling does not wait until the first calling finishes.
@@ -46,7 +57,7 @@ func (r *OnceRunner) Run() {
 // If buf is nil or empty, it will make a new one with 2048.
 func CopyNBuffer(dst io.Writer, src io.Reader, n int64, buf []byte) (written int64, err error) {
 	if len(buf) == 0 {
-		buf = make([]byte, 2048)
+		buf = make([]byte, 1024)
 	}
 
 	// For like byte.Buffer, we maybe grow its capacity to avoid allocating
@@ -217,5 +228,99 @@ func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err er
 			fieldv.SetFloat(v)
 		}
 	}
+	return
+}
+
+// GetJSON is equal to RequestJSON(http.MethodGet, url, nil, resp...).
+func GetJSON(url string, resp ...interface{}) (err error) {
+	return RequestJSON(http.MethodGet, url, nil, resp...)
+}
+
+// PostJSON is equal to RequestJSON(http.MethodPost, url, req, resp...).
+func PostJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	return RequestJSON(http.MethodPost, url, req, resp...)
+}
+
+// PutJSON is equal to RequestJSON(http.MethodPut, url, req, resp...).
+func PutJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	return RequestJSON(http.MethodPut, url, req, resp...)
+}
+
+// DeleteJSON is equal to RequestJSON(http.MethodDelete, url, req, resp...).
+func DeleteJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	return RequestJSON(http.MethodDelete, url, req, resp...)
+}
+
+// RequestJSON is equal to RequestJSONWithContext(context.Background(), ...).
+func RequestJSON(method, url string, req interface{}, resp ...interface{}) (err error) {
+	return RequestJSONWithContext(context.Background(), method, url, req, resp...)
+}
+
+// RequestJSONWithContext sends the http request with JSON and puts the response
+// body into respBody as JSON.
+//
+// reqBody may be one of types: nil, []byte, string, io.Reader, and otehr types.
+// For other types, it will be serialized by json.NewEncoder.
+//
+// If respBody is nil, it will ignore the response body.
+func RequestJSONWithContext(ctx context.Context, method, url string,
+	reqBody interface{}, respBody ...interface{}) (err error) {
+	var body io.Reader
+	var buf *bytes.Buffer
+	switch data := reqBody.(type) {
+	case nil:
+	case []byte:
+		body = bytes.NewBuffer(data)
+	case string:
+		body = bytes.NewBufferString(data)
+	case io.Reader:
+		body = data
+	default:
+		buf = getBuffer()
+		defer putBuffer(buf)
+		if err = json.NewEncoder(buf).Encode(reqBody); err != nil {
+			return NewHTTPClientError(method, url, 0, err)
+		}
+		body = buf
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return NewHTTPClientError(method, url, 0, err)
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return NewHTTPClientError(method, url, 0, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		if buf == nil {
+			buf = getBuffer()
+			defer putBuffer(buf)
+		}
+		_, err = CopyNBuffer(buf, resp.Body, resp.ContentLength, nil)
+		return NewHTTPClientError(method, url, resp.StatusCode, err, buf.String())
+	}
+
+	if len(respBody) != 0 && respBody[0] != nil {
+		if buf == nil {
+			buf = getBuffer()
+			defer putBuffer(buf)
+		}
+
+		if _, err = CopyNBuffer(buf, resp.Body, resp.ContentLength, nil); err == nil {
+			err = json.Unmarshal(buf.Bytes(), respBody[0])
+		}
+
+		if err != nil {
+			err = NewHTTPClientError(method, url, resp.StatusCode, err, buf.String())
+		}
+	}
+
 	return
 }
