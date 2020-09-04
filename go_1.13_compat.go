@@ -25,6 +25,9 @@ import (
 // NewRequestWithContext is the compatibility of http.NewRequestWithContext.
 func NewRequestWithContext(ctx context.Context, method, url string,
 	body io.Reader) (*http.Request, error) {
-	req := http.NewRequest(method, url, body)
-	return req.WithContext(ctx)
+	req, err := http.NewRequest(method, url, body)
+	if err == nil {
+		req = req.WithContext(ctx)
+	}
+	return req, err
 }
