@@ -23,6 +23,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -392,7 +393,20 @@ func (c *Context) Header() http.Header { return c.res.Header() }
 // GetHeader returns the first value of the request header named name.
 //
 // Return "" if the header does not exist.
-func (c *Context) GetHeader(name string) string { return c.req.Header.Get(name) }
+func (c *Context) GetHeader(name string, defaultValue ...string) string {
+	if c.req.Header != nil {
+		values, ok := c.req.Header[textproto.CanonicalMIMEHeaderKey(name)]
+		if ok && len(values) != 0 {
+			return values[0]
+		}
+	}
+
+	if len(defaultValue) != 0 {
+		return defaultValue[0]
+	}
+
+	return ""
+}
 
 // SetHeader sets the response header name to value.
 func (c *Context) SetHeader(name, value string) { c.res.Header().Set(name, value) }
@@ -428,11 +442,18 @@ func (c *Context) SetCookie(cookie *http.Cookie) {
 //----------------------------------------------------------------------------
 
 // QueryParam returns the query param for the provided name.
-func (c *Context) QueryParam(name string) string {
+func (c *Context) QueryParam(name string, defaultValue ...string) string {
 	if c.query == nil {
 		c.query = c.req.URL.Query()
 	}
-	return c.query.Get(name)
+
+	if values, ok := c.query[name]; ok && len(values) != 0 {
+		return values[0]
+	} else if len(defaultValue) != 0 {
+		return defaultValue[0]
+	}
+
+	return ""
 }
 
 // QueryParams returns the query parameters as `url.Values`.
@@ -453,8 +474,18 @@ func (c *Context) QueryRawString() string {
 //----------------------------------------------------------------------------
 
 // FormValue returns the form field value for the provided name.
-func (c *Context) FormValue(name string) string {
-	return c.req.FormValue(name)
+func (c *Context) FormValue(name string, defaultValue ...string) string {
+	if c.req.Form == nil {
+		c.req.ParseMultipartForm(MaxMemoryLimit)
+	}
+
+	if values, ok := c.req.Form[name]; ok && len(values) != 0 {
+		return values[0]
+	} else if len(defaultValue) != 0 {
+		return defaultValue[0]
+	}
+
+	return ""
 }
 
 // FormParams returns the form parameters as `url.Values`.
