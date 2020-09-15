@@ -395,9 +395,8 @@ func (c *Context) Header() http.Header { return c.res.Header() }
 // Return "" if the header does not exist.
 func (c *Context) GetHeader(name string, defaultValue ...string) string {
 	if c.req.Header != nil {
-		values, ok := c.req.Header[textproto.CanonicalMIMEHeaderKey(name)]
-		if ok && len(values) != 0 {
-			return values[0]
+		if vs, ok := c.req.Header[textproto.CanonicalMIMEHeaderKey(name)]; ok {
+			return vs[0]
 		}
 	}
 
@@ -447,7 +446,7 @@ func (c *Context) QueryParam(name string, defaultValue ...string) string {
 		c.query = c.req.URL.Query()
 	}
 
-	if values, ok := c.query[name]; ok && len(values) != 0 {
+	if values, ok := c.query[name]; ok {
 		return values[0]
 	} else if len(defaultValue) != 0 {
 		return defaultValue[0]
@@ -479,7 +478,7 @@ func (c *Context) FormValue(name string, defaultValue ...string) string {
 		c.req.ParseMultipartForm(MaxMemoryLimit)
 	}
 
-	if values, ok := c.req.Form[name]; ok && len(values) != 0 {
+	if values, ok := c.req.Form[name]; ok {
 		return values[0]
 	} else if len(defaultValue) != 0 {
 		return defaultValue[0]
