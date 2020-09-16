@@ -62,7 +62,7 @@ var ErrSkip = errors.New("skip")
 // HTTPError represents an error with HTTP Status Code.
 type HTTPError struct {
 	Code int
-	Msg  string
+	Msg  string // DEPRECATED!!!
 	Err  error
 	CT   string // For Content-Type
 }
@@ -70,7 +70,7 @@ type HTTPError struct {
 // NewHTTPError returns a new HTTPError.
 func NewHTTPError(code int, msg ...string) HTTPError {
 	if len(msg) > 0 {
-		return HTTPError{Code: code, Msg: msg[0]}
+		return HTTPError{Code: code, Err: errors.New(msg[0])}
 	}
 	return HTTPError{Code: code}
 }
@@ -93,6 +93,8 @@ func (e HTTPError) Unwrap() error { return e.Err }
 //     HTTPError{Err: errors.New("")}.GetError() != nil
 //     HTTPError{Msg: "xxx"}.GetError() != nil
 //     HTTPError{Code: 200}.GetError() == nil
+//
+// DEPRECATED!!!
 func (e HTTPError) GetError() error {
 	if e.Err != nil {
 		return e.Err
@@ -103,6 +105,8 @@ func (e HTTPError) GetError() error {
 }
 
 // GetMsg returns a message.
+//
+// DEPRECATED!!!
 func (e HTTPError) GetMsg() string {
 	if e.Msg != "" {
 		return e.Msg
@@ -118,7 +122,17 @@ func (e HTTPError) NewCT(ct string) HTTPError { e.CT = ct; return e }
 // NewError returns a new HTTPError with the new error.
 func (e HTTPError) NewError(err error) HTTPError { e.Err = err; return e }
 
+// NewErrorf is equal to NewError(fmt.Errorf(msg, args...)).
+func (e HTTPError) NewErrorf(msg string, args ...interface{}) HTTPError {
+	if len(args) == 0 {
+		return e.NewError(errors.New(msg))
+	}
+	return e.NewError(fmt.Errorf(msg, args...))
+}
+
 // NewMsg returns a new HTTPError with the new msg.
+//
+// DEPRECATED!!! Please use NewErrorf instead.
 func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
 	if len(args) == 0 {
 		e.Msg = msg

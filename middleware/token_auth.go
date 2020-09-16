@@ -14,11 +14,7 @@
 
 package middleware
 
-import (
-	"net/http"
-
-	"github.com/xgfone/ship/v3"
-)
+import "github.com/xgfone/ship/v3"
 
 // TokenAuth returns a TokenAuth middleware.
 //
@@ -41,7 +37,7 @@ func TokenAuth(validator TokenValidator, getToken ...TokenFunc) Middleware {
 				if _, ok := err.(ship.HTTPError); ok {
 					return err
 				}
-				return ship.NewHTTPError(http.StatusBadRequest, err.Error())
+				return ship.ErrBadRequest.NewError(err)
 			}
 			if valid, err := validator(token); err != nil {
 				return err

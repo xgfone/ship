@@ -92,10 +92,10 @@ func CSRF(config ...CSRFConfig) Middleware {
 					if _, ok := err.(ship.HTTPError); ok {
 						return err
 					}
-					return ship.NewHTTPError(http.StatusBadRequest, err.Error())
+					return ship.ErrBadRequest.NewError(err)
 				}
 				if !validateCSRFToken(token, clientToken) {
-					return ship.NewHTTPError(http.StatusForbidden, "invalid csrf token")
+					return ship.ErrForbidden.NewErrorf("invalid csrf token")
 				}
 			}
 
