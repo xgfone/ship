@@ -95,7 +95,7 @@ func CSRF(config ...CSRFConfig) Middleware {
 					return ship.ErrBadRequest.NewError(err)
 				}
 				if !validateCSRFToken(token, clientToken) {
-					return ship.ErrForbidden.NewErrorf("invalid csrf token")
+					return ship.ErrForbidden.Newf("invalid csrf token")
 				}
 			}
 

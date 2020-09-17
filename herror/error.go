@@ -85,6 +85,32 @@ func (e HTTPError) Error() string {
 // Unwrap unwraps the inner error.
 func (e HTTPError) Unwrap() error { return e.Err }
 
+// NewCT returns a new HTTPError with the new ContentType ct.
+func (e HTTPError) NewCT(ct string) HTTPError { e.CT = ct; return e }
+
+// New returns a new HTTPError with the new error.
+func (e HTTPError) New(err error) HTTPError { e.Err = err; return e }
+
+// Newf is equal to New(fmt.Errorf(msg, args...)).
+func (e HTTPError) Newf(msg string, args ...interface{}) HTTPError {
+	if len(args) == 0 {
+		return e.NewError(errors.New(msg))
+	}
+	return e.NewError(fmt.Errorf(msg, args...))
+}
+
+// GetMsg returns a message.
+//
+// DEPRECATED!!!
+func (e HTTPError) GetMsg() string {
+	if e.Msg != "" {
+		return e.Msg
+	} else if e.Code < 500 && e.Err != nil {
+		return e.Err.Error()
+	}
+	return ""
+}
+
 // GetError returns the inner error.
 //
 // If Err is nil but Msg is not "", return `errors.New(e.Msg)` instead;
@@ -104,35 +130,14 @@ func (e HTTPError) GetError() error {
 	return nil
 }
 
-// GetMsg returns a message.
+// NewError returns a new HTTPError with the new error.
 //
 // DEPRECATED!!!
-func (e HTTPError) GetMsg() string {
-	if e.Msg != "" {
-		return e.Msg
-	} else if e.Code < 500 && e.Err != nil {
-		return e.Err.Error()
-	}
-	return ""
-}
-
-// NewCT returns a new HTTPError with the new ContentType ct.
-func (e HTTPError) NewCT(ct string) HTTPError { e.CT = ct; return e }
-
-// NewError returns a new HTTPError with the new error.
 func (e HTTPError) NewError(err error) HTTPError { e.Err = err; return e }
-
-// NewErrorf is equal to NewError(fmt.Errorf(msg, args...)).
-func (e HTTPError) NewErrorf(msg string, args ...interface{}) HTTPError {
-	if len(args) == 0 {
-		return e.NewError(errors.New(msg))
-	}
-	return e.NewError(fmt.Errorf(msg, args...))
-}
 
 // NewMsg returns a new HTTPError with the new msg.
 //
-// DEPRECATED!!! Please use NewErrorf instead.
+// DEPRECATED!!! Please use Newf instead.
 func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
 	if len(args) == 0 {
 		e.Msg = msg
