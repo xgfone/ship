@@ -416,6 +416,11 @@ func (c *Context) AddHeader(name, value string) { c.res.Header().Add(name, value
 // DelHeader deletes the header named name from the response.
 func (c *Context) DelHeader(name string) { c.res.Header().Del(name) }
 
+// HasHeader reports whether the request header named name exists or not.
+func (c *Context) HasHeader(name string) bool {
+	return c.req.Header.Values(name) != nil
+}
+
 //----------------------------------------------------------------------------
 // Cookie
 //----------------------------------------------------------------------------
@@ -466,6 +471,15 @@ func (c *Context) QueryParams() url.Values {
 // QueryRawString returns the URL query string.
 func (c *Context) QueryRawString() string {
 	return c.req.URL.RawQuery
+}
+
+// HasQuery reports whether the query argument named name exists or not.
+func (c *Context) HasQuery(name string) bool {
+	if c.query == nil {
+		c.query = c.req.URL.Query()
+	}
+	_, ok := c.query[name]
+	return ok
 }
 
 //----------------------------------------------------------------------------
