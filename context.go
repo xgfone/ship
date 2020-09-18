@@ -418,7 +418,8 @@ func (c *Context) DelHeader(name string) { c.res.Header().Del(name) }
 
 // HasHeader reports whether the request header named name exists or not.
 func (c *Context) HasHeader(name string) bool {
-	return c.req.Header.Values(name) != nil
+	_, ok := c.req.Header[textproto.CanonicalMIMEHeaderKey(name)]
+	return ok
 }
 
 //----------------------------------------------------------------------------
