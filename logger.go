@@ -26,10 +26,10 @@ import (
 // to get the underlynig writer.
 type Logger interface {
 	Tracef(format string, args ...interface{})
-	Debugf(foramt string, args ...interface{})
-	Infof(foramt string, args ...interface{})
-	Warnf(foramt string, args ...interface{})
-	Errorf(foramt string, args ...interface{})
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
 }
 
 // NewLoggerFromStdlog converts stdlib log to Logger.
