@@ -62,7 +62,7 @@ func CopyNBuffer(dst io.Writer, src io.Reader, n int64, buf []byte) (written int
 
 	// For like byte.Buffer, we maybe grow its capacity to avoid allocating
 	// the memory more times.
-	if b, ok := dst.(interface{ Grow(int) }); ok {
+	if b, ok := dst.(interface{ Grow(int) }); ok && n > 0 {
 		if n < 32768 { // 32KB
 			b.Grow(int(n))
 		} else {
@@ -70,7 +70,12 @@ func CopyNBuffer(dst io.Writer, src io.Reader, n int64, buf []byte) (written int
 		}
 	}
 
-	written, err = io.CopyBuffer(dst, io.LimitReader(src, n), buf)
+	// (xgfone): Fix for compression, such as gzip or deflate.
+	if n > 0 {
+		src = io.LimitReader(src, n)
+	}
+
+	written, err = io.CopyBuffer(dst, src, buf)
 	if written == n {
 		return n, nil
 	} else if written < n && err == nil {
@@ -303,8 +308,8 @@ func RequestJSONWithContext(ctx context.Context, method, url string,
 			buf = getBuffer()
 			defer putBuffer(buf)
 		}
-		_, err = CopyNBuffer(buf, resp.Body, resp.ContentLength, nil)
-		return NewHTTPClientError(method, url, resp.StatusCode, err, buf.String())
+		CopyNBuffer(buf, resp.Body, resp.ContentLength, nil)
+		return NewHTTPClientError(method, url, resp.StatusCode, nil, buf.String())
 	}
 
 	if len(respBody) != 0 && respBody[0] != nil {
