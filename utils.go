@@ -268,6 +268,9 @@ func RequestJSON(method, url string, req interface{}, resp ...interface{}) (err 
 // For other types, it will be serialized by json.NewEncoder.
 //
 // If respBody is nil, it will ignore the response body.
+//
+// If respBody[1] is a function and its type is func(*http.Request)*http.Request,
+// it will call it to fix the new request and use the returned request.
 func RequestJSONWithContext(ctx context.Context, method, url string,
 	reqBody interface{}, respBody ...interface{}) (err error) {
 	var body io.Reader
@@ -296,6 +299,12 @@ func RequestJSONWithContext(ctx context.Context, method, url string,
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+
+	if len(respBody) > 1 {
+		if fix, ok := respBody[1].(func(*http.Request) *http.Request); ok {
+			req = fix(req)
+		}
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
