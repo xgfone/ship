@@ -17,6 +17,10 @@ package ship
 import "fmt"
 
 func ExampleSetStructFieldToDefault() {
+	type Struct struct {
+		InnerInt int `default:"123"`
+	}
+
 	type S struct {
 		Ignore  bool    `default:"true"`
 		Int     int     `default:"123"`
@@ -34,9 +38,11 @@ func ExampleSetStructFieldToDefault() {
 		Float64 float64 `default:"1.2"`
 		FloatN  float64 `default:".Float64"` // Set the default value to other field
 		String  string  `default:"abc"`
+		Struct  Struct
+		Structs []Struct
 	}
 
-	var s S
+	s := S{Structs: make([]Struct, 2)}
 	err := SetStructFieldToDefault(&s)
 	fmt.Println(err)
 
@@ -56,6 +62,9 @@ func ExampleSetStructFieldToDefault() {
 	fmt.Println(s.Float64)
 	fmt.Println(s.FloatN)
 	fmt.Println(s.String)
+	fmt.Println(s.Struct.InnerInt)
+	fmt.Println(s.Structs[0].InnerInt)
+	fmt.Println(s.Structs[1].InnerInt)
 
 	// Output:
 	// <nil>
@@ -75,5 +84,7 @@ func ExampleSetStructFieldToDefault() {
 	// 1.2
 	// 1.2
 	// abc
-
+	// 123
+	// 123
+	// 123
 }
