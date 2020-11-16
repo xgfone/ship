@@ -117,6 +117,8 @@ var (
 //   uint16
 //   uint32
 //   uint64
+//   struct
+//   struct slice
 //   interface{ SetDefault(_default interface{}) error }
 //
 // Notice: If the tag value starts with ".", it represents a field name and
@@ -146,14 +148,11 @@ func setDefault(vf reflect.Value) (err error) {
 	vt := vf.Type()
 	for i, _len := 0, vt.NumField(); i < _len; i++ {
 		tag := strings.TrimSpace(vt.Field(i).Tag.Get("default"))
-		if tag == "" {
-			continue
-		}
 
 		fieldv := vf.Field(i)
 		switch v := fieldv.Interface().(type) {
 		case string:
-			if v == "" {
+			if v == "" && tag != "" {
 				fieldv.SetString(tag)
 			}
 		case int:
@@ -183,7 +182,23 @@ func setDefault(vf reflect.Value) (err error) {
 		case float64:
 			err = setFieldFloat(vf, fieldv, v, tag)
 		case setDefaulter:
-			err = v.SetDefault(tag)
+			if tag != "" {
+				err = v.SetDefault(tag)
+			}
+
+		default:
+			switch fieldv.Kind() {
+			case reflect.Struct:
+				err = setDefault(fieldv)
+			case reflect.Slice:
+				for i, _len := 0, fieldv.Len(); i < _len; i++ {
+					if _fieldv := fieldv.Index(i); _fieldv.Kind() == reflect.Struct {
+						if err = setDefault(_fieldv); err != nil {
+							return
+						}
+					}
+				}
+			}
 		}
 
 		if err != nil {
@@ -195,7 +210,7 @@ func setDefault(vf reflect.Value) (err error) {
 }
 
 func setFieldInt(structv, fieldv reflect.Value, v int64, tag string) (err error) {
-	if v == 0 {
+	if v == 0 && tag != "" {
 		if tag[0] == '.' {
 			if tag = tag[1:]; tag == "" {
 				return errInvalidTagValue
@@ -209,7 +224,7 @@ func setFieldInt(structv, fieldv reflect.Value, v int64, tag string) (err error)
 }
 
 func setFieldUint(structv, fieldv reflect.Value, v uint64, tag string) (err error) {
-	if v == 0 {
+	if v == 0 && tag != "" {
 		if tag[0] == '.' {
 			if tag = tag[1:]; tag == "" {
 				return errInvalidTagValue
@@ -223,7 +238,7 @@ func setFieldUint(structv, fieldv reflect.Value, v uint64, tag string) (err erro
 }
 
 func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err error) {
-	if v == 0 {
+	if v == 0 && tag != "" {
 		if tag[0] == '.' {
 			if tag = tag[1:]; tag == "" {
 				return errInvalidTagValue
