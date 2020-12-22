@@ -276,8 +276,15 @@ func RequestJSON(method, url string, req interface{}, resp ...interface{}) (err 
 	return RequestJSONWithContext(context.Background(), method, url, req, resp...)
 }
 
-// RequestJSONWithContext sends the http request with JSON and puts the response
-// body into respBody as JSON.
+// RequestJSONWithContext is equal to
+// RequestJSONWithContextAndHeaders(ctx, method, url, nil, reqBody, respBody...).
+func RequestJSONWithContext(ctx context.Context, method, url string,
+	reqBody interface{}, respBody ...interface{}) (err error) {
+	return RequestJSONWithContextAndHeaders(ctx, method, url, nil, reqBody, respBody...)
+}
+
+// RequestJSONWithContextAndHeaders sends the http request with JSON
+// and puts the response body into respBody as JSON.
 //
 // reqBody may be one of types: nil, []byte, string, io.Reader, and otehr types.
 // For other types, it will be serialized by json.NewEncoder.
@@ -286,8 +293,8 @@ func RequestJSON(method, url string, req interface{}, resp ...interface{}) (err 
 //
 // If respBody[1] is a function and its type is func(*http.Request)*http.Request,
 // it will call it to fix the new request and use the returned request.
-func RequestJSONWithContext(ctx context.Context, method, url string,
-	reqBody interface{}, respBody ...interface{}) (err error) {
+func RequestJSONWithContextAndHeaders(ctx context.Context, method, url string,
+	reqHeaders http.Header, reqBody interface{}, respBody ...interface{}) (err error) {
 	var body io.Reader
 	var buf *bytes.Buffer
 	switch data := reqBody.(type) {
@@ -312,6 +319,9 @@ func RequestJSONWithContext(ctx context.Context, method, url string,
 		return NewHTTPClientError(method, url, 0, err)
 	}
 
+	for key, values := range reqHeaders {
+		req.Header[key] = values
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
