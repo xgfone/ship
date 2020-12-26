@@ -23,10 +23,38 @@ import (
 	"github.com/xgfone/ship/v3"
 )
 
+// LoggerConfig is used to configure the logger middleware.
+type LoggerConfig struct {
+	// If true, log the request body.
+	//
+	// Default: false
+	LogReqBody bool
+}
+
 // Logger returns a new logger middleware that will log the request.
-func Logger() Middleware {
+func Logger(config ...LoggerConfig) Middleware {
+	var conf LoggerConfig
+	if len(config) > 0 {
+		conf = config[0]
+	}
+
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {
+			var bodyFmt string
+			var bodyCnt string
+			if conf.LogReqBody {
+				buf := ctx.AcquireBuffer()
+				body := bufferBody{Closer: ctx.Body(), Buffer: buf}
+				_, err = ship.CopyNBuffer(body.Buffer, ctx.Body(), ctx.ContentLength(), nil)
+				if err != nil {
+					return
+				}
+
+				bodyFmt = ", reqbody="
+				bodyCnt = body.Buffer.String()
+				ctx.Request().Body = body
+			}
+
 			start := time.Now()
 			err = next(ctx)
 			cost := time.Now().Sub(start).String()
@@ -52,11 +80,11 @@ func Logger() Middleware {
 			}
 
 			if errmsg == "" {
-				ctx.Logger().Infof("addr=%s, code=%d, method=%s, path=%s, starttime=%d, cost=%s",
-					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost)
+				ctx.Logger().Infof("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s%s%s",
+					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, start.Unix(), cost)
 			} else {
-				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, path=%s, starttime=%d, cost=%s, err=%s",
-					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), start.Unix(), cost, errmsg)
+				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s, err=%s",
+					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, start.Unix(), cost, errmsg)
 			}
 
 			return
@@ -70,6 +98,8 @@ type bufferBody struct {
 }
 
 // ReqBodyLogger returns a middleware to log the request body.
+//
+// DEPRECATED! Please use Logger instead.
 func ReqBodyLogger() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {

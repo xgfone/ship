@@ -30,14 +30,14 @@ func TestLogger(t *testing.T) {
 
 	router := ship.New()
 	router.Logger = logger
-	router.Use(Logger())
+	router.Use(Logger(LoggerConfig{LogReqBody: true}))
 
 	router.Route("/test").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Infof("handler")
 		return nil
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", bytes.NewBufferString("body"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -47,8 +47,8 @@ func TestLogger(t *testing.T) {
 		t.Errorf("expected two lines, but got '%d'", len(ss))
 	} else if ss[0] != "[I] handler" {
 		t.Errorf("expected '[I] handler', but got '%s'", ss[0])
-	} else if s := strings.Join(strings.Split(ss[1], ", ")[1:4], ", "); s !=
-		`code=200, method=GET, path=/test` {
+	} else if s := strings.Join(strings.Split(ss[1], ", ")[1:5], ", "); s !=
+		`code=200, method=GET, path=/test, reqbody=body` {
 		t.Error(s)
 	}
 }
