@@ -80,7 +80,7 @@ func Logger(config ...LoggerConfig) Middleware {
 			}
 
 			if errmsg == "" {
-				ctx.Logger().Infof("addr=%s, code=%d,  method=%s, path=%s%s%s, starttime=%d, cost=%s",
+				ctx.Logger().Infof("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s",
 					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, start.Unix(), cost)
 			} else {
 				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s, err=%s",
