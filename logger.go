@@ -57,7 +57,9 @@ type stdlog struct {
 }
 
 func (l stdlog) output(level, format string, args ...interface{}) {
-	if len(args) == 0 {
+	if l.Logger == nil {
+		return
+	} else if len(args) == 0 {
 		l.Output(3, level+format)
 	} else {
 		l.Output(3, fmt.Sprintf(level+format, args...))
