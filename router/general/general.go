@@ -494,6 +494,7 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 // which also parses the path for the parameters.
 func (r *Router) Find(method, path string, pnames, pvalues []string) (h interface{}, pn int) {
 	var (
+		hasp   = len(pnames) > 0 && len(pvalues) > 0
 		cn     = r.tree
 		search = path
 		child  *node  // Child node
@@ -561,7 +562,7 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 		// Search Param Node
 	Param:
 		if child = cn.FindChildByKind(pkind); child != nil {
-			if len(pvalues) == n { // Issue #378
+			if hasp && len(pvalues) == n { // Issue #378
 				continue
 			}
 
@@ -576,7 +577,9 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 			var i int
 			for l := len(search); i < l && search[i] != '/'; i++ {
 			}
-			pvalues[n] = search[:i]
+			if hasp {
+				pvalues[n] = search[:i]
+			}
 			n++
 
 			search = search[i:]
@@ -605,7 +608,9 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 			return r.notFound, 0 // Not found
 		}
 
-		pvalues[len(cn.pnames)-1] = search
+		if hasp {
+			pvalues[len(cn.pnames)-1] = search
+		}
 		break
 	}
 
@@ -619,12 +624,12 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 				h = n.CheckMethodNotAllowed(r, r.notFound)
 			}
 
-			if pn = len(n.pnames); pn > 0 {
+			if pn = len(n.pnames); pn > 0 && hasp {
 				copy(pnames, n.pnames)
 				pvalues[pn-1] = ""
 			}
 		}
-	} else if pn = len(cn.pnames); pn > 0 {
+	} else if pn = len(cn.pnames); pn > 0 && hasp {
 		copy(pnames, cn.pnames)
 	}
 

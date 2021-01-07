@@ -61,6 +61,9 @@ type Router interface {
 	// Find searchs and returns the handler and the number of the url path
 	// paramethers. For the paramethers, they are put into pnames and pvalues.
 	//
+	// If pnames or pvalues is empty, it will ignore the path paramethers
+	// when finding the route handler.
+	//
 	// Return (nil, 0) if not found the route handler.
 	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
 }

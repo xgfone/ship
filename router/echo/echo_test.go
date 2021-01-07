@@ -86,6 +86,10 @@ func TestRouter(t *testing.T) {
 	} else if pvalues[0] != "path/to/file" {
 		t.Errorf("ParamValue: expected dir 'path/to/file', but got '%s'", pvalues[0])
 	}
+
+	if h, _ := router.Find("POST", "/test/param", nil, nil); h == nil {
+		t.Error("not found the handler")
+	}
 }
 
 func TestRouterAnyMethod(t *testing.T) {
