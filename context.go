@@ -111,6 +111,9 @@ func SetContentType(res http.ResponseWriter, ct string) {
 
 // Context represetns a request and response context.
 type Context struct {
+	// RouteInfo is the route information associated with the route.
+	RouteInfo RouteInfo
+
 	// RouteCtxData is the context data associated with the route.
 	RouteCtxData interface{}
 
@@ -203,6 +206,15 @@ func (c *Context) SetRouter(r router.Router) { c.router = r }
 // Router returns the router.
 func (c *Context) Router() router.Router { return c.router }
 
+// FindRoute finds the route from the router and returns the route info.
+func (c *Context) FindRoute() (ri RouteInfo, ok bool) {
+	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	ri, ok = h.(RouteInfo)
+	c.RouteCtxData = ri.CtxData
+	c.plen = n
+	return
+}
+
 // Execute finds the route and calls the handler.
 //
 // SetRouter must be called before calling Execute, which be done
@@ -212,6 +224,7 @@ func (c *Context) Execute() error {
 	c.plen = n
 	if ch, ok := h.(RouteInfo); ok {
 		c.RouteCtxData = ch.CtxData
+		c.RouteInfo = ch
 		return ch.Handler(c)
 	} else if h == nil {
 		return c.notFound(c)
