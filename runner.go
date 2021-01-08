@@ -166,15 +166,15 @@ func (r *Runner) startServer(certFile, keyFile string) {
 
 		if err == nil || err == http.ErrServerClosed {
 			if name == "" {
-				logger.Infof("The HTTP Server is shutdown")
+				logger.Infof("The HTTP Server listening on %s is shutdown", server.Addr)
 			} else {
-				logger.Infof("The HTTP Server [%s] is shutdown", name)
+				logger.Infof("The HTTP Server [%s] listening on %s is shutdown", name, server.Addr)
 			}
 		} else {
 			if name == "" {
-				logger.Errorf("The HTTP Server is shutdown: %s", err)
+				logger.Errorf("The HTTP Server is listening on %s shutdown: %s", server.Addr, err)
 			} else {
-				logger.Errorf("The HTTP Server [%s] is shutdown: %s", name, err)
+				logger.Errorf("The HTTP Server [%s] listening on %s is shutdown: %s", name, server.Addr, err)
 			}
 		}
 	})
