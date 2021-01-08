@@ -343,7 +343,7 @@ func (s *Ship) URLParamsMaxNum() int {
 
 func (s *Ship) getRoutes(h string, r router.Router, rs []RouteInfo) []RouteInfo {
 	for _, r := range r.Routes() {
-		ch := r.Handler.(ctxHandler)
+		ch := r.Handler.(RouteInfo)
 		rs = append(rs, RouteInfo{
 			Host:    h,
 			Name:    r.Name,
@@ -460,8 +460,7 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 		return RouteError{RouteInfo: ri, Err: err}
 	}
 
-	handler := ctxHandler{Handler: ri.Handler, CtxData: ri.CtxData}
-	num, err := router.Add(ri.Name, ri.Method, ri.Path, handler)
+	num, err := router.Add(ri.Name, ri.Method, ri.Path, ri)
 	if err != nil {
 		err = RouteError{RouteInfo: ri, Err: err}
 	} else if maxnum := s.URLParamsMaxNum(); num > maxnum {
@@ -564,9 +563,4 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		s.routing(router, resp, req)
 	}
-}
-
-type ctxHandler struct {
-	Handler Handler
-	CtxData interface{}
 }

@@ -210,7 +210,7 @@ func (c *Context) Router() router.Router { return c.router }
 func (c *Context) Execute() error {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
 	c.plen = n
-	if ch, ok := h.(ctxHandler); ok {
+	if ch, ok := h.(RouteInfo); ok {
 		c.RouteCtxData = ch.CtxData
 		return ch.Handler(c)
 	} else if h == nil {
