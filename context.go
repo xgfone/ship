@@ -207,10 +207,11 @@ func (c *Context) SetRouter(r router.Router) { c.router = r }
 func (c *Context) Router() router.Router { return c.router }
 
 // FindRoute finds the route from the router and returns the route info.
-func (c *Context) FindRoute() (ri RouteInfo, ok bool) {
+func (c *Context) FindRoute() (ok bool) {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
-	ri, ok = h.(RouteInfo)
+	ri, ok := h.(RouteInfo)
 	c.RouteCtxData = ri.CtxData
+	c.RouteInfo = ri
 	c.plen = n
 	return
 }
