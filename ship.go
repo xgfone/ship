@@ -555,12 +555,23 @@ func (s *Ship) routing(router router.Router, w http.ResponseWriter, r *http.Requ
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	s.rlock()
-	router := s.hosts.Match(req.Host)
-	s.runlock()
-	if router == nil {
-		s.routing(s.router, resp, req)
+	var router router.Router
+
+	if s.Lock == nil {
+		if s.hosts.Sum == 0 || req.Host == "" {
+			router = s.router
+		} else if router = s.hosts.Match(req.Host); router == nil {
+			router = s.router
+		}
 	} else {
-		s.routing(router, resp, req)
+		s.Lock.RLock()
+		if s.hosts.Sum == 0 || req.Host == "" {
+			router = s.router
+		} else if router = s.hosts.Match(req.Host); router == nil {
+			router = s.router
+		}
+		s.Lock.RUnlock()
 	}
+
+	s.routing(router, resp, req)
 }

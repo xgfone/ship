@@ -28,6 +28,7 @@ type regexpRouter struct {
 }
 
 type hostManager struct {
+	Sum    int
 	ship   *Ship
 	ehosts map[string]router.Router // Host Matching: Exact
 	fhosts map[string]router.Router // Host Matching: Prefix/Suffix
@@ -71,25 +72,17 @@ func (hm *hostManager) Router(host string) router.Router {
 }
 
 func (hm *hostManager) Match(host string) router.Router {
-	if host == "" {
-		return nil
-	}
-
-	elen, flen, rlen := len(hm.ehosts), len(hm.fhosts), len(hm.rhosts)
-	if elen == 0 && flen == 0 && rlen == 0 {
-		return nil
-	}
 	host = splitHost(host)
 
 	// Exact Matching
-	if elen != 0 {
+	if len(hm.ehosts) != 0 {
 		if router, ok := hm.ehosts[host]; ok {
 			return router
 		}
 	}
 
 	// Prefix/Suffix Matching
-	if flen != 0 {
+	if len(hm.fhosts) != 0 {
 		for h, r := range hm.fhosts {
 			if h[0] == '*' { // Suffix
 				if strings.HasSuffix(host, h[1:]) {
@@ -102,7 +95,7 @@ func (hm *hostManager) Match(host string) router.Router {
 	}
 
 	// Regexp Matching
-	if rlen != 0 {
+	if len(hm.rhosts) != 0 {
 		for _, r := range hm.rhosts {
 			if r.Regexp.MatchString(host) {
 				return r.Router
@@ -165,6 +158,7 @@ func (hm *hostManager) Add(h string, r router.Router) (router.Router, error) {
 		}
 	}
 
+	hm.Sum = hm.Len()
 	return r, nil
 }
 
@@ -176,6 +170,7 @@ func (hm *hostManager) Del(host string) {
 	} else {
 		delete(hm.rhosts, host)
 	}
+	hm.Sum = hm.Len()
 }
 
 /// --------------------------------------------------------------------------
