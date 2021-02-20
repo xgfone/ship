@@ -405,7 +405,7 @@ func TestRouterAPI(t *testing.T) {
 
 func TestMethodNotAllowed(t *testing.T) {
 	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(nil, MethodNotAllowedHandler())
+		return echo.NewRouter(nil, RouteInfo{Handler: MethodNotAllowedHandler()})
 	})
 
 	p.Route("/home").PUT(defaultHandler)
@@ -442,7 +442,7 @@ func TestMethodNotAllowed(t *testing.T) {
 
 func TestMethodNotAllowed2(t *testing.T) {
 	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(nil, MethodNotAllowedHandler())
+		return echo.NewRouter(nil, RouteInfo{Handler: MethodNotAllowedHandler()})
 	})
 
 	p.Route("/home").GET(defaultHandler)

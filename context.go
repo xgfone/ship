@@ -224,16 +224,14 @@ func (c *Context) FindRoute() (ri RouteInfo, ok bool) {
 // by the framework.
 func (c *Context) Execute() error {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
-	c.plen = n
-	if ch, ok := h.(RouteInfo); ok {
-		c.RouteCtxData = ch.CtxData
-		c.RouteInfo = ch
-		return ch.Handler(c)
-	} else if h == nil {
+	if h == nil {
 		return c.notFound(c)
-	} else {
-		return h.(Handler)(c)
 	}
+
+	c.plen = n
+	c.RouteInfo = h.(RouteInfo)
+	c.RouteCtxData = c.RouteInfo.CtxData
+	return c.RouteInfo.Handler(c)
 }
 
 // SetNotFoundHandler sets the NotFound handler.
