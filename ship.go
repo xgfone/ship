@@ -441,10 +441,12 @@ func (s *Ship) AddRoutes(ris ...RouteInfo) {
 // and others are mandatory.
 func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 	ok, err := s.checkRouteInfo(&ri)
-	if !ok || err != nil {
+	if err != nil {
+		return RouteError{RouteInfo: ri, Err: err}
+	} else if !ok {
 		return
 	} else if ri.Handler == nil {
-		return errors.New("handler must not be nil")
+		return RouteError{RouteInfo: ri, Err: errors.New("handler must not be nil")}
 	}
 
 	router := s.router
