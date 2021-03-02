@@ -78,9 +78,10 @@ type Ship struct {
 	bufferPool  sync.Pool
 	contextPool sync.Pool
 
-	hosts     *hostManager
-	router    router.Router
-	newRouter func() router.Router
+	hosts       *hostManager
+	router      router.Router
+	newRouter   func() router.Router
+	newReRouter func() RegexpHostRouter
 
 	handler        Handler
 	middlewares    []Middleware
@@ -103,7 +104,8 @@ func New() *Ship {
 
 	s.contextPool.New = func() interface{} { return s.NewContext() }
 	s.handler = s.handleRoute
-	s.hosts = newHostManager(s)
+	s.hosts = newHostManager(nil)
+	s.SetNewRegexpHostRouter(NewRegexpHostRouter)
 
 	return s
 }
@@ -143,7 +145,8 @@ func (s *Ship) Clone() *Ship {
 	newShip := new(Ship)
 
 	// Private
-	newShip.hosts = newHostManager(newShip)
+	newShip.hosts = newHostManager(s.newReRouter())
+	newShip.newReRouter = s.newReRouter
 	newShip.handler = newShip.handleRoute
 	newShip.contextPool.New = func() interface{} { return newShip.NewContext() }
 
@@ -217,8 +220,8 @@ func (s *Ship) SetBufferSize(size int) *Ship {
 //
 // It must be called before adding any route.
 func (s *Ship) SetNewRouter(f func() router.Router) *Ship {
-	s.newRouter = f
 	s.router = f()
+	s.newRouter = f
 	return s
 }
 
@@ -228,6 +231,13 @@ func (s *Ship) SetLogger(logger Logger) *Ship {
 	if s.Runner != nil {
 		s.Runner.Logger = logger
 	}
+	return s
+}
+
+// SetNewRegexpHostRouter is used to customize RegexpHostRouter.
+func (s *Ship) SetNewRegexpHostRouter(f func() RegexpHostRouter) *Ship {
+	s.hosts.rhosts = f()
+	s.newReRouter = f
 	return s
 }
 
@@ -400,13 +410,14 @@ func (s *Ship) Router(host string) (router router.Router) {
 	return
 }
 
-// AddHost adds and returns the new host router. If existed, return it
-// and do nothing.
+// AddHost adds and returns the new host router.
+//
+// If existed, return it and do nothing. If router is nil, new one firstly.
 func (s *Ship) AddHost(host string, r router.Router) (router.Router, error) {
 	if host == "" {
 		return nil, errors.New("the host must not be empty")
 	} else if r == nil {
-		return nil, errors.New("the router must not be nil")
+		r = s.newRouter()
 	}
 
 	s.lock()
@@ -453,7 +464,7 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 	s.lock()
 	if ri.Host != "" {
 		if router = s.hosts.Router(ri.Host); router == nil {
-			router, err = s.hosts.Add(ri.Host, nil)
+			router, err = s.hosts.Add(ri.Host, s.newRouter())
 		}
 	}
 	s.unlock()
@@ -544,9 +555,11 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 
 func (s *Ship) handleRoute(c *Context) error { return c.Execute() }
 
-func (s *Ship) routing(router router.Router, w http.ResponseWriter, r *http.Request) {
+func (s *Ship) routing(rhost string, router router.Router,
+	w http.ResponseWriter, r *http.Request) {
 	ctx := s.AcquireContext(r, w)
 	ctx.SetRouter(router)
+	ctx.RouteInfo.Host = rhost
 	switch err := s.handler(ctx); err {
 	case nil, ErrSkip:
 	default:
@@ -557,23 +570,24 @@ func (s *Ship) routing(router router.Router, w http.ResponseWriter, r *http.Requ
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	var rhost string
 	var router router.Router
 
 	if s.Lock == nil {
 		if s.hosts.Sum == 0 || req.Host == "" {
 			router = s.router
-		} else if router = s.hosts.Match(req.Host); router == nil {
+		} else if rhost, router = s.hosts.Match(req.Host); router == nil {
 			router = s.router
 		}
 	} else {
 		s.Lock.RLock()
 		if s.hosts.Sum == 0 || req.Host == "" {
 			router = s.router
-		} else if router = s.hosts.Match(req.Host); router == nil {
+		} else if rhost, router = s.hosts.Match(req.Host); router == nil {
 			router = s.router
 		}
 		s.Lock.RUnlock()
 	}
 
-	s.routing(router, resp, req)
+	s.routing(rhost, router, resp, req)
 }
