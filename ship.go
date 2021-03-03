@@ -57,6 +57,12 @@ type Ship struct {
 	MethodMapping    map[string]string // The default is DefaultMethodMapping.
 	MiddlewareMaxNum int               // Default is 256
 
+	// RouteExecutor is called after matching the host and before finding
+	// the route. By default, it only calls the method Execute() of Context.
+	//
+	// For the context, the executor can only use the field RouteInfo.Host.
+	RouteExecutor Handler
+
 	// If not nil, it will be locked and unlocked during access the routers.
 	// So you can modify the routes concurrently and safely during running.
 	//
@@ -156,6 +162,7 @@ func (s *Ship) Clone() *Ship {
 	newShip.NotFound = s.NotFound
 	newShip.RouteFilter = s.RouteFilter
 	newShip.RouteModifier = s.RouteModifier
+	newShip.RouteExecutor = s.RouteExecutor
 	newShip.MethodMapping = s.MethodMapping
 	newShip.MiddlewareMaxNum = s.MiddlewareMaxNum
 	newShip.Binder = s.Binder
@@ -553,7 +560,12 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 	}
 }
 
-func (s *Ship) handleRoute(c *Context) error { return c.Execute() }
+func (s *Ship) handleRoute(c *Context) error {
+	if s.RouteExecutor == nil {
+		return c.Execute()
+	}
+	return s.RouteExecutor(c)
+}
 
 func (s *Ship) routing(rhost string, router router.Router,
 	w http.ResponseWriter, r *http.Request) {
