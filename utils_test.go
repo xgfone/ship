@@ -19,6 +19,7 @@ import "fmt"
 func ExampleSetStructFieldToDefault() {
 	type Struct struct {
 		InnerInt int `default:"123"`
+		_        int `default:"-"`
 	}
 
 	type S struct {
@@ -40,6 +41,7 @@ func ExampleSetStructFieldToDefault() {
 		String  string  `default:"abc"`
 		Struct  Struct
 		Structs []Struct
+		_       int `default:"-"`
 	}
 
 	s := S{Structs: make([]Struct, 2)}
