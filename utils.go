@@ -147,9 +147,12 @@ type setDefaulter interface {
 func setDefault(vf reflect.Value) (err error) {
 	vt := vf.Type()
 	for i, _len := 0, vt.NumField(); i < _len; i++ {
-		tag := strings.TrimSpace(vt.Field(i).Tag.Get("default"))
-
 		fieldv := vf.Field(i)
+		if !fieldv.CanSet() {
+			continue
+		}
+
+		tag := strings.TrimSpace(vt.Field(i).Tag.Get("default"))
 		switch v := fieldv.Interface().(type) {
 		case string:
 			if v == "" && tag != "" {
