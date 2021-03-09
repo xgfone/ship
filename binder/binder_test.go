@@ -131,6 +131,7 @@ type (
 		T           Timestamp
 		Tptr        *Timestamp
 		SA          StringArray
+		_           int
 	}
 	Timestamp   time.Time
 	TA          []Timestamp
