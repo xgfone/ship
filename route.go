@@ -32,6 +32,7 @@ import (
 
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
+	// If Host is empty, it is the route of the default host router.
 	Host    string      `json:"host,omitempty" xml:"host,omitempty"`
 	Name    string      `json:"name,omitempty" xml:"name,omitempty"`
 	Path    string      `json:"path,omitempty" xml:"path,omitempty"`

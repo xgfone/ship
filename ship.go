@@ -85,8 +85,9 @@ type Ship struct {
 	bufferPool  sync.Pool
 	contextPool sync.Pool
 
-	hosts       *hostManager
+	rhost       string
 	router      router.Router
+	hosts       *hostManager
 	newRouter   func() router.Router
 	newReRouter func() RegexpHostRouter
 
@@ -377,26 +378,29 @@ func (s *Ship) getRoutes(h string, r router.Router, rs []RouteInfo) []RouteInfo 
 // Routes returns the information of all the routes.
 func (s *Ship) Routes() (routes []RouteInfo) {
 	routes = make([]RouteInfo, 0, 64)
-	routes = s.getRoutes("", s.router, routes)
-
 	s.rlock()
+	nodefault := true
 	s.hosts.Each(func(host string, router router.Router) {
 		routes = s.getRoutes(host, router, routes)
+		if nodefault && host == s.rhost {
+			nodefault = false
+		}
 	})
+	if nodefault {
+		routes = s.getRoutes(s.rhost, s.router, routes)
+	}
 	s.runlock()
 	return
 }
 
 // Routers returns the routers with their host.
-//
-// For the main router, the host is "".
 func (s *Ship) Routers() (routers map[string]router.Router) {
 	s.rlock()
 	if _len := s.hosts.Len() + 1; _len == 1 {
-		routers = map[string]router.Router{"": s.router}
+		routers = map[string]router.Router{s.rhost: s.router}
 	} else {
 		routers = make(map[string]router.Router, _len)
-		routers[""] = s.router
+		routers[s.rhost] = s.router
 		s.hosts.Each(func(host string, router router.Router) {
 			routers[host] = router
 		})
@@ -409,12 +413,33 @@ func (s *Ship) Routers() (routers map[string]router.Router) {
 //
 // If host is empty, return the main router.
 func (s *Ship) Router(host string) (router router.Router) {
-	router = s.router
-	if host != "" {
-		s.rlock()
+	s.rlock()
+	if host == "" || host == s.rhost {
+		router = s.router
+	} else {
 		router = s.hosts.Router(host)
-		s.runlock()
 	}
+	s.runlock()
+	return
+}
+
+// SetDefaultRouter resets the default router with the host domain.
+func (s *Ship) SetDefaultRouter(host string, router router.Router) {
+	if router == nil {
+		panic("Ship.SetDefaultRouter: router must not be nil")
+	}
+	s.lock()
+	s.rhost, s.router = host, router
+	s.unlock()
+}
+
+// GetDefaultRouter returns the default host domain and router.
+//
+// For the default default router, the host is "".
+func (s *Ship) GetDefaultRouter() (host string, router router.Router) {
+	s.rlock()
+	host, router = s.rhost, s.router
+	s.runlock()
 	return
 }
 
@@ -468,8 +493,8 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 		return RouteError{RouteInfo: ri, Err: errors.New("handler must not be nil")}
 	}
 
-	router := s.router
 	s.lock()
+	router := s.router
 	if ri.Host != "" {
 		if router = s.hosts.Router(ri.Host); router == nil {
 			router, err = s.hosts.Add(ri.Host, s.newRouter())
@@ -521,8 +546,8 @@ func (s *Ship) DelRoute(ri RouteInfo) (err error) {
 		return
 	}
 
-	router := s.router
 	s.lock()
+	router := s.router
 	if ri.Host != "" {
 		router = s.hosts.Router(ri.Host)
 	}
@@ -593,16 +618,16 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	if s.Lock == nil {
 		if s.hosts.Sum == 0 || req.Host == "" {
-			router = s.router
+			rhost, router = s.rhost, s.router
 		} else if rhost, router = s.hosts.Match(req.Host); router == nil {
-			router = s.router
+			rhost, router = s.rhost, s.router
 		}
 	} else {
 		s.Lock.RLock()
 		if s.hosts.Sum == 0 || req.Host == "" {
-			router = s.router
+			rhost, router = s.rhost, s.router
 		} else if rhost, router = s.hosts.Match(req.Host); router == nil {
-			router = s.router
+			rhost, router = s.rhost, s.router
 		}
 		s.Lock.RUnlock()
 	}
