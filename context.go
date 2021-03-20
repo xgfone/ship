@@ -716,18 +716,23 @@ func (c *Context) Scheme() (scheme string) {
 	return "http"
 }
 
-// RealIP returns the client's network address based on `X-Forwarded-For`
-// or `X-Real-IP` request header.
-func (c *Context) RealIP() string {
+// ClientIP returns the real client's network address based on `X-Forwarded-For`
+// or `X-Real-IP` request header. Or returns the remote address.
+func (c *Context) ClientIP() string {
 	if ip := c.req.Header.Get(HeaderXForwardedFor); ip != "" {
 		return strings.TrimSpace(strings.Split(ip, ",")[0])
-	}
-	if ip := c.req.Header.Get(HeaderXRealIP); ip != "" {
+	} else if ip := c.req.Header.Get(HeaderXRealIP); ip != "" {
 		return ip
+	} else if ra, _, _ := net.SplitHostPort(c.req.RemoteAddr); ra != "" {
+		return ra
 	}
-	ra, _, _ := net.SplitHostPort(c.req.RemoteAddr)
-	return ra
+	return c.req.RemoteAddr
 }
+
+// RealIP is equal to ClientIP.
+//
+// DEPRECATED!!! Please ClientIP instead.
+func (c *Context) RealIP() string { return c.ClientIP() }
 
 // Charset returns the charset of the request content.
 //
