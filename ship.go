@@ -496,10 +496,14 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 		return RouteError{RouteInfo: ri, Err: errors.New("handler must not be nil")}
 	}
 
+	var router router.Router
 	s.lock()
-	router := s.router
-	if ri.Host != "" {
-		if router = s.hosts.Router(ri.Host); router == nil {
+	if ri.Host == "" {
+		router = s.router
+	} else if router = s.hosts.Router(ri.Host); router == nil {
+		if ri.Host == s.rhost {
+			router = s.router
+		} else {
 			router, err = s.hosts.Add(ri.Host, s.newRouter())
 		}
 	}
@@ -549,10 +553,12 @@ func (s *Ship) DelRoute(ri RouteInfo) (err error) {
 		return
 	}
 
+	var router router.Router
 	s.lock()
-	router := s.router
-	if ri.Host != "" {
-		router = s.hosts.Router(ri.Host)
+	if ri.Host == "" {
+		router = s.router
+	} else if router = s.hosts.Router(ri.Host); router == nil && ri.Host == s.rhost {
+		router = s.router
 	}
 	s.unlock()
 
