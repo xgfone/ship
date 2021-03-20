@@ -131,13 +131,8 @@ type closeNotifyingRecorder struct {
 	closed chan bool
 }
 
-func (c *closeNotifyingRecorder) close() {
-	c.closed <- true
-}
-
-func (c *closeNotifyingRecorder) CloseNotify() <-chan bool {
-	return c.closed
-}
+func (c *closeNotifyingRecorder) Close()                   { close(c.closed) }
+func (c *closeNotifyingRecorder) CloseNotify() <-chan bool { return c.closed }
 
 func sendTestRequest(method, path string, s *Ship) (int, string) {
 	r, _ := http.NewRequest(method, path, nil)
@@ -773,15 +768,6 @@ func (t TestType) Update(ctx *Context) error { return nil }
 func (t TestType) Get(ctx *Context) error    { return nil }
 func (t TestType) Has(ctx *Context) error    { return nil }
 func (t TestType) NotHandler()               {}
-
-func strIsInSlice(s string, ss []string) bool {
-	for _, _s := range ss {
-		if _s == s {
-			return true
-		}
-	}
-	return false
-}
 
 func TestRouteMapType(t *testing.T) {
 	router1 := New()

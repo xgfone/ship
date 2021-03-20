@@ -56,6 +56,7 @@ type Ship struct {
 	RouteModifier    func(RouteInfo) RouteInfo
 	MethodMapping    map[string]string // The default is DefaultMethodMapping.
 	MiddlewareMaxNum int               // Default is 256
+	MaxBodySize      int
 
 	// RouteExecutor is called after matching the host and before finding
 	// the route. By default, it only calls the method Execute() of Context.
@@ -582,6 +583,11 @@ func (s *Ship) routing(rhost string, router router.Router,
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	if s.MaxBodySize > 0 && req.ContentLength > int64(s.MaxBodySize) {
+		resp.WriteHeader(http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	var rhost string
 	var router router.Router
 

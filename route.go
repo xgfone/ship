@@ -204,7 +204,7 @@ func (r *Route) Ship() *Ship { return r.ship }
 func (r *Route) Group() *RouteGroup { return r.group }
 
 // Clone closes itself and returns a new one.
-func (r *Route) Clone() *Route { var nr Route; nr = *r; return &nr }
+func (r *Route) Clone() *Route { nr := *r; return &nr }
 
 // NoMiddlewares clears all the middlewares and returns itself.
 func (r *Route) NoMiddlewares() *Route { r.mdwares = nil; return r }

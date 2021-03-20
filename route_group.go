@@ -47,7 +47,7 @@ func newRouteGroup(s *Ship, pprefix, prefix, host string, mws ...Middleware) *Ro
 func (g *RouteGroup) Ship() *Ship { return g.ship }
 
 // Clone clones itself and returns a new one.
-func (g *RouteGroup) Clone() *RouteGroup { var rg RouteGroup; rg = *g; return &rg }
+func (g *RouteGroup) Clone() *RouteGroup { rg := *g; return &rg }
 
 // Host sets the host of the route group to host.
 func (g *RouteGroup) Host(host string) *RouteGroup { g.host = host; return g }
