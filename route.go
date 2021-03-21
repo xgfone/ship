@@ -252,7 +252,7 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 				if len(kv.Values) == 0 {
 					if ctx.GetHeader(kv.Key) == "" {
 						err := fmt.Errorf("missing the header '%s'", kv.Key)
-						return ErrBadRequest.NewError(err)
+						return ErrBadRequest.New(err)
 					}
 				} else {
 					values := ctx.ReqHeader()[kv.Key]
@@ -264,7 +264,7 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 						}
 					}
 					err := fmt.Errorf("invalid header '%s: %v'", kv.Key, values)
-					return ErrBadRequest.NewError(err)
+					return ErrBadRequest.New(err)
 				}
 			}
 			return next(ctx)
@@ -535,13 +535,8 @@ func (r *Route) StaticFS(fs http.FileSystem) *Route {
 	}
 
 	fileServer := http.StripPrefix(r.path, http.FileServer(fs))
-	rpath := path.Join(r.path, "/*")
-
-	r.addRoute("", r.host, rpath, func(ctx *Context) error {
-		if _, err := fs.Open(ctx.URLParam("*")); err != nil {
-			return ctx.NotFoundHandler()(ctx)
-		}
-		fileServer.ServeHTTP(ctx.Response(), ctx.Request())
+	r.addRoute("", r.host, path.Join(r.path, "/*"), func(c *Context) error {
+		fileServer.ServeHTTP(c.res, c.req)
 		return nil
 	}, http.MethodHead, http.MethodGet)
 
@@ -569,13 +564,9 @@ func (fs onlyFileFS) Open(name string) (http.File, error) {
 	return notDirFile{f}, nil
 }
 
-type notDirFile struct {
-	http.File
-}
+type notDirFile struct{ http.File }
 
-func (f notDirFile) Readdir(count int) ([]os.FileInfo, error) {
-	return nil, nil
-}
+func (f notDirFile) Readdir(count int) ([]os.FileInfo, error) { return nil, nil }
 
 /// ----------------------------------------------------------------------- ///
 

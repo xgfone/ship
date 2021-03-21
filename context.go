@@ -115,6 +115,8 @@ type Context struct {
 	RouteInfo RouteInfo
 
 	// RouteCtxData is the context data associated with the route.
+	//
+	// DEPRECATED!!! Please use RouteInfo.CtxData instead.
 	RouteCtxData interface{}
 
 	// Data is used to store many key-value pairs about the context.
@@ -169,8 +171,10 @@ func NewContext(urlParamMaxNum, dataSize int) *Context {
 
 // ClearData clears the data.
 func (c *Context) ClearData() {
-	for key := range c.Data {
-		delete(c.Data, key)
+	if len(c.Data) != 0 {
+		for key := range c.Data {
+			delete(c.Data, key)
+		}
 	}
 }
 
@@ -179,7 +183,12 @@ func (c *Context) Reset() {
 	c.Key1 = nil
 	c.Key2 = nil
 	c.Key3 = nil
-	c.ClearData()
+
+	if len(c.Data) != 0 {
+		for key := range c.Data {
+			delete(c.Data, key)
+		}
+	}
 
 	c.req = nil
 	c.res.Reset(nil)
@@ -209,11 +218,9 @@ func (c *Context) Router() router.Router { return c.router }
 // FindRoute finds the route from the router and returns the route info.
 func (c *Context) FindRoute() (ri RouteInfo, ok bool) {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
-	if h != nil {
-		ri, ok = h.(RouteInfo)
-		c.RouteCtxData = ri.CtxData
-		c.RouteInfo = ri
-		c.plen = n
+	if ok = h != nil; ok {
+		c.plen, c.RouteInfo = n, h.(RouteInfo)
+		c.RouteCtxData = c.RouteInfo.CtxData
 	}
 	return
 }
@@ -228,8 +235,7 @@ func (c *Context) Execute() error {
 		return c.notFound(c)
 	}
 
-	c.plen = n
-	c.RouteInfo = h.(RouteInfo)
+	c.plen, c.RouteInfo = n, h.(RouteInfo)
 	c.RouteCtxData = c.RouteInfo.CtxData
 	return c.RouteInfo.Handler(c)
 }
@@ -967,8 +973,8 @@ func (c *Context) Text(code int, format string, args ...interface{}) error {
 }
 
 // Error sends an error response with status code.
-func (c *Context) Error(code int, err error) HTTPError {
-	return HTTPError{Code: code, Err: err}
+func (c *Context) Error(code int, err error) HTTPServerError {
+	return HTTPServerError{Code: code, Err: err}
 }
 
 // JSON sends a JSON response with status code.
@@ -1071,7 +1077,7 @@ func (c *Context) File(file string) (err error) {
 
 	fi, err := f.Stat()
 	if err != nil {
-		return ErrInternalServerError.NewError(err)
+		return ErrInternalServerError.New(err)
 	} else if fi.IsDir() {
 		f, err := os.Open(filepath.Join(file, "index.html"))
 		if err != nil {
@@ -1080,7 +1086,7 @@ func (c *Context) File(file string) (err error) {
 		defer f.Close()
 
 		if fi, err = f.Stat(); err != nil {
-			return ErrInternalServerError.NewError(err)
+			return ErrInternalServerError.New(err)
 		}
 
 		http.ServeContent(c.res.ResponseWriter, c.req, fi.Name(), fi.ModTime(), f)

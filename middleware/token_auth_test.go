@@ -49,14 +49,14 @@ func TestAuthToken(t *testing.T) {
 	// Invalid AuthToken
 	auth = "abc invalid_token"
 	req.Header.Set(ship.HeaderAuthorization, auth)
-	he := handler(ctx).(ship.HTTPError)
+	he := handler(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusUnauthorized {
 		t.Errorf("StatusCode: expect %d, got %d", http.StatusUnauthorized, he.Code)
 	}
 
 	// Missing Authorization header
 	req.Header.Del(ship.HeaderAuthorization)
-	he = handler(ctx).(ship.HTTPError)
+	he = handler(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusBadRequest {
 		t.Errorf("StatusCode: expect %d, got %d", http.StatusBadRequest, he.Code)
 	}

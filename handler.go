@@ -15,7 +15,6 @@
 package ship
 
 import (
-	"errors"
 	"net/http"
 )
 
@@ -33,16 +32,15 @@ func (h Handler) HTTPHandler(s *Ship) http.Handler {
 type Middleware func(Handler) Handler
 
 type httpHandlerBridge struct {
-	ship    *Ship
-	Handler Handler
+	ship *Ship
+	Handler
 }
 
 func newHTTPHandlerBridge(s *Ship, h Handler) httpHandlerBridge {
 	if h == nil {
-		panic(errors.New("Handler must not be nil"))
-	}
-	if s == nil {
-		s = New()
+		panic("Handler must not be nil")
+	} else if s == nil {
+		panic("Ship must not be nil")
 	}
 	return httpHandlerBridge{ship: s, Handler: h}
 }
@@ -61,39 +59,35 @@ func ToHTTPHandler(s *Ship, h Handler) http.Handler {
 // FromHTTPHandler converts http.Handler to Handler.
 func FromHTTPHandler(h http.Handler) Handler {
 	return func(ctx *Context) error {
-		h.ServeHTTP(ctx.Response(), ctx.Request())
+		h.ServeHTTP(ctx.res, ctx.req)
 		return nil
 	}
 }
 
 // FromHTTPHandlerFunc converts http.HandlerFunc to Handler.
 func FromHTTPHandlerFunc(h http.HandlerFunc) Handler {
-	return func(ctx *Context) error {
-		h(ctx.Response(), ctx.Request())
-		return nil
-	}
+	return FromHTTPHandler(h)
 }
 
-func nothingHandler(ctx *Context) error { return nil }
-
 // NothingHandler returns a Handler doing nothing.
-func NothingHandler() Handler { return nothingHandler }
-
-func okHandler(ctx *Context) error { return ctx.Text(http.StatusOK, "OK") }
+func NothingHandler() Handler { return func(*Context) error { return nil } }
 
 // OkHandler returns a Handler only sending the response "200 OK"
-func OkHandler() Handler { return okHandler }
-
-func notFoundHandler(ctx *Context) error {
-	return ctx.Text(http.StatusNotFound, "Not Found")
+func OkHandler() Handler {
+	return func(c *Context) error { return c.Text(http.StatusOK, "OK") }
 }
 
 // NotFoundHandler returns a NotFound handler.
-func NotFoundHandler() Handler { return notFoundHandler }
-
-func methodNotAllowedHandler(ctx *Context) error {
-	return ctx.NoContent(http.StatusMethodNotAllowed)
+func NotFoundHandler() Handler {
+	return func(c *Context) error {
+		return c.Text(http.StatusNotFound, "Not Found")
+	}
 }
 
 // MethodNotAllowedHandler returns a MethodNotAllowed handler.
-func MethodNotAllowedHandler() Handler { return methodNotAllowedHandler }
+func MethodNotAllowedHandler() Handler {
+	return func(c *Context) error {
+		// c.SetHeader(HeaderAllow, strings.Join(methods, ", "))
+		return c.NoContent(http.StatusMethodNotAllowed)
+	}
+}

@@ -34,10 +34,10 @@ func TokenAuth(validator TokenValidator, getToken ...TokenFunc) Middleware {
 		return func(ctx *ship.Context) error {
 			token, err := getAuthToken(ctx)
 			if err != nil {
-				if _, ok := err.(ship.HTTPError); ok {
+				if _, ok := err.(ship.HTTPServerError); ok {
 					return err
 				}
-				return ship.ErrBadRequest.NewError(err)
+				return ship.ErrBadRequest.New(err)
 			}
 			if valid, err := validator(token); err != nil {
 				return err

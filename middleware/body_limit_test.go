@@ -32,7 +32,7 @@ func TestBodyLimitReader(t *testing.T) {
 	reader := &limitedReader{limit: 6}
 	reader.Reset(req.Body)
 	_, err := ioutil.ReadAll(reader)
-	he := err.(ship.HTTPError)
+	he := err.(ship.HTTPServerError)
 	if he.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("StatusCode: expect %d, got %d",
 			http.StatusRequestEntityTooLarge, he.Code)
@@ -81,7 +81,7 @@ func TestBodyLimit(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
 	ctx = s.AcquireContext(req, rec)
-	he := BodyLimit(6)(handler)(ctx).(ship.HTTPError)
+	he := BodyLimit(6)(handler)(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("StatusCode: expect %d, got %d",
 			http.StatusRequestEntityTooLarge, he.Code)
@@ -103,7 +103,7 @@ func TestBodyLimit(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
 	ctx = s.AcquireContext(req, rec)
-	he = BodyLimit(6)(handler)(ctx).(ship.HTTPError)
+	he = BodyLimit(6)(handler)(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("StatusCode: expect %d, got %d",
 			http.StatusRequestEntityTooLarge, he.Code)

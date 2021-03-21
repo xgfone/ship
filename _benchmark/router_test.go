@@ -652,6 +652,4 @@ var (
 		// Cloud Functions
 		{"POST", "/1/functions"},
 	}
-
-	apis = [][]*Route{githubAPI, gplusAPI, parseAPI}
 )

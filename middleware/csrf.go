@@ -89,10 +89,10 @@ func CSRF(config ...CSRFConfig) Middleware {
 				// Validate token only for requests which are not defined as 'safe' by RFC7231
 				clientToken, err := conf.GetTokenFromRequest(ctx)
 				if err != nil {
-					if _, ok := err.(ship.HTTPError); ok {
+					if _, ok := err.(ship.HTTPServerError); ok {
 						return err
 					}
-					return ship.ErrBadRequest.NewError(err)
+					return ship.ErrBadRequest.New(err)
 				}
 				if !validateCSRFToken(token, clientToken) {
 					return ship.ErrForbidden.Newf("invalid csrf token")

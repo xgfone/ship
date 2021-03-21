@@ -57,7 +57,7 @@ func Logger(config ...LoggerConfig) Middleware {
 
 			start := time.Now()
 			err = next(ctx)
-			cost := time.Now().Sub(start).String()
+			cost := time.Since(start)
 
 			req := ctx.Request()
 			code := ctx.StatusCode()
@@ -65,7 +65,7 @@ func Logger(config ...LoggerConfig) Middleware {
 
 			switch e := err.(type) {
 			case nil:
-			case ship.HTTPError:
+			case ship.HTTPServerError:
 				if !ctx.IsResponded() {
 					code = e.Code
 				}

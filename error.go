@@ -56,17 +56,21 @@ var (
 	ErrSkip = herror.ErrSkip
 )
 
-// HTTPError is the alias of herror.HTTPError.
-type HTTPError = herror.HTTPError
+// HTTPError is the alias of herror.HTTPServerError.
+//
+// DEPRECATED!!! Please use HTTPServerError instead.
+type HTTPError = HTTPServerError
 
-// HTTPServerError is the alias of HTTPError.
-type HTTPServerError = HTTPError
+// NewHTTPError is the alias of herror.NewHTTPServerError.
+//
+// DEPRECATED!!! Please use NewHTTPServerError instead.
+var NewHTTPError = NewHTTPServerError
 
-// NewHTTPError is the alias of herror.NewHTTPError.
-var NewHTTPError = herror.NewHTTPError
+// HTTPServerError is the alias of herror.HTTPServerError.
+type HTTPServerError = herror.HTTPServerError
 
-// NewHTTPServerError is the alias of NewHTTPError.
-var NewHTTPServerError = NewHTTPError
+// NewHTTPServerError is the alias of herror.NewHTTPServerError.
+var NewHTTPServerError = herror.NewHTTPServerError
 
 // RouteError represents a route error when adding a route.
 type RouteError struct {

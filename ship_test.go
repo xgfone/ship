@@ -22,9 +22,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"github.com/xgfone/ship/v3/router"
-	"github.com/xgfone/ship/v3/router/echo"
 )
 
 func sortRouteInfos(ris []RouteInfo) {
@@ -102,7 +99,7 @@ var defaultHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.Request().Method)); err != nil {
 		code := http.StatusInternalServerError
-		err = HTTPError{Code: code, Err: err}
+		err = HTTPServerError{Code: code, Err: err}
 	}
 	return
 }
@@ -111,7 +108,7 @@ var idHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
 	if _, err = resp.Write([]byte(ctx.URLParam("id"))); err != nil {
 		code := http.StatusInternalServerError
-		err = HTTPError{Code: code, Err: err}
+		err = HTTPServerError{Code: code, Err: err}
 	}
 	return
 }
@@ -121,7 +118,7 @@ var params2Handler = func(ctx *Context) (err error) {
 	_, err = resp.Write([]byte(ctx.URLParam("p1") + "|" + ctx.URLParam("p2")))
 	if err != nil {
 		code := http.StatusInternalServerError
-		err = HTTPError{Code: code, Err: err}
+		err = HTTPServerError{Code: code, Err: err}
 	}
 	return
 }
@@ -396,66 +393,6 @@ func TestRouterAPI(t *testing.T) {
 			t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, code)
 		}
 	}
-}
-
-func TestMethodNotAllowed(t *testing.T) {
-	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(nil, RouteInfo{Handler: MethodNotAllowedHandler()})
-	})
-
-	p.Route("/home").PUT(defaultHandler)
-	p.Route("/home").POST(defaultHandler)
-	p.Route("/home").HEAD(defaultHandler)
-	p.Route("/home").DELETE(defaultHandler)
-	p.Route("/home").CONNECT(defaultHandler)
-	p.Route("/home").OPTIONS(defaultHandler)
-	p.Route("/home").PATCH(defaultHandler)
-	p.Route("/home").TRACE(defaultHandler)
-	p.Route("/home").Method(defaultHandler, "PROPFIND")
-
-	code, _ := sendTestRequest(http.MethodPut, "/home", p)
-	if code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, code)
-	}
-
-	r, _ := http.NewRequest(http.MethodGet, "/home", nil)
-	w := httptest.NewRecorder()
-	p.ServeHTTP(w, r)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusMethodNotAllowed, w.Code)
-	}
-
-	r, _ = http.NewRequest("PROPFIND2", "/home/1", nil)
-	w = httptest.NewRecorder()
-	p.ServeHTTP(w, r)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, w.Code)
-	}
-}
-
-func TestMethodNotAllowed2(t *testing.T) {
-	p := New().SetNewRouter(func() router.Router {
-		return echo.NewRouter(nil, RouteInfo{Handler: MethodNotAllowedHandler()})
-	})
-
-	p.Route("/home").GET(defaultHandler)
-	p.Route("/home").HEAD(defaultHandler)
-
-	code, _ := sendTestRequest(http.MethodGet, "/home", p)
-	if code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, code)
-	}
-
-	r, _ := http.NewRequest(http.MethodPost, "/home", nil)
-	w := httptest.NewRecorder()
-	p.ServeHTTP(w, r)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusMethodNotAllowed, w.Code)
-	}
-
 }
 
 func TestNotFound(t *testing.T) {
@@ -894,9 +831,7 @@ func TestRouteStaticFile(t *testing.T) {
 }
 
 func TestRouteHasHeader(t *testing.T) {
-	buf := bytes.NewBuffer(nil)
-	s := New().SetLogger(NewLoggerFromWriter(buf, ""))
-
+	s := New()
 	s.Route("/path").HasHeader("Content-Type", "application/json").GET(
 		func(ctx *Context) error { return ctx.Text(200, "OK") })
 

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package herror is deprecated!
 package herror
 
 import (
@@ -33,24 +34,24 @@ var (
 
 // Some HTTP error.
 var (
-	ErrBadRequest                    = NewHTTPError(http.StatusBadRequest)
-	ErrUnauthorized                  = NewHTTPError(http.StatusUnauthorized)
-	ErrForbidden                     = NewHTTPError(http.StatusForbidden)
-	ErrNotFound                      = NewHTTPError(http.StatusNotFound)
-	ErrMethodNotAllowed              = NewHTTPError(http.StatusMethodNotAllowed)
-	ErrStatusNotAcceptable           = NewHTTPError(http.StatusNotAcceptable)
-	ErrRequestTimeout                = NewHTTPError(http.StatusRequestTimeout)
-	ErrStatusConflict                = NewHTTPError(http.StatusConflict)
-	ErrStatusGone                    = NewHTTPError(http.StatusGone)
-	ErrStatusRequestEntityTooLarge   = NewHTTPError(http.StatusRequestEntityTooLarge)
-	ErrUnsupportedMediaType          = NewHTTPError(http.StatusUnsupportedMediaType)
-	ErrTooManyRequests               = NewHTTPError(http.StatusTooManyRequests)
-	ErrInternalServerError           = NewHTTPError(http.StatusInternalServerError)
-	ErrStatusNotImplemented          = NewHTTPError(http.StatusNotImplemented)
-	ErrBadGateway                    = NewHTTPError(http.StatusBadGateway)
-	ErrServiceUnavailable            = NewHTTPError(http.StatusServiceUnavailable)
-	ErrStatusGatewayTimeout          = NewHTTPError(http.StatusGatewayTimeout)
-	ErrStatusHTTPVersionNotSupported = NewHTTPError(http.StatusHTTPVersionNotSupported)
+	ErrBadRequest                    = NewHTTPServerError(http.StatusBadRequest)
+	ErrUnauthorized                  = NewHTTPServerError(http.StatusUnauthorized)
+	ErrForbidden                     = NewHTTPServerError(http.StatusForbidden)
+	ErrNotFound                      = NewHTTPServerError(http.StatusNotFound)
+	ErrMethodNotAllowed              = NewHTTPServerError(http.StatusMethodNotAllowed)
+	ErrStatusNotAcceptable           = NewHTTPServerError(http.StatusNotAcceptable)
+	ErrRequestTimeout                = NewHTTPServerError(http.StatusRequestTimeout)
+	ErrStatusConflict                = NewHTTPServerError(http.StatusConflict)
+	ErrStatusGone                    = NewHTTPServerError(http.StatusGone)
+	ErrStatusRequestEntityTooLarge   = NewHTTPServerError(http.StatusRequestEntityTooLarge)
+	ErrUnsupportedMediaType          = NewHTTPServerError(http.StatusUnsupportedMediaType)
+	ErrTooManyRequests               = NewHTTPServerError(http.StatusTooManyRequests)
+	ErrInternalServerError           = NewHTTPServerError(http.StatusInternalServerError)
+	ErrStatusNotImplemented          = NewHTTPServerError(http.StatusNotImplemented)
+	ErrBadGateway                    = NewHTTPServerError(http.StatusBadGateway)
+	ErrServiceUnavailable            = NewHTTPServerError(http.StatusServiceUnavailable)
+	ErrStatusGatewayTimeout          = NewHTTPServerError(http.StatusGatewayTimeout)
+	ErrStatusHTTPVersionNotSupported = NewHTTPServerError(http.StatusHTTPVersionNotSupported)
 )
 
 // ErrSkip is not an error, which is used to suggest that the middeware should
@@ -59,49 +60,50 @@ var (
 // Notice: it is only a suggestion.
 var ErrSkip = errors.New("skip")
 
-// HTTPError represents an error with HTTP Status Code.
-type HTTPError struct {
+// HTTPError is the alias of HTTPServerError
+type HTTPError = HTTPServerError
+
+// NewHTTPError is the alias of NewHTTPServerError.
+var NewHTTPError = NewHTTPServerError
+
+// HTTPServerError represents a server error with HTTP Status Code.
+type HTTPServerError struct {
 	Code int
-	Msg  string // DEPRECATED!!!
 	Err  error
-	CT   string // For Content-Type
+	Msg  string // DEPRECATED!!!
+	CT   string // Content-Type
 }
 
-// NewHTTPError returns a new HTTPError.
-func NewHTTPError(code int, msg ...string) HTTPError {
+// NewHTTPServerError returns a new HTTPServerError.
+func NewHTTPServerError(code int, msg ...string) HTTPServerError {
 	if len(msg) > 0 {
-		return HTTPError{Code: code, Err: errors.New(msg[0])}
+		return HTTPServerError{Code: code, Err: errors.New(msg[0])}
 	}
-	return HTTPError{Code: code}
+	return HTTPServerError{Code: code}
 }
 
-func (e HTTPError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return e.Msg
-}
+func (e HTTPServerError) Error() string { return e.Err.Error() }
 
 // Unwrap unwraps the inner error.
-func (e HTTPError) Unwrap() error { return e.Err }
+func (e HTTPServerError) Unwrap() error { return e.Err }
 
 // NewCT returns a new HTTPError with the new ContentType ct.
-func (e HTTPError) NewCT(ct string) HTTPError { e.CT = ct; return e }
+func (e HTTPServerError) NewCT(ct string) HTTPServerError { e.CT = ct; return e }
 
 // New returns a new HTTPError with the new error.
-func (e HTTPError) New(err error) HTTPError { e.Err = err; return e }
+func (e HTTPServerError) New(err error) HTTPServerError { e.Err = err; return e }
 
 // Newf is equal to New(fmt.Errorf(msg, args...)).
-func (e HTTPError) Newf(msg string, args ...interface{}) HTTPError {
+func (e HTTPServerError) Newf(msg string, args ...interface{}) HTTPServerError {
 	if len(args) == 0 {
-		return e.NewError(errors.New(msg))
+		return e.New(errors.New(msg))
 	}
-	return e.NewError(fmt.Errorf(msg, args...))
+	return e.New(fmt.Errorf(msg, args...))
 }
 
-// GetMsg returns a message.
-//
-// DEPRECATED!!!
+/////////////////////////////////////////////////////////////////////////////
+
+// GetMsg is DEPRECATED!
 func (e HTTPError) GetMsg() string {
 	if e.Msg != "" {
 		return e.Msg
@@ -111,17 +113,8 @@ func (e HTTPError) GetMsg() string {
 	return ""
 }
 
-// GetError returns the inner error.
-//
-// If Err is nil but Msg is not "", return `errors.New(e.Msg)` instead;
-// Or return nil.
-//
-//     HTTPError{Err: errors.New("")}.GetError() != nil
-//     HTTPError{Msg: "xxx"}.GetError() != nil
-//     HTTPError{Code: 200}.GetError() == nil
-//
-// DEPRECATED!!!
-func (e HTTPError) GetError() error {
+// GetError is DEPRECATED!
+func (e HTTPServerError) GetError() error {
 	if e.Err != nil {
 		return e.Err
 	} else if e.Msg != "" {
@@ -130,14 +123,10 @@ func (e HTTPError) GetError() error {
 	return nil
 }
 
-// NewError returns a new HTTPError with the new error.
-//
-// DEPRECATED!!!
+// NewError is DEPRECATED!
 func (e HTTPError) NewError(err error) HTTPError { e.Err = err; return e }
 
-// NewMsg returns a new HTTPError with the new msg.
-//
-// DEPRECATED!!! Please use Newf instead.
+// NewMsg is DEPRECATED!
 func (e HTTPError) NewMsg(msg string, args ...interface{}) HTTPError {
 	if len(args) == 0 {
 		e.Msg = msg
