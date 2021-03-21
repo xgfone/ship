@@ -82,7 +82,12 @@ func NewHTTPServerError(code int, msg ...string) HTTPServerError {
 	return HTTPServerError{Code: code}
 }
 
-func (e HTTPServerError) Error() string { return e.Err.Error() }
+func (e HTTPServerError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return e.Msg
+}
 
 // Unwrap unwraps the inner error.
 func (e HTTPServerError) Unwrap() error { return e.Err }
