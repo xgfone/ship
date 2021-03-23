@@ -196,10 +196,14 @@ func (n *node) FindChildByKind(t kind) *node {
 }
 
 func (n *node) CheckMethodNotAllowed(r *Router, h interface{}) interface{} {
-	if r.notAllowed != nil && len(n.handlers.Methods()) != 0 {
-		return r.notAllowed
+	if r.notAllowed == nil {
+		return h
+	} else if methods := n.handlers.Methods(); len(methods) == 0 {
+		return h
+	} else if f, ok := r.notAllowed.(func([]string) interface{}); ok {
+		return f(n.handlers.Methods())
 	}
-	return h
+	return r.notAllowed
 }
 
 /// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -220,6 +224,10 @@ type Router struct {
 }
 
 // NewRouter returns a new Router instance.
+//
+// If methodNotAllowedHandler is the function
+//   func(methods []string) interface{}
+// it will be called with the allowed methods. Or return itself directly.
 func NewRouter(notFoundHandler, methodNotAllowedHandler interface{},
 	newMethodHandlerFunc ...func() MethodHandler) *Router {
 	newMethodHandler := newMethodHandler
