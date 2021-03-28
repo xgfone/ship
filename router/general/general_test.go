@@ -30,7 +30,7 @@ func TestRouter(t *testing.T) {
 		t.Errorf("expected '/test/Aaron', got '%s'", v)
 	}
 
-	if h, n = router.Find("GET", "/static", nil, nil); h == nil {
+	if h, _ = router.Find("GET", "/static", nil, nil); h == nil {
 		t.Error("no route handler for 'GET /static'")
 	}
 

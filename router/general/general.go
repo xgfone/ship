@@ -784,7 +784,6 @@ func (r *Router) removeNode(cn *node, method string) {
 	}
 
 	r.removeWholeNode(cn)
-	return
 }
 
 func (r *Router) replaceParentWithChild(cn *node) {

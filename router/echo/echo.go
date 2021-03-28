@@ -320,13 +320,13 @@ func (n *node) FindChildByKind(t kind) *node {
 	return nil
 }
 
-func (n *node) CheckMethodNotAllowed(r *Router, h interface{}) interface{} {
-	if r.notAllowed == nil || !n.handlers.HasHandler() {
-		return h
-	} else if f, ok := r.notAllowed.(func([]string) interface{}); ok {
+func (n *node) CheckMethodNotAllowed(r *Router) interface{} {
+	if r.conf.MethodNotAllowedHandler == nil || !n.handlers.HasHandler() {
+		return r.conf.NotFoundHandler
+	} else if f, ok := r.conf.MethodNotAllowedHandler.(func([]string) interface{}); ok {
 		return f(n.handlers.Methods())
 	}
-	return r.notAllowed
+	return r.conf.MethodNotAllowedHandler
 }
 
 /// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -334,28 +334,61 @@ func (n *node) CheckMethodNotAllowed(r *Router, h interface{}) interface{} {
 var errInconsistentRouteName = fmt.Errorf("inconsistent route name")
 var _ router.Router = &Router{}
 
+// Config is used to configure the router.
+type Config struct {
+	// NotFoundHandler is returned when not finding the route handler.
+	//
+	// Default: nil
+	NotFoundHandler interface{}
+
+	// MethodNotAllowedHandler is returned when not finding the route handler
+	// with the given method and path, which will be called with the allowed
+	// methods if it is the function func(allowedMethods []string) interface{}.
+	//
+	// Default: nil
+	MethodNotAllowedHandler interface{}
+
+	// If true, the trailing slash will be removed before adding, deleting
+	// and finding the route.
+	//
+	// Default: the global variable RemoveTrailingSlash.
+	RemoveTrailingSlash bool
+}
+
 // Router is the registry of all registered routes for request matching
 // and URL path parameter parsing.
 type Router struct {
-	tree       *node
-	bufpool    sync.Pool
-	maxnum     int               // The maximum number of the parameter
-	routes     map[string]string // Name -> Path
-	notFound   interface{}       // The NotFound handler
-	notAllowed interface{}       // The MethodNotAllowed handler
+	conf    Config
+	tree    *node
+	bufpool sync.Pool
+	maxnum  int               // The maximum number of the parameter
+	routes  map[string]string // Name -> Path
 }
 
-// NewRouter returns a new Router instance.
+// NewRouter is equal to
+//   NewRouterWithConfig(&Config{
+//       NotFoundHandler:         notFoundHandler,
+//       MethodNotAllowedHandler: methodNotAllowedHandler,
+//   })
 //
-// If methodNotAllowedHandler is the function
-//   func(methods []string) interface{}
-// it will be called with the allowed methods. Or return itself directly.
 func NewRouter(notFoundHandler, methodNotAllowedHandler interface{}) *Router {
+	return NewRouterWithConfig(&Config{
+		NotFoundHandler:         notFoundHandler,
+		MethodNotAllowedHandler: methodNotAllowedHandler,
+	})
+}
+
+// NewRouterWithConfig returns a new Router instance with the config.
+func NewRouterWithConfig(c *Config) *Router {
+	var conf Config
+	if c != nil {
+		conf = *c
+	}
+
 	return &Router{
-		tree:       &node{handlers: new(methodHandler)},
-		routes:     make(map[string]string, 32),
-		notFound:   notFoundHandler,
-		notAllowed: methodNotAllowedHandler,
+		conf:   conf,
+		tree:   &node{handlers: new(methodHandler)},
+		routes: make(map[string]string, 32),
 		bufpool: sync.Pool{New: func() interface{} {
 			return bytes.NewBuffer(make([]byte, 0, 64))
 		}},
@@ -440,7 +473,7 @@ func (r *Router) Add(name, method, path string, h interface{}) (n int, err error
 	}
 
 	// Validate path
-	if RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
 		path = strings.TrimRight(path, "/")
 	}
 	if path == "" {
@@ -622,7 +655,7 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 // Find lookups a handler registered for method and path,
 // which also parses the path for the parameters.
 func (r *Router) Find(method, path string, pnames, pvalues []string) (h interface{}, pn int) {
-	if RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
 	}
@@ -667,7 +700,7 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 			search = search[l:]
 		} else {
 			if nn == nil { // Issue #1348
-				return r.notFound, 0 // Not found
+				return r.conf.NotFoundHandler, 0 // Not found
 			}
 
 			cn = nn
@@ -742,7 +775,7 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 				}
 			}
 
-			return r.notFound, 0 // Not found
+			return r.conf.NotFoundHandler, 0 // Not found
 		}
 
 		if hasp {
@@ -755,10 +788,10 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 		// Dig further for any, might have an empty value for *,
 		// e.g. serving a directory. Issue #207.
 		if n := cn.FindChildByKind(akind); n == nil {
-			h = cn.CheckMethodNotAllowed(r, r.notFound)
+			h = cn.CheckMethodNotAllowed(r)
 		} else {
 			if h = n.handlers.FindHandler(method); h == nil {
-				h = n.CheckMethodNotAllowed(r, r.notFound)
+				h = n.CheckMethodNotAllowed(r)
 			}
 
 			if pn = len(n.pnames); pn > 0 && hasp {
@@ -787,7 +820,7 @@ func (r *Router) Del(name, method, path string) (err error) {
 }
 
 func (r *Router) delRoute(path, method string) (err error) {
-	if RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
 	}
