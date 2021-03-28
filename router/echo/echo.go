@@ -787,6 +787,14 @@ func (r *Router) Del(name, method, path string) (err error) {
 }
 
 func (r *Router) delRoute(path, method string) (err error) {
+	if RemoveTrailingSlash {
+		// path = strings.TrimRight(path, "/")
+		path = removeTrailingSlash(path)
+	}
+	if path == "" {
+		path = "/"
+	}
+
 	var (
 		cn     = r.tree
 		search = path

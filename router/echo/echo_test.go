@@ -14,7 +14,10 @@
 
 package echo
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
 func TestRemoveTrailingSlash(t *testing.T) {
 	if path := removeTrailingSlash(""); path != "" {
@@ -34,6 +37,37 @@ func TestRemoveTrailingSlash(t *testing.T) {
 	}
 	if path := removeTrailingSlash("/a/b"); path != "/a/b" {
 		t.Error(path)
+	}
+
+	OldRemoveTrailingSlash := RemoveTrailingSlash
+	RemoveTrailingSlash = true
+	defer func() { RemoveTrailingSlash = OldRemoveTrailingSlash }()
+
+	r := NewRouter(nil, nil)
+	if _, err := r.Add("", http.MethodGet, "/v1/path/", true); err != nil {
+		t.Error(err)
+	} else if rs := r.Routes(); len(rs) != 1 {
+		t.Error(rs)
+	}
+
+	if h, _ := r.Find(http.MethodGet, "/v1/path/", nil, nil); h == nil {
+		t.Error("no route")
+	}
+	if h, _ := r.Find(http.MethodGet, "/v1/path", nil, nil); h == nil {
+		t.Error("no route")
+	}
+
+	if err := r.Del("", http.MethodGet, "/v1/path/"); err != nil {
+		t.Error(err)
+	} else if rs := r.Routes(); len(rs) != 0 {
+		t.Error(rs)
+	}
+
+	r.Add("", http.MethodGet, "/v1/path/", true)
+	if err := r.Del("", http.MethodGet, "/v1/path"); err != nil {
+		t.Error(err)
+	} else if rs := r.Routes(); len(rs) != 0 {
+		t.Error(rs)
 	}
 }
 
