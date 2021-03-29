@@ -21,7 +21,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func TestBodyLimitReader(t *testing.T) {

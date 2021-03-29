@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func TestGzip(t *testing.T) {
@@ -32,7 +32,7 @@ func TestGzip(t *testing.T) {
 	ctx := s.AcquireContext(req, rec)
 
 	// Skip if no Accept-Encoding header
-	handler := Gzip()(func(ctx *ship.Context) error {
+	handler := Gzip(nil)(func(ctx *ship.Context) error {
 		ctx.Response().Write([]byte("test"))
 		return nil
 	})
@@ -70,7 +70,7 @@ func TestGzipNoContent(t *testing.T) {
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
 	rec := httptest.NewRecorder()
 	ctx := s.AcquireContext(req, rec)
-	handler := Gzip()(func(ctx *ship.Context) error {
+	handler := Gzip(nil)(func(ctx *ship.Context) error {
 		return ctx.NoContent(http.StatusNoContent)
 	})
 
@@ -89,8 +89,8 @@ func TestGzipErrorReturned(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	s := ship.New()
 	s.Logger = ship.NewLoggerFromWriter(buf, "", 0)
-	s.Use(Gzip())
-	s.R("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
+	s.Use(Gzip(nil))
+	s.Route("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")

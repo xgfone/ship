@@ -21,24 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func TestMaxRequests(t *testing.T) {
-	sleep := time.Millisecond * 300
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-
 	s := ship.New()
-	s.Use(MaxRequests(2, func(c *ship.Context) error {
-		c.NoContent(http.StatusTooManyRequests)
-		wg.Done()
-		return nil
-	}))
-	s.R("/").GET(func(ctx *ship.Context) error {
-		time.Sleep(sleep)
-		wg.Done()
-		return nil
+	s.Use(MaxRequests(2))
+	s.Route("/").GET(func(ctx *ship.Context) error {
+		time.Sleep(time.Millisecond * 300)
+		return ctx.NoContent(200)
 	})
 
 	req1 := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -48,12 +39,18 @@ func TestMaxRequests(t *testing.T) {
 	req3 := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec3 := httptest.NewRecorder()
 
-	go s.ServeHTTP(rec1, req1)
-	go s.ServeHTTP(rec2, req2)
-	go s.ServeHTTP(rec3, req3)
+	wg := new(sync.WaitGroup)
+	run := func(w http.ResponseWriter, r *http.Request) {
+		s.ServeHTTP(w, r)
+		wg.Done()
+	}
 
+	wg.Add(3)
+	go run(rec1, req1)
+	go run(rec2, req2)
+	go run(rec3, req3)
 	wg.Wait()
-	time.Sleep(sleep)
+
 	if rec1.Code+rec2.Code+rec3.Code != 200+200+429 {
 		t.Errorf("req1=%d, req2=%d, req3=%d", rec1.Code, rec2.Code, rec3.Code)
 	}

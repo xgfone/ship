@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // CORSConfig is used to configure the CORS middleware.
@@ -64,18 +64,10 @@ type CORSConfig struct {
 }
 
 // CORS returns a CORS middleware.
-//
-// If the config is missing, it will use:
-//
-//   conf := CORSConfig{
-//       AllowOrigins: []string{"*"},
-//       AllowMethods: []string{"HEAD", "GET", "POST", "PUT", "PATHC", "DELETE"},
-//   }
-//
-func CORS(config ...CORSConfig) Middleware {
+func CORS(config *CORSConfig) Middleware {
 	var conf CORSConfig
-	if len(config) > 0 {
-		conf = config[0]
+	if config != nil {
+		conf = *config
 	}
 
 	if len(conf.AllowOrigins) == 0 {

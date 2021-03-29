@@ -39,11 +39,7 @@ func TestRemoveTrailingSlash(t *testing.T) {
 		t.Error(path)
 	}
 
-	OldRemoveTrailingSlash := RemoveTrailingSlash
-	RemoveTrailingSlash = true
-	defer func() { RemoveTrailingSlash = OldRemoveTrailingSlash }()
-
-	r := NewRouter(nil, nil)
+	r := NewRouter(&Config{RemoveTrailingSlash: true})
 	if _, err := r.Add("", http.MethodGet, "/v1/path/", true); err != nil {
 		t.Error(err)
 	} else if rs := r.Routes(); len(rs) != 1 {
@@ -77,7 +73,7 @@ func TestRouter(t *testing.T) {
 	var h interface{}
 	var pnames, pvalues []string
 
-	router := NewRouter(nil, nil)
+	router := NewRouter(nil)
 	router.Add("static", "GET", "/static", handler)
 	router.Add("param", "POST", "/test/:name", handler)
 
@@ -132,7 +128,7 @@ func TestRouterAnyMethod(t *testing.T) {
 	handler3 := 3
 	handler4 := 4
 
-	router := NewRouter(nil, nil)
+	router := NewRouter(nil)
 	router.Add("", "GET", "/path1", handler1)
 	router.Add("", "PUT", "/path2", handler2)
 	router.Add("", "POST", "/path2", handler3)

@@ -15,137 +15,13 @@
 package ship
 
 import (
-	"crypto/md5"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"path"
-	"reflect"
-	"runtime"
-	rpprof "runtime/pprof"
-	"strconv"
 	"strings"
 )
-
-// RouteInfo is used to represent the information of the registered route.
-type RouteInfo struct {
-	// If Host is empty, it is the route of the default host router.
-	Host    string      `json:"host,omitempty" xml:"host,omitempty"`
-	Name    string      `json:"name,omitempty" xml:"name,omitempty"`
-	Path    string      `json:"path,omitempty" xml:"path,omitempty"`
-	Method  string      `json:"method,omitempty" xml:"method,omitempty"`
-	Handler Handler     `json:"-" xml:"-"`
-	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
-}
-
-func (ri RouteInfo) String() string {
-	if ri.Host == "" {
-		if ri.Name == "" {
-			return fmt.Sprintf("RouteInfo(method=%s, path=%s)", ri.Method, ri.Path)
-		}
-		return fmt.Sprintf("RouteInfo(name=%s, method=%s, path=%s)",
-			ri.Name, ri.Method, ri.Path)
-	} else if ri.Name == "" {
-		return fmt.Sprintf("RouteInfo(host=%s, method=%s, path=%s)",
-			ri.Host, ri.Method, ri.Path)
-	}
-	return fmt.Sprintf("RouteInfo(host=%s, name=%s, method=%s, path=%s)",
-		ri.Host, ri.Name, ri.Method, ri.Path)
-}
-
-func (ri RouteInfo) checkPath() error {
-	if len(ri.Path) == 0 || ri.Path[0] != '/' {
-		return fmt.Errorf("path '%s' must start with '/'", ri.Path)
-	}
-
-	if i := strings.Index(ri.Path, "//"); i != -1 {
-		return fmt.Errorf("bad path '%s' contains duplicate // at index:%d", ri.Path, i)
-	}
-
-	return nil
-}
-
-type pprofHandler string
-
-func (name pprofHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	p := rpprof.Lookup(string(name))
-	if p == nil {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Go-Pprof", "1")
-		w.Header().Del("Content-Disposition")
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintln(w, "Unknown profile")
-		return
-	}
-	gc, _ := strconv.Atoi(r.FormValue("gc"))
-	if name == "heap" && gc > 0 {
-		runtime.GC()
-	}
-	debug, _ := strconv.Atoi(r.FormValue("debug"))
-	if debug != 0 {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	} else {
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
-	}
-	p.WriteTo(w, debug)
-}
-
-// HTTPPprofToRouteInfo converts http pprof handler to RouteInfo,
-// so that you can register them and get runtime profiling data by HTTP server.
-func HTTPPprofToRouteInfo() []RouteInfo {
-	return []RouteInfo{
-		{
-			Name:   "pprof_index",
-			Path:   "/debug/pprof/*",
-			Method: http.MethodGet,
-			Handler: func(ctx *Context) error {
-				path := ctx.Path()
-				i := strings.Index(path, "/debug/pprof/")
-				if _len := i + 13; len(path) > _len {
-					pprofHandler(path[_len:]).ServeHTTP(ctx.Response(), ctx.Request())
-					return nil
-				}
-				pprof.Index(ctx.Response(), ctx.Request())
-				return nil
-			},
-		},
-		{
-			Name:    "pprof_cmdline",
-			Path:    "/debug/pprof/cmdline",
-			Method:  http.MethodGet,
-			Handler: FromHTTPHandlerFunc(pprof.Cmdline),
-		},
-		{
-			Name:    "pprof_profile",
-			Path:    "/debug/pprof/profile",
-			Method:  http.MethodGet,
-			Handler: FromHTTPHandlerFunc(pprof.Profile),
-		},
-		{
-			Name:    "pprof_symbol",
-			Path:    "/debug/pprof/symbol",
-			Method:  http.MethodGet,
-			Handler: FromHTTPHandlerFunc(pprof.Symbol),
-		},
-		{
-			Name:    "pprof_symbol",
-			Path:    "/debug/pprof/symbol",
-			Method:  http.MethodPost,
-			Handler: FromHTTPHandlerFunc(pprof.Symbol),
-		},
-		{
-			Name:    "pprof_trace",
-			Path:    "/debug/pprof/trace",
-			Method:  http.MethodGet,
-			Handler: FromHTTPHandlerFunc(pprof.Trace),
-		},
-	}
-}
 
 type kvalues struct {
 	Key    string
@@ -180,6 +56,13 @@ func newRoute(s *Ship, g *RouteGroup, prefix, host, path string,
 		mdwares: append([]Middleware{}, ms...),
 		ctxdata: ctxdata,
 	}
+}
+
+// Route returns a new route, then you can customize and register it.
+//
+// You must call Route.Method() or its short method.
+func (s *Ship) Route(path string) *Route {
+	return newRoute(s, nil, s.Prefix, "", path, nil, s.mws...)
 }
 
 // New clones a new Route based on the current route.
@@ -272,8 +155,7 @@ func (r *Route) buildHeaderMiddleware() Middleware {
 	}
 }
 
-func (r *Route) toRouteInfo(name, host, path string, handler Handler,
-	methods ...string) []RouteInfo {
+func (r *Route) toRouteInfo(name, host, path string, handler Handler, methods ...string) []RouteInfo {
 	if len(methods) == 0 {
 		return nil
 	}
@@ -402,129 +284,6 @@ func (r *Route) Map(method2handlers map[string]Handler) *Route {
 	for method, handler := range method2handlers {
 		r.Method(handler, method)
 	}
-	return r
-}
-
-// MapType registers the methods of a type as the routes.
-//
-// By default, mapping is Ship.Config.DefaultMethodMapping if not given.
-//
-// Example
-//
-//    type TestType struct{}
-//    func (t TestType) Create(ctx *ship.Context) error { return nil }
-//    func (t TestType) Delete(ctx *ship.Context) error { return nil }
-//    func (t TestType) Update(ctx *ship.Context) error { return nil }
-//    func (t TestType) Get(ctx *ship.Context) error    { return nil }
-//    func (t TestType) Has(ctx *ship.Context) error    { return nil }
-//    func (t TestType) NotHandler()                   {}
-//
-//    router := ship.New()
-//    router.Route("/path/to").MapType(TestType{})
-//
-// It's equal to the operation as follow:
-//
-//    router.Route("/v1/testtype/get").Name("testtype_get").GET(ts.Get)
-//    router.Route("/v1/testtype/update").Name("testtype_update").PUT(ts.Update)
-//    router.Route("/v1/testtype/create").Name("testtype_create").POST(ts.Create)
-//    router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(ts.Delete)
-//
-// If you don't like the default mapping policy, you can give the customized
-// mapping by the last argument, the key of which is the name of the method
-// of the type, and the value of that is the request method, such as GET, POST,
-// etc. Notice that the method type must be compatible with
-//
-//    func (*Context) error
-//
-// Notice: the name of type and method will be converted to the lower.
-func (r *Route) MapType(tv interface{}) *Route {
-	if tv == nil {
-		panic(errors.New("the type value must no be nil"))
-	}
-
-	value := reflect.ValueOf(tv)
-	methodMaps := r.ship.MethodMapping
-	if methodMaps == nil {
-		methodMaps = DefaultMethodMapping
-	}
-
-	var err error
-	errType := reflect.TypeOf(&err).Elem()
-	prefix := r.path
-	if prefix == "/" {
-		prefix = ""
-	}
-
-	_type := value.Type()
-	typeName := strings.ToLower(_type.Name())
-	for i := _type.NumMethod() - 1; i >= 0; i-- {
-		method := _type.Method(i)
-		mtype := method.Type
-
-		// func (s StructType) Handler(ctx *Context) error
-		if mtype.NumIn() != 2 || mtype.NumOut() != 1 {
-			continue
-		}
-		if _, ok := reflect.New(mtype.In(1)).Interface().(*Context); !ok {
-			continue
-		}
-		if !mtype.Out(0).Implements(errType) {
-			continue
-		}
-
-		// r.addRoute(r.name, r.path, handler, methods...)
-		if reqMethod := methodMaps[method.Name]; reqMethod != "" {
-			methodName := strings.ToLower(method.Name)
-			path := fmt.Sprintf("%s/%s/%s", prefix, typeName, methodName)
-
-			name := fmt.Sprintf("%s_%s", typeName, methodName)
-			r.addRoute(name, r.host, path, func(ctx *Context) error {
-				vs := method.Func.Call([]reflect.Value{value, reflect.ValueOf(ctx)})
-				return vs[0].Interface().(error)
-			}, reqMethod)
-		}
-	}
-
-	return r
-}
-
-func (r *Route) serveFileMetadata(ctx *Context, filename string) error {
-	f, err := os.Open(filename)
-	if err != nil {
-		return NewHTTPError(http.StatusInternalServerError).NewError(err)
-	}
-	defer f.Close()
-
-	fi, err := f.Stat()
-	if err != nil {
-		return NewHTTPError(http.StatusInternalServerError).NewError(err)
-	} else if fi.IsDir() {
-		return ctx.NotFoundHandler()(ctx)
-	}
-
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return NewHTTPError(http.StatusInternalServerError).NewError(err)
-	}
-
-	ctx.SetHeader(HeaderEtag, fmt.Sprintf("%x", h.Sum(nil)))
-	ctx.SetHeader(HeaderContentLength, fmt.Sprintf("%d", fi.Size()))
-	return ctx.NoContent(http.StatusOK)
-}
-
-// StaticFile registers a route for a static file, which supports the HEAD method
-// to get the its length and the GET method to download it.
-func (r *Route) StaticFile(filePath string) *Route {
-	if strings.Contains(r.path, ":") || strings.Contains(r.path, "*") {
-		panic(errors.New("URL parameters cannot be used when serving a static file"))
-	}
-
-	r.addRoute("", r.host, r.path, func(ctx *Context) error {
-		return ctx.File(filePath)
-	}, http.MethodGet)
-	r.addRoute("", r.host, r.path, func(ctx *Context) error {
-		return r.serveFileMetadata(ctx, filePath)
-	}, http.MethodHead)
 	return r
 }
 

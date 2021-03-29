@@ -21,7 +21,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package binder
+package ship
 
 import (
 	"bytes"
@@ -36,8 +36,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/xgfone/ship/v3/herror"
 )
 
 var testMuxBinder = NewMuxBinder()
@@ -97,42 +95,6 @@ func testBindError(t *testing.T, r io.Reader, ctype string, expectedInternal err
 }
 
 type (
-	bindTestStruct struct {
-		I           int
-		PtrI        *int
-		I8          int8
-		PtrI8       *int8
-		I16         int16
-		PtrI16      *int16
-		I32         int32
-		PtrI32      *int32
-		I64         int64
-		PtrI64      *int64
-		UI          uint
-		PtrUI       *uint
-		UI8         uint8
-		PtrUI8      *uint8
-		UI16        uint16
-		PtrUI16     *uint16
-		UI32        uint32
-		PtrUI32     *uint32
-		UI64        uint64
-		PtrUI64     *uint64
-		B           bool
-		PtrB        *bool
-		F32         float32
-		PtrF32      *float32
-		F64         float64
-		PtrF64      *float64
-		S           string
-		PtrS        *string
-		cantSet     string
-		DoesntExist string
-		T           Timestamp
-		Tptr        *Timestamp
-		SA          StringArray
-		_           int
-	}
 	Timestamp   time.Time
 	TA          []Timestamp
 	StringArray []string
@@ -184,11 +146,11 @@ func TestBindJSON(t *testing.T) {
 
 func TestBindXML(t *testing.T) {
 	testBindOkay(t, strings.NewReader(userXML), "application/xml")
-	testBindError(t, strings.NewReader(invalidContent), "application/xml", herror.ErrMissingContentType)
+	testBindError(t, strings.NewReader(invalidContent), "application/xml", ErrMissingContentType)
 	testBindError(t, strings.NewReader(userXMLConvertNumberError), "application/xml", &strconv.NumError{})
 	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), "application/xml", &xml.SyntaxError{})
 	testBindOkay(t, strings.NewReader(userXML), "text/xml")
-	testBindError(t, strings.NewReader(invalidContent), "text/xml", herror.ErrMissingContentType)
+	testBindError(t, strings.NewReader(invalidContent), "text/xml", ErrMissingContentType)
 	testBindError(t, strings.NewReader(userXMLConvertNumberError), "text/xml", &strconv.NumError{})
 	testBindError(t, strings.NewReader(userXMLUnsupportedTypeError), "text/xml", &xml.SyntaxError{})
 }

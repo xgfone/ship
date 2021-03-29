@@ -111,8 +111,8 @@ const (
 	// Security
 	HeaderStrictTransportSecurity = "Strict-Transport-Security"
 	HeaderXContentTypeOptions     = "X-Content-Type-Options"
-	HeaderXXSSProtection          = "X-XSS-Protection"
+	HeaderXXSSProtection          = "X-Xss-Protection"
 	HeaderXFrameOptions           = "X-Frame-Options"
 	HeaderContentSecurityPolicy   = "Content-Security-Policy"
-	HeaderXCSRFToken              = "X-CSRF-Token"
+	HeaderXCSRFToken              = "X-Csrf-Token"
 )

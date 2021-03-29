@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xgfone/ship/v3/router"
+	"github.com/xgfone/ship/v4/router"
 )
 
 // PROPFIND Method can be used on collection and property resources.
@@ -33,10 +33,6 @@ const PROPFIND = "PROPFIND"
 
 // REPORT Method can be used to get information about a resource, see rfc 3253
 const REPORT = "REPORT"
-
-// RemoveTrailingSlash is used by Router to remove the trailing slash
-// of the route path if true.
-var RemoveTrailingSlash bool
 
 // removeTrailingSlash is used to replace the stdlib fucntion strings.TrimRight
 // to improve the performance when finding the handler by the route path.
@@ -351,7 +347,7 @@ type Config struct {
 	// If true, the trailing slash will be removed before adding, deleting
 	// and finding the route.
 	//
-	// Default: the global variable RemoveTrailingSlash.
+	// Default: false.
 	RemoveTrailingSlash bool
 }
 
@@ -365,21 +361,8 @@ type Router struct {
 	routes  map[string]string // Name -> Path
 }
 
-// NewRouter is equal to
-//   NewRouterWithConfig(&Config{
-//       NotFoundHandler:         notFoundHandler,
-//       MethodNotAllowedHandler: methodNotAllowedHandler,
-//   })
-//
-func NewRouter(notFoundHandler, methodNotAllowedHandler interface{}) *Router {
-	return NewRouterWithConfig(&Config{
-		NotFoundHandler:         notFoundHandler,
-		MethodNotAllowedHandler: methodNotAllowedHandler,
-	})
-}
-
-// NewRouterWithConfig returns a new Router instance with the config.
-func NewRouterWithConfig(c *Config) *Router {
+// NewRouter returns a new Router instance with the config.
+func NewRouter(c *Config) *Router {
 	var conf Config
 	if c != nil {
 		conf = *c
@@ -473,7 +456,7 @@ func (r *Router) Add(name, method, path string, h interface{}) (n int, err error
 	}
 
 	// Validate path
-	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash {
 		path = strings.TrimRight(path, "/")
 	}
 	if path == "" {
@@ -655,7 +638,7 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 // Find lookups a handler registered for method and path,
 // which also parses the path for the parameters.
 func (r *Router) Find(method, path string, pnames, pvalues []string) (h interface{}, pn int) {
-	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
 	}
@@ -820,7 +803,7 @@ func (r *Router) Del(name, method, path string) (err error) {
 }
 
 func (r *Router) delRoute(path, method string) (err error) {
-	if r.conf.RemoveTrailingSlash || RemoveTrailingSlash {
+	if r.conf.RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
 	}

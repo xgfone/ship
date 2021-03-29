@@ -22,7 +22,7 @@ import (
 func TestGithubAPI(t *testing.T) {
 	var maxParamNum int
 	var handler bool
-	router := NewRouter(nil, nil)
+	router := NewRouter(nil)
 	for _, r := range githubAPI {
 		if n, _ := router.Add(r.Path, r.Method, r.Path, handler); n > maxParamNum {
 			maxParamNum = n

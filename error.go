@@ -15,62 +15,49 @@
 package ship
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/xgfone/ship/v3/herror"
+	"net/http"
 )
 
-// Re-export some errors.
+// Some non-HTTP Errors
 var (
-	// Some non-HTTP errors
-	ErrMissingContentType    = herror.ErrMissingContentType
-	ErrRendererNotRegistered = herror.ErrRendererNotRegistered
-	ErrInvalidRedirectCode   = herror.ErrInvalidRedirectCode
-	ErrInvalidSession        = herror.ErrInvalidSession
-	ErrSessionNotExist       = herror.ErrSessionNotExist
-	ErrNoSessionSupport      = herror.ErrNoSessionSupport
-	ErrNoResponder           = herror.ErrNoResponder
-
-	// Some HTTP error.
-	ErrBadRequest                    = herror.ErrBadRequest
-	ErrUnauthorized                  = herror.ErrUnauthorized
-	ErrForbidden                     = herror.ErrForbidden
-	ErrNotFound                      = herror.ErrNotFound
-	ErrMethodNotAllowed              = herror.ErrMethodNotAllowed
-	ErrStatusNotAcceptable           = herror.ErrStatusNotAcceptable
-	ErrRequestTimeout                = herror.ErrRequestTimeout
-	ErrStatusConflict                = herror.ErrStatusConflict
-	ErrStatusGone                    = herror.ErrStatusGone
-	ErrStatusRequestEntityTooLarge   = herror.ErrStatusRequestEntityTooLarge
-	ErrUnsupportedMediaType          = herror.ErrUnsupportedMediaType
-	ErrTooManyRequests               = herror.ErrTooManyRequests
-	ErrInternalServerError           = herror.ErrInternalServerError
-	ErrStatusNotImplemented          = herror.ErrStatusNotImplemented
-	ErrBadGateway                    = herror.ErrBadGateway
-	ErrServiceUnavailable            = herror.ErrServiceUnavailable
-	ErrStatusGatewayTimeout          = herror.ErrStatusGatewayTimeout
-	ErrStatusHTTPVersionNotSupported = herror.ErrStatusHTTPVersionNotSupported
-
-	// ErrSkip is not an error, which is used to suggest that the middeware
-	// should skip and return it back to the outer middleware to handle.
-	ErrSkip = herror.ErrSkip
+	ErrMissingContentType    = errors.New("missing the header 'Content-Type'")
+	ErrRendererNotRegistered = errors.New("renderer not registered")
+	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
+	ErrInvalidSession        = errors.New("invalid session")
+	ErrSessionNotExist       = errors.New("session does not exist")
+	ErrNoSessionSupport      = errors.New("no session support")
+	ErrNoResponder           = errors.New("no responder")
 )
 
-// HTTPError is the alias of herror.HTTPServerError.
+// Some HTTP error.
+var (
+	ErrBadRequest                    = NewHTTPServerError(http.StatusBadRequest)
+	ErrUnauthorized                  = NewHTTPServerError(http.StatusUnauthorized)
+	ErrForbidden                     = NewHTTPServerError(http.StatusForbidden)
+	ErrNotFound                      = NewHTTPServerError(http.StatusNotFound)
+	ErrMethodNotAllowed              = NewHTTPServerError(http.StatusMethodNotAllowed)
+	ErrStatusNotAcceptable           = NewHTTPServerError(http.StatusNotAcceptable)
+	ErrRequestTimeout                = NewHTTPServerError(http.StatusRequestTimeout)
+	ErrStatusConflict                = NewHTTPServerError(http.StatusConflict)
+	ErrStatusGone                    = NewHTTPServerError(http.StatusGone)
+	ErrStatusRequestEntityTooLarge   = NewHTTPServerError(http.StatusRequestEntityTooLarge)
+	ErrUnsupportedMediaType          = NewHTTPServerError(http.StatusUnsupportedMediaType)
+	ErrTooManyRequests               = NewHTTPServerError(http.StatusTooManyRequests)
+	ErrInternalServerError           = NewHTTPServerError(http.StatusInternalServerError)
+	ErrStatusNotImplemented          = NewHTTPServerError(http.StatusNotImplemented)
+	ErrBadGateway                    = NewHTTPServerError(http.StatusBadGateway)
+	ErrServiceUnavailable            = NewHTTPServerError(http.StatusServiceUnavailable)
+	ErrStatusGatewayTimeout          = NewHTTPServerError(http.StatusGatewayTimeout)
+	ErrStatusHTTPVersionNotSupported = NewHTTPServerError(http.StatusHTTPVersionNotSupported)
+)
+
+// ErrSkip is not an error, which is used to suggest that the middeware should
+// skip and return it back to the outer middleware to handle.
 //
-// DEPRECATED!!! Please use HTTPServerError instead.
-type HTTPError = HTTPServerError
-
-// NewHTTPError is the alias of herror.NewHTTPServerError.
-//
-// DEPRECATED!!! Please use NewHTTPServerError instead.
-var NewHTTPError = NewHTTPServerError
-
-// HTTPServerError is the alias of herror.HTTPServerError.
-type HTTPServerError = herror.HTTPServerError
-
-// NewHTTPServerError is the alias of herror.NewHTTPServerError.
-var NewHTTPServerError = herror.NewHTTPServerError
+// Notice: it is only a suggestion.
+var ErrSkip = errors.New("skip")
 
 // RouteError represents a route error when adding a route.
 type RouteError struct {
@@ -81,6 +68,40 @@ type RouteError struct {
 func (re RouteError) Error() string {
 	return fmt.Sprintf("%s: name=%s, path=%s, method=%s, host=%s",
 		re.Err, re.Name, re.Path, re.Method, re.Host)
+}
+
+// HTTPServerError represents a server error with HTTP Status Code.
+type HTTPServerError struct {
+	Code int
+	Err  error
+	CT   string // Content-Type
+}
+
+// NewHTTPServerError returns a new HTTPServerError.
+func NewHTTPServerError(code int, msg ...string) HTTPServerError {
+	if len(msg) == 0 {
+		return HTTPServerError{Code: code, Err: errors.New(http.StatusText(code))}
+	}
+	return HTTPServerError{Code: code, Err: errors.New(msg[0])}
+}
+
+func (e HTTPServerError) Error() string { return e.Err.Error() }
+
+// Unwrap unwraps the inner error.
+func (e HTTPServerError) Unwrap() error { return e.Err }
+
+// NewCT returns a new HTTPError with the new ContentType ct.
+func (e HTTPServerError) NewCT(ct string) HTTPServerError { e.CT = ct; return e }
+
+// New returns a new HTTPError with the new error.
+func (e HTTPServerError) New(err error) HTTPServerError { e.Err = err; return e }
+
+// Newf is equal to New(fmt.Errorf(msg, args...)).
+func (e HTTPServerError) Newf(msg string, args ...interface{}) HTTPServerError {
+	if len(args) == 0 {
+		return e.New(errors.New(msg))
+	}
+	return e.New(fmt.Errorf(msg, args...))
 }
 
 // HTTPClientError represents an error about the http client response.

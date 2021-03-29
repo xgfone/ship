@@ -17,8 +17,6 @@ package ship
 import (
 	"fmt"
 	"strings"
-
-	"github.com/xgfone/ship/v3/router"
 )
 
 // RegexpHostRouter is the manager to match the host by the regular expression.
@@ -27,40 +25,40 @@ type RegexpHostRouter interface {
 	Len() int
 
 	// Each is used to traverse all the regexp host routers.
-	Each(func(regexpHost string, router router.Router))
+	Each(func(regexpHost string, router Router))
 
 	// Add adds and returns the regexp host router.
 	//
 	// If the regexp host has been added, do nothing and return the added router.
-	Add(regexpHost string, router router.Router) (router.Router, error)
+	Add(regexpHost string, router Router) (Router, error)
 
 	// Del deletes and returns the regexp host router.
 	//
 	// If the regexp host router does not exist, return nil.
-	Del(regexpHost string) router.Router
+	Del(regexpHost string) Router
 
 	// Router accurately returns the router by the regexp host.
 	//
 	// If the regexp host router does not exist, return nil.
-	Router(regexpHost string) router.Router
+	Router(regexpHost string) Router
 
 	// Match matches the host and returns the corresponding router information.
 	//
 	// If there is no regexp host router to match it, return ("", nil).
-	Match(host string) (matchedRegexpHost string, matchedRouter router.Router)
+	Match(host string) (matchedRegexpHost string, matchedRouter Router)
 }
 
 type hostManager struct {
 	Sum    int
-	ehosts map[string]router.Router // Host Matching: Exact
-	fhosts map[string]router.Router // Host Matching: Prefix/Suffix
-	rhosts RegexpHostRouter         // Host Matching: Regexp
+	ehosts map[string]Router // Host Matching: Exact
+	fhosts map[string]Router // Host Matching: Prefix/Suffix
+	rhosts RegexpHostRouter  // Host Matching: Regexp
 }
 
 func newHostManager(regexpHostRouter RegexpHostRouter) *hostManager {
 	return &hostManager{
-		ehosts: make(map[string]router.Router, 4),
-		fhosts: make(map[string]router.Router, 4),
+		ehosts: make(map[string]Router, 4),
+		fhosts: make(map[string]Router, 4),
 		rhosts: regexpHostRouter,
 	}
 }
@@ -69,7 +67,7 @@ func (hm *hostManager) Len() int {
 	return len(hm.ehosts) + len(hm.fhosts) + hm.rhosts.Len()
 }
 
-func (hm *hostManager) Each(f func(string, router.Router)) {
+func (hm *hostManager) Each(f func(string, Router)) {
 	for host, router := range hm.ehosts {
 		f(host, router)
 	}
@@ -79,7 +77,7 @@ func (hm *hostManager) Each(f func(string, router.Router)) {
 	hm.rhosts.Each(f)
 }
 
-func (hm *hostManager) Router(host string) router.Router {
+func (hm *hostManager) Router(host string) Router {
 	if router, ok := hm.ehosts[host]; ok {
 		return router
 	} else if router, ok := hm.fhosts[host]; ok {
@@ -90,7 +88,7 @@ func (hm *hostManager) Router(host string) router.Router {
 	return nil
 }
 
-func (hm *hostManager) Match(host string) (string, router.Router) {
+func (hm *hostManager) Match(host string) (string, Router) {
 	host = splitHost(host)
 
 	// Exact Matching
@@ -117,7 +115,7 @@ func (hm *hostManager) Match(host string) (string, router.Router) {
 	return hm.rhosts.Match(host)
 }
 
-func (hm *hostManager) Add(h string, r router.Router) (n router.Router, err error) {
+func (hm *hostManager) Add(h string, r Router) (n Router, err error) {
 	if strings.HasPrefix(h, "*.") { // Prefix Matching
 		if !isDomainName(h[2:]) {
 			return nil, fmt.Errorf("invalid domain '%s'", h)

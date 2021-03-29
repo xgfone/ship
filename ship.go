@@ -17,29 +17,22 @@ package ship
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 
-	"github.com/xgfone/ship/v3/binder"
-	"github.com/xgfone/ship/v3/render"
-	"github.com/xgfone/ship/v3/router"
-	"github.com/xgfone/ship/v3/router/echo"
-	"github.com/xgfone/ship/v3/session"
+	"github.com/xgfone/ship/v4/binder"
+	"github.com/xgfone/ship/v4/router"
+	"github.com/xgfone/ship/v4/router/echo"
 )
-
-// DefaultMethodMapping is the default method mapping of the route.
-var DefaultMethodMapping = map[string]string{
-	"Create": "POST",
-	"Delete": "DELETE",
-	"Update": "PUT",
-	"Get":    "GET",
-}
 
 // DefaultShip is the default global ship.
 var DefaultShip = Default()
+
+// Router is the alias of router.Router.
+type Router = router.Router
 
 // Ship is an app to be used to manage the router.
 type Ship struct {
@@ -56,17 +49,12 @@ type Ship struct {
 	// The initialization capacity of Context.Data.
 	//
 	// Default: 0
-	CtxDataSize int
-
-	// The maximum size of the request body. And 0 represents no limit.
-	//
-	// Default: 0
-	MaxBodySize int
+	CtxDataInitCap int
 
 	// The maximum number of the url paramters of the route.
 	//
 	// Default: 4
-	MaxURLParamNum int
+	URLParamMaxNum int
 
 	// The maximum number of the middlewares.
 	//
@@ -83,11 +71,6 @@ type Ship struct {
 	// Default: NotFoundHandler()
 	NotFound Handler
 
-	// MethodMapping is used to map the struct method to register the routes.
-	//
-	// Default: DefaultMethodMapping.
-	MethodMapping map[string]string
-
 	// Filter the route when registering and unregistering it.
 	//
 	// Default: nil
@@ -97,12 +80,12 @@ type Ship struct {
 	// Default: nil
 	RouteModifier func(RouteInfo) RouteInfo
 
-	// RouteExecutor is the route executor, which is called after matching
+	// RouterExecutor is the router executor, which is called after matching
 	// the host and before finding the route. By default, it only calls
 	// Context.Execute().
 	//
 	// For the context, the executor can only use the field RouteInfo.Host.
-	RouteExecutor Handler
+	RouterExecutor Handler
 
 	// HandleError is used to handle the error at last
 	// if the handler or middleware returns an error.
@@ -111,20 +94,20 @@ type Ship struct {
 	HandleError func(c *Context, err error)
 
 	// Others is used to set the context.
+	Session    Session                                     // Default: NewMemorySession()
 	Logger     Logger                                      // Default: NewLoggerFromWriter(os.Stderr, "")
-	Session    session.Session                             // Default: NewMemorySession()
-	Binder     binder.Binder                               // Default: nil
-	Renderer   render.Renderer                             // Default: nil
+	Binder     Binder                                      // Default: nil
+	Renderer   Renderer                                    // Default: nil
 	Responder  func(c *Context, args ...interface{}) error // Default: nil
-	BindQuery  func(interface{}, url.Values) error         // Default: binder.BindURLValues(v, vs, "query")
+	BindQuery  func(interface{}, url.Values) error         // Default: BindURLValues(v, vs, "query")
 	SetDefault func(v interface{}) error                   // Default: SetStructFieldToDefault
 	Validator  func(v interface{}) error                   // Default: nil
 
 	defaultHost   string
-	defaultRouter router.Router
+	defaultRouter Router
 	hostManager   *hostManager
 	newReRouter   func() RegexpHostRouter
-	newRouter     func() router.Router
+	newRouter     func() Router
 
 	mws     []Middleware
 	pmws    []Middleware
@@ -140,11 +123,11 @@ func New() *Ship {
 	s.hostManager = newHostManager(nil)
 	s.cpool.New = func() interface{} { return s.NewContext() }
 
-	s.MaxURLParamNum = 4
+	s.URLParamMaxNum = 4
 	s.MiddlewareMaxNum = 256
 
 	s.Runner = NewRunner("", s)
-	s.Session = session.NewMemorySession()
+	s.Session = NewMemorySession()
 	s.NotFound = NotFoundHandler()
 	s.HandleError = s.handleErrorDefault
 	s.SetDefault = SetStructFieldToDefault
@@ -156,7 +139,7 @@ func New() *Ship {
 	s.SetBufferSize(2048)
 	s.SetLogger(NewLoggerFromWriter(os.Stderr, ""))
 	s.SetNewRegexpHostRouter(NewRegexpHostRouter)
-	s.SetNewRouter(func() router.Router { return echo.NewRouter(nil, nil) })
+	s.SetNewRouter(func() Router { return echo.NewRouter(nil) })
 
 	return s
 }
@@ -164,22 +147,16 @@ func New() *Ship {
 // Default returns a new ship with MuxBinder and MuxRenderer
 // as the binder and renderer.
 func Default() *Ship {
-	mb := binder.NewMuxBinder()
-	mb.Add(MIMEApplicationJSON, binder.JSONBinder())
-	mb.Add(MIMETextXML, binder.XMLBinder())
-	mb.Add(MIMEApplicationXML, binder.XMLBinder())
-	mb.Add(MIMEMultipartForm, binder.FormBinder(MaxMemoryLimit))
-	mb.Add(MIMEApplicationForm, binder.FormBinder(MaxMemoryLimit))
-
-	mr := render.NewMuxRenderer()
-	mr.Add("json", render.JSONRenderer())
-	mr.Add("jsonpretty", render.JSONPrettyRenderer())
-	mr.Add("xml", render.XMLRenderer())
-	mr.Add("xmlpretty", render.XMLPrettyRenderer())
+	mb := NewMuxBinder()
+	mb.Add(MIMEApplicationJSON, JSONBinder())
+	mb.Add(MIMETextXML, XMLBinder())
+	mb.Add(MIMEApplicationXML, XMLBinder())
+	mb.Add(MIMEMultipartForm, FormBinder(MaxMemoryLimit))
+	mb.Add(MIMEApplicationForm, FormBinder(MaxMemoryLimit))
 
 	s := New()
 	s.Binder = mb
-	s.Renderer = mr
+	s.Renderer = NewMuxRenderer()
 
 	return s
 }
@@ -198,15 +175,13 @@ func (s *Ship) Clone() *Ship {
 	// Public
 	newShip.Prefix = s.Prefix
 	newShip.NotFound = s.NotFound
-	newShip.CtxDataSize = s.CtxDataSize
 	newShip.HandleError = s.HandleError
 	newShip.RouteFilter = s.RouteFilter
 	newShip.RouteModifier = s.RouteModifier
-	newShip.RouteExecutor = s.RouteExecutor
-	newShip.MethodMapping = s.MethodMapping
-	newShip.MaxURLParamNum = s.MaxURLParamNum
+	newShip.RouterExecutor = s.RouterExecutor
+	newShip.CtxDataInitCap = s.CtxDataInitCap
+	newShip.URLParamMaxNum = s.URLParamMaxNum
 	newShip.MiddlewareMaxNum = s.MiddlewareMaxNum
-	newShip.MaxBodySize = s.MaxBodySize
 
 	// Context
 	newShip.Binder = s.Binder
@@ -268,7 +243,7 @@ func (s *Ship) SetBufferSize(size int) *Ship {
 // SetNewRouter resets the NewRouter to create the new router.
 //
 // It must be called before adding any route.
-func (s *Ship) SetNewRouter(f func() router.Router) *Ship {
+func (s *Ship) SetNewRouter(f func() Router) *Ship {
 	s.defaultRouter = f()
 	s.newRouter = f
 	return s
@@ -296,7 +271,7 @@ func (s *Ship) SetNewRegexpHostRouter(f func() RegexpHostRouter) *Ship {
 
 // NewContext news a Context.
 func (s *Ship) NewContext() *Context {
-	c := NewContext(s.MaxURLParamNum, s.CtxDataSize)
+	c := NewContext(s.URLParamMaxNum, s.CtxDataInitCap)
 	c.SetSessionManagement(s.Session)
 	c.SetNotFoundHandler(s.NotFound)
 	c.SetBufferAllocator(s)
@@ -363,75 +338,15 @@ func (s *Ship) Use(middlewares ...Middleware) *Ship {
 	return s
 }
 
-// Host returns a new sub-group with the virtual host.
-func (s *Ship) Host(host string) *RouteGroup {
-	return newRouteGroup(s, s.Prefix, "", host, s.mws...)
-}
-
-// Group returns a new sub-group.
-func (s *Ship) Group(prefix string) *RouteGroup {
-	return newRouteGroup(s, s.Prefix, prefix, "", s.mws...)
-}
-
-// Route returns a new route, then you can customize and register it.
-//
-// You must call Route.Method() or its short method.
-func (s *Ship) Route(path string) *Route {
-	return newRoute(s, nil, s.Prefix, "", path, nil, s.mws...)
-}
-
-// R is short for Route(path).
-func (s *Ship) R(path string) *Route { return s.Route(path) }
-
-// URLParamsMaxNum reports the maximum number of the parameters of all the URLs.
-//
-// Notice: it should be only called after adding all the urls.
-//
-// DEPRECATED!!! Please use MaxURLParamNum instead.
-func (s *Ship) URLParamsMaxNum() int { return s.MaxURLParamNum }
-
-func (s *Ship) getRoutes(host string, r router.Router, rs []RouteInfo) []RouteInfo {
-	for _, r := range r.Routes() {
-		ch := r.Handler.(RouteInfo)
-		rs = append(rs, RouteInfo{
-			Host:    host,
-			Name:    r.Name,
-			Path:    r.Path,
-			Method:  r.Method,
-			Handler: ch.Handler,
-			CtxData: ch.CtxData,
-		})
-	}
-	return rs
-}
-
-// Routes returns the information of all the routes.
-func (s *Ship) Routes() (routes []RouteInfo) {
-	s.rlock()
-	nodefault := true
-	routes = make([]RouteInfo, 0, s.hostManager.Sum+1)
-	s.hostManager.Each(func(host string, router router.Router) {
-		routes = s.getRoutes(host, router, routes)
-		if nodefault && host == s.defaultHost {
-			nodefault = false
-		}
-	})
-	if nodefault {
-		routes = s.getRoutes(s.defaultHost, s.defaultRouter, routes)
-	}
-	s.runlock()
-	return
-}
-
 // Routers returns the routers with their host.
-func (s *Ship) Routers() (routers map[string]router.Router) {
+func (s *Ship) Routers() (routers map[string]Router) {
 	s.rlock()
 	if _len := s.hostManager.Len() + 1; _len == 1 {
-		routers = map[string]router.Router{s.defaultHost: s.defaultRouter}
+		routers = map[string]Router{s.defaultHost: s.defaultRouter}
 	} else {
-		routers = make(map[string]router.Router, _len)
+		routers = make(map[string]Router, _len)
 		routers[s.defaultHost] = s.defaultRouter
-		s.hostManager.Each(func(host string, router router.Router) {
+		s.hostManager.Each(func(host string, router Router) {
 			routers[host] = router
 		})
 	}
@@ -442,7 +357,7 @@ func (s *Ship) Routers() (routers map[string]router.Router) {
 // Router returns the Router implementation by the host name.
 //
 // If host is empty, return the default router.
-func (s *Ship) Router(host string) (r router.Router) {
+func (s *Ship) Router(host string) (r Router) {
 	s.rlock()
 	if host == "" {
 		r = s.defaultRouter
@@ -457,7 +372,7 @@ func (s *Ship) Router(host string) (r router.Router) {
 //
 // If no host router matches the request host, use the default router
 // to find the route handler to handle the request.
-func (s *Ship) SetDefaultRouter(host string, router router.Router) {
+func (s *Ship) SetDefaultRouter(host string, router Router) {
 	if router == nil {
 		panic("Ship.SetDefaultRouter: router must not be nil")
 	}
@@ -469,7 +384,7 @@ func (s *Ship) SetDefaultRouter(host string, router router.Router) {
 // GetDefaultRouter returns the default host domain and router.
 //
 // For the default default router, the host is "".
-func (s *Ship) GetDefaultRouter() (host string, router router.Router) {
+func (s *Ship) GetDefaultRouter() (host string, router Router) {
 	s.rlock()
 	host, router = s.defaultHost, s.defaultRouter
 	s.runlock()
@@ -479,7 +394,7 @@ func (s *Ship) GetDefaultRouter() (host string, router router.Router) {
 // AddHost adds and returns the new host router.
 //
 // If existed, return it and do nothing. If router is nil, new one firstly.
-func (s *Ship) AddHost(host string, r router.Router) (router.Router, error) {
+func (s *Ship) AddHost(host string, r Router) (Router, error) {
 	if host == "" {
 		return nil, errors.New("the host must not be empty")
 	} else if r == nil {
@@ -501,108 +416,6 @@ func (s *Ship) DelHost(host string) {
 	}
 }
 
-// AddRoutes registers a set of the routes.
-func (s *Ship) AddRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		if err := s.AddRoute(ri); err != nil {
-			panic(err)
-		}
-	}
-}
-
-// DelRoutes deletes a set of the registered routes.
-func (s *Ship) DelRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		if err := s.DelRoute(ri); err != nil {
-			panic(err)
-		}
-	}
-}
-
-// AddRoute registers the route.
-//
-// Only "Path", "Method" and "Handler" are mandatory, and others are optional.
-func (s *Ship) AddRoute(ri RouteInfo) (err error) {
-	ok, err := s.checkRouteInfo(&ri)
-	if err != nil {
-		return RouteError{RouteInfo: ri, Err: err}
-	} else if !ok {
-		return
-	} else if ri.Handler == nil {
-		return RouteError{RouteInfo: ri, Err: errors.New("handler must not be nil")}
-	}
-
-	var router router.Router
-	s.lock()
-	if ri.Host == "" {
-		router = s.defaultRouter
-	} else if router = s.hostManager.Router(ri.Host); router == nil {
-		if ri.Host == s.defaultHost {
-			router = s.defaultRouter
-		} else {
-			router, err = s.hostManager.Add(ri.Host, s.newRouter())
-		}
-	}
-	s.unlock()
-
-	if err != nil {
-		return RouteError{RouteInfo: ri, Err: err}
-	} else if n, e := router.Add(ri.Name, ri.Method, ri.Path, ri); e != nil {
-		err = RouteError{RouteInfo: ri, Err: e}
-	} else if n > s.MaxURLParamNum {
-		router.Del(ri.Name, ri.Method, ri.Path)
-		err = RouteError{RouteInfo: ri, Err: errors.New("too many url params")}
-	}
-
-	return
-}
-
-func (s *Ship) checkRouteInfo(ri *RouteInfo) (ok bool, err error) {
-	ri.Method = strings.ToUpper(ri.Method)
-	if s.RouteModifier != nil {
-		*ri = s.RouteModifier(*ri)
-	}
-
-	if s.RouteFilter != nil && s.RouteFilter(*ri) {
-		return
-	}
-
-	if err = ri.checkPath(); err == nil {
-		ok = true
-	}
-
-	return
-}
-
-// DelRoute deletes the registered route, which only needs "Host", "Name",
-// "Path" and "Method", and others are ignored.
-//
-// If Name is not empty, lookup the path by it instead of Path.
-// If Method is empty, deletes all the routes associated with the path.
-func (s *Ship) DelRoute(ri RouteInfo) (err error) {
-	ok, err := s.checkRouteInfo(&ri)
-	if !ok || err != nil {
-		return
-	}
-
-	var r router.Router
-	s.lock()
-	if ri.Host == "" {
-		r = s.defaultRouter
-	} else if r = s.hostManager.Router(ri.Host); r == nil && ri.Host == s.defaultHost {
-		r = s.defaultRouter
-	}
-	s.unlock()
-
-	if r != nil {
-		if err = r.Del(ri.Name, ri.Method, ri.Path); err != nil {
-			err = RouteError{RouteInfo: ri, Err: err}
-		}
-	}
-
-	return
-}
-
 //----------------------------------------------------------------------------
 // Handle Request
 //----------------------------------------------------------------------------
@@ -619,8 +432,8 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 }
 
 func (s *Ship) executeRouter(c *Context) error {
-	if s.RouteExecutor != nil {
-		return s.RouteExecutor(c)
+	if s.RouterExecutor != nil {
+		return s.RouterExecutor(c)
 	}
 
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
@@ -628,19 +441,23 @@ func (s *Ship) executeRouter(c *Context) error {
 		return c.notFound(c)
 	}
 
-	c.plen, c.RouteInfo = n, h.(RouteInfo)
+	c.plen = n
+	switch ri := h.(type) {
+	case RouteInfo:
+		c.RouteInfo = ri
+	case Handler:
+		c.RouteInfo.Handler = ri
+	default:
+		panic(fmt.Errorf("unknown handler type '%T'", h))
+	}
+
 	return c.RouteInfo.Handler(c)
 }
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	if s.MaxBodySize > 0 && req.ContentLength > int64(s.MaxBodySize) {
-		resp.WriteHeader(http.StatusRequestEntityTooLarge)
-		return
-	}
-
 	var host string
-	var router router.Router
+	var router Router
 
 	if s.Lock == nil {
 		if s.hostManager.Sum == 0 || req.Host == "" {
@@ -669,7 +486,6 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	ctx.router = router                         // ctx.SetRouter(router)
 	ctx.RouteInfo.Host = host
 
-	// s.executeRouter(ctx)
 	switch err := s.handler(ctx); err {
 	case nil, ErrSkip:
 	default:

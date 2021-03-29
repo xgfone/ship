@@ -22,6 +22,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/xgfone/ship/v4/router/echo"
 )
 
 func sortRouteInfos(ris []RouteInfo) {
@@ -419,6 +421,26 @@ func TestNotFound(t *testing.T) {
 	}
 }
 
+func TestMethodNotAllowed(t *testing.T) {
+	r := New()
+	r.SetNewRouter(func() Router {
+		return echo.NewRouter(&echo.Config{
+			MethodNotAllowedHandler: func(allowedMethods []string) interface{} {
+				return MethodNotAllowedHandler(allowedMethods)
+			}})
+	})
+	r.Route("/path").GET(defaultHandler).POST(defaultHandler)
+
+	req, _ := http.NewRequest(http.MethodPut, "/path", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != 405 {
+		t.Errorf("expect status code '%d', but got '%d'", 405, rec.Code)
+	} else if methods := rec.Header().Get(HeaderAllow); methods != "GET, POST" {
+		t.Errorf("expect Allow header '%s', but got '%v'", "GET, POST", methods)
+	}
+}
+
 func TestBasePath(t *testing.T) {
 	p := New()
 	p.Route("/").GET(defaultHandler)
@@ -706,60 +728,6 @@ func (t TestType) Get(ctx *Context) error    { return nil }
 func (t TestType) Has(ctx *Context) error    { return nil }
 func (t TestType) NotHandler()               {}
 
-func TestRouteMapType(t *testing.T) {
-	router1 := New()
-	router1.Route("/v1").MapType(TestType{})
-	for _, r := range router1.Routes() {
-		name, method, path := r.Name, r.Method, r.Path
-		switch method {
-		case "GET":
-			if name != "testtype_get" || path != "/v1/testtype/get" {
-				t.Fail()
-			}
-		case "POST":
-			if name != "testtype_create" || path != "/v1/testtype/create" {
-				t.Fail()
-			}
-		case "PUT":
-			if name != "testtype_update" || path != "/v1/testtype/update" {
-				t.Fail()
-			}
-		case "DELETE":
-			if name != "testtype_delete" || path != "/v1/testtype/delete" {
-				t.Fail()
-			}
-		default:
-			t.Fail()
-		}
-	}
-
-	router2 := New()
-	router2.Route("/").MapType(TestType{})
-	for _, r := range router2.Routes() {
-		name, method, path := r.Name, r.Method, r.Path
-		switch method {
-		case "GET":
-			if name != "testtype_get" || path != "/testtype/get" {
-				t.Fail()
-			}
-		case "POST":
-			if name != "testtype_create" || path != "/testtype/create" {
-				t.Fail()
-			}
-		case "PUT":
-			if name != "testtype_update" || path != "/testtype/update" {
-				t.Fail()
-			}
-		case "DELETE":
-			if name != "testtype_delete" || path != "/testtype/delete" {
-				t.Fail()
-			}
-		default:
-			t.Fail()
-		}
-	}
-}
-
 func TestShipHost(t *testing.T) {
 	s := New()
 	s.Route("/router").GET(func(c *Context) error { return c.Text(200, "default") })
@@ -798,35 +766,6 @@ func TestShipHost(t *testing.T) {
 	}
 	if s := rec.Body.String(); s != "vhost2" {
 		t.Errorf("Body: expect '%s', got '%s'", "vhost2", s)
-	}
-}
-
-func TestRouteStaticFile(t *testing.T) {
-	s := New()
-	s.Route("/README.md").StaticFile("./README.md")
-
-	req := httptest.NewRequest(http.MethodHead, "/README.md", nil)
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	} else if rec.Body.Len() != 0 {
-		t.Error("the body is not empty")
-	} else if rec.Header().Get(HeaderEtag) == "" {
-		t.Error("no ETAG")
-	}
-
-	req = httptest.NewRequest(http.MethodGet, "/README.md", nil)
-	rec = httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	} else if rec.Body.Len() == 0 {
-		t.Error("the body is empty")
-	} else if ct := rec.Header().Get(HeaderContentType); ct != "text/markdown; charset=utf-8" {
-		t.Errorf("ContentType: expect '%s', got '%s'", "text/markdown; charset=utf-8", ct)
 	}
 }
 
@@ -877,7 +816,7 @@ func TestContextAccept(t *testing.T) {
 	expected := []string{"text/html", "application/xhtml+xml", "image/webp", "application/", ""}
 	var accepts []string
 	s := New()
-	s.R("/path").GET(func(ctx *Context) error {
+	s.Route("/path").GET(func(ctx *Context) error {
 		accepts = ctx.Accept()
 		return nil
 	})
@@ -908,8 +847,8 @@ func TestSetRouteFilter(t *testing.T) {
 	}
 
 	handler := func(ctx *Context) error { return nil }
-	app.Group("/group").R("/name").Name("test").GET(handler)
-	app.R("/noname").GET(handler)
+	app.Group("/group").Route("/name").Name("test").GET(handler)
+	app.Route("/noname").GET(handler)
 
 	routes := app.Routes()
 	if len(routes) == 0 {
@@ -932,7 +871,7 @@ func TestSetRouteModifier(t *testing.T) {
 	}
 
 	handler := func(ctx *Context) error { return nil }
-	app.R("/path").GET(handler)
+	app.Route("/path").GET(handler)
 
 	noRoute := true
 	for _, ri := range app.Routes() {
@@ -1018,7 +957,7 @@ func TestMiddleware(t *testing.T) {
 		}
 	})
 
-	group.R("/route").Use(func(next Handler) Handler {
+	group.Route("/route").Use(func(next Handler) Handler {
 		return func(ctx *Context) error {
 			bs.WriteString("route m1 start\n")
 			err := next(ctx)
@@ -1041,46 +980,6 @@ func TestMiddleware(t *testing.T) {
 	if bs.String() != middlewareoutput {
 		t.Error(bs.String())
 		t.Fail()
-	}
-}
-
-func TestShipAddRoutes(t *testing.T) {
-	app := New()
-	app.RouteModifier = func(ri RouteInfo) RouteInfo {
-		ri.Host = "www.example.com"
-		return ri
-	}
-	app.Group("/test").AddRoutes(HTTPPprofToRouteInfo()...)
-
-	routes := app.Routes()
-	if len(routes) == 0 {
-		t.Errorf("no routes")
-	}
-
-	for _, ri := range routes {
-		switch ri.Path {
-		case "/test/debug/pprof/*":
-		case "/test/debug/pprof/cmdline":
-		case "/test/debug/pprof/profile":
-		case "/test/debug/pprof/symbol":
-			switch ri.Method {
-			case http.MethodGet, http.MethodPost:
-			default:
-				t.Error(ri)
-			}
-		case "/test/debug/pprof/trace":
-		default:
-			t.Error(ri)
-		}
-	}
-
-	rs := HTTPPprofToRouteInfo()
-	for i := range rs {
-		rs[i].Handler = nil
-	}
-	app.Group("/test").DelRoutes(rs...)
-	if routes := app.Routes(); len(routes) > 0 {
-		t.Error(routes)
 	}
 }
 

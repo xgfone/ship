@@ -43,6 +43,16 @@ func newRouteGroup(s *Ship, pprefix, prefix, host string, mws ...Middleware) *Ro
 	}
 }
 
+// Host returns a new sub-group with the virtual host.
+func (s *Ship) Host(host string) *RouteGroup {
+	return newRouteGroup(s, s.Prefix, "", host, s.mws...)
+}
+
+// Group returns a new sub-group.
+func (s *Ship) Group(prefix string) *RouteGroup {
+	return newRouteGroup(s, s.Prefix, prefix, "", s.mws...)
+}
+
 // Ship returns the ship that the current group belongs to.
 func (g *RouteGroup) Ship() *Ship { return g.ship }
 
@@ -76,9 +86,6 @@ func (g *RouteGroup) CtxData(data interface{}) *RouteGroup {
 func (g *RouteGroup) Route(path string) *Route {
 	return newRoute(g.ship, g, g.prefix, g.host, path, g.ctxdata, g.mdwares...)
 }
-
-// R is short for Group#Route(path).
-func (g *RouteGroup) R(path string) *Route { return g.Route(path) }
 
 // NoMiddlewares clears all the middlewares and returns itself.
 func (g *RouteGroup) NoMiddlewares() *RouteGroup { g.mdwares = nil; return g }

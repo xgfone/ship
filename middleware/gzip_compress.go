@@ -21,14 +21,22 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
+// GZipConfig is used to configure the GZIP middleware.
+type GZipConfig struct {
+	// Level is the compression level.
+	//
+	// Default: -1 (default compression level)
+	Level int
+}
+
 // Gzip returns a middleware to compress the response body by GZIP.
-func Gzip(level ...int) Middleware {
-	glevel := -1
-	if len(level) > 0 {
-		glevel = level[0]
+func Gzip(config *GZipConfig) Middleware {
+	var conf GZipConfig
+	if config != nil {
+		conf = *config
 	}
 
 	return func(next ship.Handler) ship.Handler {
@@ -39,7 +47,7 @@ func Gzip(level ...int) Middleware {
 
 				resp := ctx.ResponseWriter()
 				writer := ship.GetResponseFromPool(resp)
-				newWriter, err := gzip.NewWriterLevel(writer, glevel)
+				newWriter, err := gzip.NewWriterLevel(writer, conf.Level)
 				if err != nil {
 					return err
 				}

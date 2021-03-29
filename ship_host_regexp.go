@@ -14,14 +14,10 @@
 
 package ship
 
-import (
-	"regexp"
-
-	"github.com/xgfone/ship/v3/router"
-)
+import "regexp"
 
 type regexpRouter struct {
-	router router.Router
+	router Router
 	regexp *regexp.Regexp
 }
 
@@ -42,13 +38,13 @@ func (rr *reHostRouter) Len() int {
 	return len(rr.hosts)
 }
 
-func (rr *reHostRouter) Each(f func(string, router.Router)) {
+func (rr *reHostRouter) Each(f func(string, Router)) {
 	for rehost, router := range rr.hosts {
 		f(rehost, router.router)
 	}
 }
 
-func (rr *reHostRouter) Add(h string, r router.Router) (router.Router, error) {
+func (rr *reHostRouter) Add(h string, r Router) (Router, error) {
 	re, err := regexp.Compile(h)
 	if err != nil {
 		return nil, err
@@ -60,7 +56,7 @@ func (rr *reHostRouter) Add(h string, r router.Router) (router.Router, error) {
 	}
 }
 
-func (rr *reHostRouter) Del(regexpHost string) router.Router {
+func (rr *reHostRouter) Del(regexpHost string) Router {
 	if r, ok := rr.hosts[regexpHost]; ok {
 		delete(rr.hosts, regexpHost)
 		return r.router
@@ -68,14 +64,14 @@ func (rr *reHostRouter) Del(regexpHost string) router.Router {
 	return nil
 }
 
-func (rr *reHostRouter) Router(regexpHost string) router.Router {
+func (rr *reHostRouter) Router(regexpHost string) Router {
 	if r, ok := rr.hosts[regexpHost]; ok {
 		return r.router
 	}
 	return nil
 }
 
-func (rr *reHostRouter) Match(host string) (string, router.Router) {
+func (rr *reHostRouter) Match(host string) (string, Router) {
 	if len(rr.hosts) != 0 {
 		for rehost, r := range rr.hosts {
 			if r.regexp.MatchString(host) {

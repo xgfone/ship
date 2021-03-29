@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/labstack/echo/v4"
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func loadEchoRoutes(e *echo.Echo, routes []*Route) {
@@ -109,9 +109,10 @@ func BenchmarkGinParseAPI(b *testing.B) {
 /// ----------------------------------------------------------------------- ///
 
 func loadShipRoutes(s *ship.Ship, routes []*Route) {
+	s.NotFound = func(*ship.Context) error { panic("notfound") }
 	h := func(c *ship.Context) error { return c.Text(http.StatusOK, "OK") }
 	for _, r := range routes {
-		s.R(r.Path).Method(h, r.Method)
+		s.Route(r.Path).Method(h, r.Method)
 	}
 }
 

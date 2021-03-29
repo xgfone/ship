@@ -30,11 +30,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/xgfone/ship/v3/binder"
-	"github.com/xgfone/ship/v3/render"
-	"github.com/xgfone/ship/v3/router"
-	"github.com/xgfone/ship/v3/session"
 )
 
 // MaxMemoryLimit is the maximum memory.
@@ -114,11 +109,6 @@ type Context struct {
 	// RouteInfo is the route information associated with the route.
 	RouteInfo RouteInfo
 
-	// RouteCtxData is the context data associated with the route.
-	//
-	// DEPRECATED!!! Please use RouteInfo.CtxData instead.
-	RouteCtxData interface{}
-
 	// Data is used to store many key-value pairs about the context.
 	//
 	// Data maybe asks the system to allocate many memories.
@@ -135,17 +125,18 @@ type Context struct {
 	res *Response
 	req *http.Request
 
-	query   url.Values
+	plen    int
 	pnames  []string
 	pvalues []string
-	plen    int
+	cookies []*http.Cookie
+	query   url.Values
 
 	logger    Logger
 	buffer    BufferAllocator
-	router    router.Router
-	binder    binder.Binder
-	session   session.Session
-	renderer  render.Renderer
+	router    Router
+	binder    Binder
+	session   Session
+	renderer  Renderer
 	defaulter func(interface{}) error
 	validate  func(interface{}) error
 	qbinder   func(interface{}, url.Values) error
@@ -154,7 +145,7 @@ type Context struct {
 }
 
 // NewContext returns a new Context.
-func NewContext(urlParamMaxNum, dataSize int) *Context {
+func NewContext(urlParamMaxNum, dataInitCap int) *Context {
 	var pnames, pvalues []string
 	if urlParamMaxNum > 0 {
 		pnames = make([]string, urlParamMaxNum)
@@ -163,7 +154,7 @@ func NewContext(urlParamMaxNum, dataSize int) *Context {
 
 	return &Context{
 		res:     NewResponse(nil),
-		Data:    make(map[string]interface{}, dataSize),
+		Data:    make(map[string]interface{}, dataInitCap),
 		pnames:  pnames,
 		pvalues: pvalues,
 	}
@@ -192,6 +183,7 @@ func (c *Context) Reset() {
 
 	c.req = nil
 	c.res.Reset(nil)
+	c.cookies = nil
 	c.query = nil
 	c.plen = 0
 
@@ -210,17 +202,24 @@ func (c *Context) Reset() {
 }
 
 // SetRouter sets the router to r.
-func (c *Context) SetRouter(r router.Router) { c.router = r }
+func (c *Context) SetRouter(r Router) { c.router = r }
 
 // Router returns the router.
-func (c *Context) Router() router.Router { return c.router }
+func (c *Context) Router() Router { return c.router }
 
-// FindRoute finds the route from the router and returns the route info.
-func (c *Context) FindRoute() (ri RouteInfo, ok bool) {
+// FindRoute finds the route from the router.
+func (c *Context) FindRoute() (ok bool) {
 	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
 	if ok = h != nil; ok {
-		c.plen, c.RouteInfo = n, h.(RouteInfo)
-		c.RouteCtxData = c.RouteInfo.CtxData
+		c.plen = n
+		switch ri := h.(type) {
+		case RouteInfo:
+			c.RouteInfo = ri
+		case Handler:
+			c.RouteInfo.Handler = ri
+		default:
+			panic(fmt.Errorf("unknown handler type '%T'", h))
+		}
 	}
 	return
 }
@@ -235,8 +234,16 @@ func (c *Context) Execute() error {
 		return c.notFound(c)
 	}
 
-	c.plen, c.RouteInfo = n, h.(RouteInfo)
-	c.RouteCtxData = c.RouteInfo.CtxData
+	c.plen = n
+	switch ri := h.(type) {
+	case RouteInfo:
+		c.RouteInfo = ri
+	case Handler:
+		c.RouteInfo.Handler = ri
+	default:
+		panic(fmt.Errorf("unknown handler type '%T'", h))
+	}
+
 	return c.RouteInfo.Handler(c)
 }
 
@@ -407,7 +414,7 @@ func (c *Context) ReqHeader() http.Header { return c.req.Header }
 // RespHeader returns the header of the response.
 func (c *Context) RespHeader() http.Header { return c.res.Header() }
 
-// Header is equal to RespHeader().
+// Header is the alias of RespHeader to implement the interface http.ResponseWriter.
 func (c *Context) Header() http.Header { return c.res.Header() }
 
 // GetHeader returns the first value of the request header named name.
@@ -447,14 +454,23 @@ func (c *Context) HasHeader(name string) bool {
 //----------------------------------------------------------------------------
 
 // Cookies returns the HTTP cookies sent with the request.
-func (c *Context) Cookies() []*http.Cookie { return c.req.Cookies() }
+func (c *Context) Cookies() []*http.Cookie {
+	if c.cookies == nil {
+		c.cookies = c.req.Cookies()
+	}
+	return c.cookies
+}
 
 // Cookie returns the named cookie provided in the request.
 //
 // Return nil if no the cookie named name.
 func (c *Context) Cookie(name string) *http.Cookie {
-	cookie, _ := c.req.Cookie(name)
-	return cookie
+	for _, cookie := range c.Cookies() {
+		if cookie.Name == name {
+			return cookie
+		}
+	}
+	return nil
 }
 
 // SetCookie adds a `Set-Cookie` header in HTTP response.
@@ -735,11 +751,6 @@ func (c *Context) ClientIP() string {
 	return c.req.RemoteAddr
 }
 
-// RealIP is equal to ClientIP.
-//
-// DEPRECATED!!! Please ClientIP instead.
-func (c *Context) RealIP() string { return c.ClientIP() }
-
 // Charset returns the charset of the request content.
 //
 // Return "" if there is no charset.
@@ -771,7 +782,7 @@ func (c *Context) ContentType() (ct string) {
 //----------------------------------------------------------------------------
 
 // SetSessionManagement sets the session management to s.
-func (c *Context) SetSessionManagement(s session.Session) { c.session = s }
+func (c *Context) SetSessionManagement(s Session) { c.session = s }
 
 // GetSession returns the session content by id from the backend store.
 //
@@ -837,7 +848,7 @@ func (c *Context) SetDefault(v interface{}) error { return c.defaulter(v) }
 //----------------------------------------------------------------------------
 
 // SetBinder sets the binder to b to bind the request information to an object.
-func (c *Context) SetBinder(b binder.Binder) { c.binder = b }
+func (c *Context) SetBinder(b Binder) { c.binder = b }
 
 // Bind binds the request information into the provided value v.
 //
@@ -879,7 +890,7 @@ func (c *Context) BindQuery(v interface{}) (err error) {
 //----------------------------------------------------------------------------
 
 // SetRenderer sets the renderer to r to render the response to the peer.
-func (c *Context) SetRenderer(r render.Renderer) { c.renderer = r }
+func (c *Context) SetRenderer(r Renderer) { c.renderer = r }
 
 // Render renders a template named name with data and sends a text/html response
 // with status code.
@@ -916,10 +927,12 @@ func (c *Context) SetContentType(ct string) {
 // Send Repsonse
 //----------------------------------------------------------------------------
 
-// WriteHeader sends an HTTP response header with the provided status code.
+// WriteHeader sends an HTTP response header with the provided status code,
+// which implements the interface http.ResponseWriter.
 func (c *Context) WriteHeader(statusCode int) { c.res.WriteHeader(statusCode) }
 
-// Write writes the content to the peer.
+// Write writes the content to the peer, which implements the interface
+// http.ResponseWriter.
 //
 // it will write the header firstly with 200 if the header is not sent.
 func (c *Context) Write(b []byte) (int, error) { return c.res.Write(b) }
@@ -1071,7 +1084,10 @@ func (c *Context) HTMLBlob(code int, b []byte) error {
 func (c *Context) File(file string) (err error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return ErrNotFound
+		if os.IsNotExist(err) {
+			return ErrNotFound
+		}
+		return ErrInternalServerError.New(err)
 	}
 	defer f.Close()
 
@@ -1081,7 +1097,10 @@ func (c *Context) File(file string) (err error) {
 	} else if fi.IsDir() {
 		f, err := os.Open(filepath.Join(file, "index.html"))
 		if err != nil {
-			return ErrNotFound
+			if os.IsNotExist(err) {
+				return ErrNotFound
+			}
+			return ErrInternalServerError.New(err)
 		}
 		defer f.Close()
 

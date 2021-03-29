@@ -15,7 +15,7 @@
 package middleware
 
 import (
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // RequestID returns a X-Request-ID middleware.

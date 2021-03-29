@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // LoggerConfig is used to configure the logger middleware.
@@ -95,26 +95,4 @@ func Logger(config ...LoggerConfig) Middleware {
 type bufferBody struct {
 	io.Closer
 	*bytes.Buffer
-}
-
-// ReqBodyLogger returns a middleware to log the request body.
-//
-// DEPRECATED! Please use Logger instead.
-func ReqBodyLogger() Middleware {
-	return func(next ship.Handler) ship.Handler {
-		return func(ctx *ship.Context) (err error) {
-			if r := ctx.Request(); r.ContentLength > 0 {
-				body := bufferBody{Closer: r.Body, Buffer: new(bytes.Buffer)}
-				_, err = ship.CopyNBuffer(body.Buffer, r.Body, r.ContentLength, nil)
-				if err != nil {
-					return
-				}
-				ctx.Request().Body = body
-				ctx.Logger().Debugf("addr=%s, method=%s, path=%s, reqbody=%s",
-					r.RemoteAddr, r.Method, r.URL.RequestURI(), body.Buffer.String())
-			}
-
-			return next(ctx)
-		}
-	}
 }

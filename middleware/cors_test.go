@@ -19,7 +19,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // Refer to github.com/labstack/echo/middleware#TestCORS
@@ -30,7 +30,7 @@ func TestCORS(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	ctx := r.AcquireContext(req, rec)
-	h := CORS()(ship.NotFoundHandler())
+	h := CORS(nil)(ship.NotFoundHandler())
 	h(ctx)
 	if rec.Header().Get(ship.HeaderAccessControlAllowOrigin) != "*" {
 		t.Errorf("%s is not *", ship.HeaderAccessControlAllowOrigin)
@@ -40,7 +40,7 @@ func TestCORS(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	rec = httptest.NewRecorder()
 	ctx = r.AcquireContext(req, rec)
-	h = CORS(CORSConfig{AllowOrigins: []string{"localhost"}})(ship.NotFoundHandler())
+	h = CORS(&CORSConfig{AllowOrigins: []string{"localhost"}})(ship.NotFoundHandler())
 	req.Header.Set(ship.HeaderOrigin, "localhost")
 	h(ctx)
 	if rec.Header().Get(ship.HeaderAccessControlAllowOrigin) != "localhost" {
@@ -53,7 +53,7 @@ func TestCORS(t *testing.T) {
 	ctx = r.AcquireContext(req, rec)
 	req.Header.Set(ship.HeaderOrigin, "localhost")
 	req.Header.Set(ship.HeaderContentType, ship.MIMEApplicationJSON)
-	cors := CORS(CORSConfig{AllowOrigins: []string{"localhost"}, AllowCredentials: true, MaxAge: 3600})
+	cors := CORS(&CORSConfig{AllowOrigins: []string{"localhost"}, AllowCredentials: true, MaxAge: 3600})
 	h = cors(ship.NotFoundHandler())
 	h(ctx)
 	if rec.Header().Get(ship.HeaderAccessControlAllowOrigin) != "localhost" {
@@ -72,7 +72,7 @@ func TestCORS(t *testing.T) {
 	ctx = r.AcquireContext(req, rec)
 	req.Header.Set(ship.HeaderOrigin, "localhost")
 	req.Header.Set(ship.HeaderContentType, ship.MIMEApplicationJSON)
-	cors = CORS(CORSConfig{AllowOrigins: []string{"*"}, AllowCredentials: true, MaxAge: 3600})
+	cors = CORS(&CORSConfig{AllowOrigins: []string{"*"}, AllowCredentials: true, MaxAge: 3600})
 	h = cors(ship.NotFoundHandler())
 	h(ctx)
 	if rec.Header().Get(ship.HeaderAccessControlAllowOrigin) != "localhost" {
@@ -90,7 +90,7 @@ func TestCORS(t *testing.T) {
 	rec = httptest.NewRecorder()
 	ctx = r.AcquireContext(req, rec)
 	req.Header.Set(ship.HeaderOrigin, "http://aaa.example.com")
-	cors = CORS(CORSConfig{AllowOrigins: []string{"http://*.example.com"}})
+	cors = CORS(&CORSConfig{AllowOrigins: []string{"http://*.example.com"}})
 	h = cors(ship.NotFoundHandler())
 	h(ctx)
 	if s := rec.Header().Get(ship.HeaderAccessControlAllowOrigin); s != "http://aaa.example.com" {

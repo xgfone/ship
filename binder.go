@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package binder
+package ship
 
 import (
 	"encoding/json"
@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v3/herror"
+	"github.com/xgfone/ship/v4/binder"
 )
 
 // Binder is the interface to bind the value to v from ctx.
@@ -66,12 +66,12 @@ func (mb *MuxBinder) Bind(req *http.Request, v interface{}) error {
 	}
 
 	if ct == "" {
-		return herror.ErrMissingContentType
+		return ErrMissingContentType
 	}
 	if binder := mb.Get(ct); binder != nil {
 		return binder.Bind(req, v)
 	}
-	return herror.ErrUnsupportedMediaType.NewMsg("not support Content-Type '%s'", ct)
+	return ErrUnsupportedMediaType.Newf("not support Content-Type '%s'", ct)
 }
 
 // JSONBinder returns a JSON binder to bind the JSON request.
@@ -113,7 +113,7 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 			return err
 		}
 
-		return BindURLValues(v, r.Form, _tag)
+		return binder.BindURLValues(v, r.Form, _tag)
 	})
 }
 
@@ -128,6 +128,6 @@ func QueryBinder(tag ...string) Binder {
 	}
 
 	return BinderFunc(func(r *http.Request, v interface{}) error {
-		return BindURLValues(v, r.URL.Query(), _tag)
+		return binder.BindURLValues(v, r.URL.Query(), _tag)
 	})
 }

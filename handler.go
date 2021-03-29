@@ -16,6 +16,7 @@ package ship
 
 import (
 	"net/http"
+	"strings"
 )
 
 // Handler is a handler of the HTTP request.
@@ -85,9 +86,9 @@ func NotFoundHandler() Handler {
 }
 
 // MethodNotAllowedHandler returns a MethodNotAllowed handler.
-func MethodNotAllowedHandler() Handler {
+func MethodNotAllowedHandler(allowedMethods []string) Handler {
 	return func(c *Context) error {
-		// c.SetHeader(HeaderAllow, strings.Join(methods, ", "))
+		c.SetHeader(HeaderAllow, strings.Join(allowedMethods, ", "))
 		return c.NoContent(http.StatusMethodNotAllowed)
 	}
 }

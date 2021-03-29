@@ -1,14 +1,27 @@
-# ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](https://pkg.go.dev/github.com/xgfone/ship/v3) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
+# ship [![Build Status](https://travis-ci.org/xgfone/ship.svg?branch=master)](https://travis-ci.org/xgfone/ship) [![GoDoc](https://godoc.org/github.com/xgfone/ship?status.svg)](https://pkg.go.dev/github.com/xgfone/ship/v4) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
 `ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
-`ship` has been stable, and the current version is `v3` and support Go `1.11+`.
+`ship` has been stable, and the current version is `v4` and support Go `1.11+`.
+
+
+## Features
+- Support the url parameter.
+- Support the session manager.
+- Support the customized router manager.
+- Support the pre-route and route middlewares.
+- Support the route group builder to build the route.
+- Support the mulit-virtual hosts and the default host.
+- Support the exact, prefix, suffix and regexp hostname.
+- Support the binding of the request data, such as body and query.
+- Support the renderer, such as the HTML template.
+- ......
 
 
 ## Install
 
 ```shell
-go get -u github.com/xgfone/ship/v3
+go get -u github.com/xgfone/ship/v4
 ```
 
 
@@ -18,7 +31,7 @@ go get -u github.com/xgfone/ship/v3
 // example.go
 package main
 
-import "github.com/xgfone/ship/v3"
+import "github.com/xgfone/ship/v4"
 
 func main() {
 	router := ship.New()
@@ -60,7 +73,7 @@ For the parameter, you can use `Context.URLParam(paramName)` to get it.
 ## API Example
 
 ### `Router`
-#### Using `Connect`, `Get`, `Post`, `Put`, `Patch`, `Delete` and `Option`
+#### Using `CONNECT`, `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTION`
 
 ```go
 func main() {
@@ -78,7 +91,6 @@ func main() {
 
 Notice: you can register the same handler with more than one method by `Route(path string).Method(handler Handler, method ...string)`.
 
-`R` is the alias of `Route`, and you can register the routes by `R(path string).Method(handler Handler, method ...string)`.
 
 #### Cascade the registered routes
 
@@ -131,49 +143,6 @@ func main() {
     router.Start(":8080").Wait()
 }
 ```
-
-#### Map methods into Router
-
-```go
-package main
-
-import (
-    "net/http"
-
-    "github.com/xgfone/ship/v3"
-)
-
-type TestType struct{}
-
-func (t TestType) Create(ctx *ship.Context) error { return nil }
-func (t TestType) Delete(ctx *ship.Context) error { return nil }
-func (t TestType) Update(ctx *ship.Context) error { return nil }
-func (t TestType) Get(ctx *ship.Context) error    { return nil }
-func (t TestType) Has(ctx *ship.Context) error    { return nil }
-func (t TestType) NotHandler()              {}
-
-func main() {
-    router := ship.New()
-    router.Route("/v1").MapType(TestType{})
-    router.Start(":8080").Wait()
-}
-```
-
-`router.Route("/v1").MapType(TestType{})` is equal to
-
-```go
-tv := TestType{}
-router.Route("/v1/testtype/get").Name("testtype_get").GET(tv.Get)
-router.Route("/v1/testtype/update").Name("testtype_update").PUT(tv.Update)
-router.Route("/v1/testtype/create").Name("testtype_create").POST(tv.Create)
-router.Route("/v1/testtype/delete").Name("testtype_delete").DELETE(tv.Delete)
-```
-
-**Notice:**
-- The name of type and method will be converted to the lower.
-- The mapping format of the route path is `%{prefix}/%{lower_type_name}/%{lower_method_name}`.
-- The mapping format of the route name is `%{lower_type_name}_%{lower_method_name}`.
-- The type of the method must be `func(*ship.Context) error` or it will be ignored.
 
 #### Using `SubRouter`
 
@@ -239,8 +208,8 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship/v3"
-    "github.com/xgfone/ship/v3/middleware"
+    "github.com/xgfone/ship/v4"
+    "github.com/xgfone/ship/v4/middleware"
 )
 
 func main() {
@@ -260,8 +229,8 @@ package main
 import (
     "net/http"
 
-    "github.com/xgfone/ship/v3"
-    "github.com/xgfone/ship/v3/middleware"
+    "github.com/xgfone/ship/v4"
+    "github.com/xgfone/ship/v4/middleware"
 )
 
 func RemovePathPrefix(prefix string) ship.Middleware {
@@ -295,7 +264,7 @@ func main() {
 ```go
 package main
 
-import "github.com/xgfone/ship/v3"
+import "github.com/xgfone/ship/v4"
 
 func main() {
 	router := ship.New()
@@ -322,19 +291,19 @@ func main() {
 ```
 
 ```shell
-$ curl http://127.0.0.1:8080/router
+$ curl http://127.0.0.1:8080/
 default
 
-$ curl http://127.0.0.1:8080/router -H 'Host: www.host1.example.com' # Exact
+$ curl http://127.0.0.1:8080/ -H 'Host: www.host1.example.com' # Exact
 vhost1
 
-$ curl http://127.0.0.1:8080/router -H 'Host: www.host2.example.com' # Suffix
+$ curl http://127.0.0.1:8080/ -H 'Host: www.host2.example.com' # Suffix
 vhost2
 
-$ curl http://127.0.0.1:8080/router -H 'Host: www.host3.example.com' # Prefix
+$ curl http://127.0.0.1:8080/ -H 'Host: www.host3.example.com' # Prefix
 vhost3
 
-$ curl http://127.0.0.1:8080/router -H 'Host: www.host4.example.com' # Regexp
+$ curl http://127.0.0.1:8080/ -H 'Host: www.host4.example.com' # Regexp
 vhost4
 ```
 
@@ -346,7 +315,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func responder(ctx *ship.Context, args ...interface{}) error {
@@ -425,9 +394,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/xgfone/ship/v3"
-	"github.com/xgfone/ship/v3/render"
-	"github.com/xgfone/ship/v3/render/template"
+	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v4/render"
+	"github.com/xgfone/ship/v4/render/template"
 )
 
 func main() {
@@ -442,24 +411,16 @@ func main() {
 	router.Route("/json").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.JSONPretty(200, map[string]interface{}{"msg": "json"}, "    ")
-			// Or
-			// return ctx.RenderOk("jsonpretty", map[string]interface{}{"msg": "json"})
 		}
 		return ctx.JSON(200, map[string]interface{}{"msg": "json"})
-		// Or
-		// return ctx.RenderOk("json", map[string]interface{}{"msg": "json"})
 	})
 
 	// For XML
 	router.Route("/xml").GET(func(ctx *ship.Context) error {
 		if ctx.QueryParam("pretty") == "1" {
 			return ctx.XMLPretty(200, []string{"msg", "xml"}, "    ")
-			// Or
-			// return ctx.RenderOk("xmlpretty", []string{"msg", "xml"})
 		}
 		return ctx.XML(200, []string{"msg", "xml"})
-		// Or
-		// return ctx.RenderOk("xml", []string{"msg", "xml"})
 	})
 
 	// For HTML
@@ -489,7 +450,7 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 func main() {
@@ -506,7 +467,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -531,7 +492,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // DisableBuiltinCollector removes the collectors that the default prometheus
@@ -585,7 +546,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/xgfone/ship/v3"
+	"github.com/xgfone/ship/v4"
 )
 
 // OpenTracingOption is used to configure the OpenTracingServer.
@@ -773,9 +734,9 @@ func main() {
 
 ## Route Management
 
-`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v3/router/echo?tab=doc#NewRouter).
+`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v4/router/echo?tab=doc#NewRouter).
 
-You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v3/router?tab=doc#Router).
+You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v4/router?tab=doc#Router).
 
 ```go
 type Router interface {
@@ -805,6 +766,9 @@ type Router interface {
 
 	// Find searchs and returns the handler and the number of the url path
 	// paramethers. For the paramethers, they are put into pnames and pvalues.
+	//
+	// If pnames or pvalues is empty, it will ignore the path paramethers
+	// when finding the route handler.
 	//
 	// Return (nil, 0) if not found the route handler.
 	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
