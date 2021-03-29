@@ -148,7 +148,7 @@ func main() {
 
 ```go
 func main() {
-    router := ship.New().Use(middleware.Logger(), middleware.Recover())
+    router := ship.New().Use(middleware.Logger(nil), middleware.Recover())
 
     // v1 SubRouter, which will inherit the middlewares of the parent router.
     v1 := router.Group("/v1")
@@ -214,7 +214,7 @@ import (
 
 func main() {
     // We disable the default error log because we have used the Logger middleware.
-    app := ship.New().Use(middleware.Logger(), middleware.Recover())
+    app := ship.New().Use(middleware.Logger(nil), middleware.Recover())
     app.Use(MyAuthMiddleware())
     app.Route("/url/path").GET(handler)
     app.Start(":8080").Wait()
@@ -250,7 +250,7 @@ func main() {
     router := ship.New()
 
     // Use and Before have no interference each other.
-    router.Use(middleware.Logger())
+    router.Use(middleware.Logger(nil))
     router.Pre(RemovePathPrefix("/static"))
     router.Use(middleware.Recover())
 
