@@ -32,10 +32,10 @@ type LoggerConfig struct {
 }
 
 // Logger returns a new logger middleware that will log the request.
-func Logger(config ...LoggerConfig) Middleware {
+func Logger(config *LoggerConfig) Middleware {
 	var conf LoggerConfig
-	if len(config) > 0 {
-		conf = config[0]
+	if config != nil {
+		conf = *config
 	}
 
 	return func(next ship.Handler) ship.Handler {

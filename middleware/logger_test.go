@@ -30,7 +30,7 @@ func TestLogger(t *testing.T) {
 
 	router := ship.New()
 	router.Logger = logger
-	router.Use(Logger(LoggerConfig{LogReqBody: true}))
+	router.Use(Logger(&LoggerConfig{LogReqBody: true}))
 
 	router.Route("/test").GET(func(ctx *ship.Context) error {
 		ctx.Logger().Infof("handler")
