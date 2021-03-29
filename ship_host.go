@@ -116,7 +116,7 @@ func (hm *hostManager) Match(host string) (string, Router) {
 }
 
 func (hm *hostManager) Add(h string, r Router) (n Router, err error) {
-	if strings.HasPrefix(h, "*.") { // Prefix Matching
+	if strings.HasPrefix(h, "*.") { // Suffix Matching
 		if !isDomainName(h[2:]) {
 			return nil, fmt.Errorf("invalid domain '%s'", h)
 		}
@@ -126,7 +126,7 @@ func (hm *hostManager) Add(h string, r Router) (n Router, err error) {
 		} else {
 			hm.fhosts[h] = r
 		}
-	} else if strings.HasSuffix(h, ".*") { // Suffix Matching
+	} else if strings.HasSuffix(h, ".*") { // Prefix Matching
 		if !isDomainName(h[:len(h)-2]) {
 			return nil, fmt.Errorf("invalid domain '%s'", h)
 		}
