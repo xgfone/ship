@@ -16,9 +16,12 @@ package ship
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -254,52 +257,134 @@ func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err er
 	return
 }
 
-// GetJSON is equal to RequestJSON(http.MethodGet, url, nil, resp...).
+// GetText is the same as GetJSON, but get the response body as the string.
+func GetText(url string) (body string, err error) {
+	err = Request(context.Background(), http.MethodGet, url, nil, nil, &body)
+	return
+}
+
+// GetJSON is the same as RequestJSON, but use the method GET instead.
 func GetJSON(url string, resp ...interface{}) (err error) {
-	return RequestJSON(http.MethodGet, url, nil, resp...)
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodGet, url, nil, nil, r)
 }
 
-// PostJSON is equal to RequestJSON(http.MethodPost, url, req, resp...).
+// PostJSON is the same as RequestJSON, but use the method POST instead.
 func PostJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	return RequestJSON(http.MethodPost, url, req, resp...)
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodPost, url, nil, req, r)
 }
 
-// PutJSON is equal to RequestJSON(http.MethodPut, url, req, resp...).
+// PutJSON is the same as RequestJSON, but use the method PUT instead.
 func PutJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	return RequestJSON(http.MethodPut, url, req, resp...)
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodPut, url, nil, req, r)
 }
 
-// DeleteJSON is equal to RequestJSON(http.MethodDelete, url, req, resp...).
+// PatchJSON is the same as RequestJSON, but use the method PATCH instead.
+func PatchJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodPatch, url, nil, req, r)
+}
+
+// DeleteJSON is the same as RequestJSON, but use the method DELETE instead.
 func DeleteJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	return RequestJSON(http.MethodDelete, url, req, resp...)
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodDelete, url, nil, req, r)
 }
 
-// RequestJSON is equal to RequestJSONWithContext(context.Background(), ...).
-func RequestJSON(method, url string, req interface{}, resp ...interface{}) (err error) {
-	return RequestJSONWithContext(context.Background(), method, url, req, resp...)
+// HeadJSON is the same as RequestJSON, but use the method HEADE instead.
+func HeadJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodHead, url, nil, req, r)
 }
 
-// RequestJSONWithContext is equal to
-// RequestJSONWithContextAndHeaders(ctx, method, url, nil, reqBody, respBody...).
-func RequestJSONWithContext(ctx context.Context, method, url string,
-	reqBody interface{}, respBody ...interface{}) (err error) {
-	return RequestJSONWithContextAndHeaders(ctx, method, url, nil, reqBody, respBody...)
+// OptionsJSON is the same as RequestJSON, but use the method OPTIONS instead.
+func OptionsJSON(url string, req interface{}, resp ...interface{}) (err error) {
+	var r interface{}
+	if len(resp) > 0 {
+		r = resp[0]
+	}
+	return RequestJSON(context.Background(), http.MethodOptions, url, nil, req, r)
 }
 
-// RequestJSONWithContextAndHeaders sends the http request with JSON
-// and puts the response body into respBody as JSON.
+// RequestJSON is the same as Request, but encodes the request
+// and decodes response body as JSON。
+func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
+	reqBody, respBody interface{}) error {
+	if len(reqHeader) == 0 {
+		reqHeader = http.Header{
+			HeaderAccept:      MIMEApplicationJSONCharsetUTF8s,
+			HeaderContentType: MIMEApplicationJSONCharsetUTF8s,
+		}
+	} else {
+		reqHeader.Set(HeaderAccept, MIMEApplicationJSONCharsetUTF8)
+		reqHeader.Set(HeaderContentType, MIMEApplicationJSONCharsetUTF8)
+	}
+
+	switch data := reqBody.(type) {
+	case nil:
+	case []byte:
+		reqBody = bytes.NewBuffer(data)
+	case string:
+		reqBody = bytes.NewBufferString(data)
+	case io.Reader:
+		reqBody = data
+	default:
+		buf := getBuffer()
+		defer putBuffer(buf)
+		if err := json.NewEncoder(buf).Encode(reqBody); err != nil {
+			return err
+		}
+		reqBody = buf
+	}
+
+	if respBody != nil {
+		oldRespBody := respBody
+		respBody = func(r io.Reader) error {
+			return json.NewDecoder(r).Decode(oldRespBody)
+		}
+	}
+
+	return Request(ctx, method, url, reqHeader, reqBody, respBody)
+}
+
+// Request sends the http request and parses the response body into respBody.
 //
-// reqBody may be one of types: nil, []byte, string, io.Reader, and otehr types.
-// For other types, it will be serialized by json.NewEncoder.
+// reqBody must be one of types: nil, []byte, string, io.Reader.
 //
-// If respBody is nil, it will ignore the response body.
+// respBody must be one of types:
+//   - nil: ignore the response body.
+//   - *[]byte: read the response body and puts it into respBody as []byte.
+//   - *string: read the response body and puts it into respBody as string.
+//   - io.Writer: copy the response body into the given writer.
+//   - xml.Unmarshaler: read and parse the response body as the XML.
+//   - json.Unmarshaler: read and parse the response body as the JSON.
+//   - func(io.Reader) error: call the function with the response body.
+//   - func(*bytes.Buffer) error: read the response body into the buffer and call the function.
 //
-// If respBody[1] is a function and its type is func(*http.Request)*http.Request,
-// it will call it to fix the new request and use the returned request.
-func RequestJSONWithContextAndHeaders(ctx context.Context, method, url string,
-	reqHeaders http.Header, reqBody interface{}, respBody ...interface{}) (err error) {
+// Notice: if the encoding of the response body is gzip, it will decode it firstly.
+func Request(ctx context.Context, method, url string, reqHeader http.Header,
+	reqBody, respBody interface{}) error {
 	var body io.Reader
-	var buf *bytes.Buffer
 	switch data := reqBody.(type) {
 	case nil:
 	case []byte:
@@ -309,12 +394,7 @@ func RequestJSONWithContextAndHeaders(ctx context.Context, method, url string,
 	case io.Reader:
 		body = data
 	default:
-		buf = getBuffer()
-		defer putBuffer(buf)
-		if err = json.NewEncoder(buf).Encode(reqBody); err != nil {
-			return NewHTTPClientError(method, url, 0, err)
-		}
-		body = buf
+		return fmt.Errorf("unknown request body type '%T'", reqBody)
 	}
 
 	req, err := NewRequestWithContext(ctx, method, url, body)
@@ -322,16 +402,8 @@ func RequestJSONWithContextAndHeaders(ctx context.Context, method, url string,
 		return NewHTTPClientError(method, url, 0, err)
 	}
 
-	for key, values := range reqHeaders {
-		req.Header[key] = values
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-
-	if len(respBody) > 1 {
-		if fix, ok := respBody[1].(func(*http.Request) *http.Request); ok {
-			req = fix(req)
-		}
+	if len(reqHeader) != 0 {
+		req.Header = reqHeader
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -340,29 +412,59 @@ func RequestJSONWithContextAndHeaders(ctx context.Context, method, url string,
 	}
 	defer resp.Body.Close()
 
+	respbody := resp.Body
+	if resp.Header.Get(HeaderContentEncoding) == "gzip" {
+		var reader *gzip.Reader
+		if reader, err = gzip.NewReader(resp.Body); err != nil {
+			return NewHTTPClientError(method, url, resp.StatusCode, err)
+		}
+		respbody = reader
+	}
+
 	if resp.StatusCode >= 400 {
-		if buf == nil {
-			buf = getBuffer()
-			defer putBuffer(buf)
-		}
-		CopyNBuffer(buf, resp.Body, resp.ContentLength, nil)
-		return NewHTTPClientError(method, url, resp.StatusCode, nil, buf.String())
+		data, _ := readAll(respbody)
+		return NewHTTPClientError(method, url, resp.StatusCode, nil, data)
 	}
 
-	if len(respBody) != 0 && respBody[0] != nil {
-		if buf == nil {
-			buf = getBuffer()
-			defer putBuffer(buf)
+	switch r := respBody.(type) {
+	case nil:
+	case *[]byte:
+		buf := getBuffer()
+		_, err = io.CopyBuffer(buf, respbody, make([]byte, 1024))
+		*r = make([]byte, buf.Len())
+		copy(*r, buf.Bytes())
+		putBuffer(buf)
+	case *string:
+		*r, err = readAll(respbody)
+	case xml.Unmarshaler:
+		err = xml.NewDecoder(respbody).Decode(r)
+	case json.Unmarshaler:
+		err = json.NewDecoder(respbody).Decode(r)
+	case io.Writer:
+		_, err = io.CopyBuffer(r, respbody, make([]byte, 1024))
+	case func(io.Reader) error:
+		err = r(respbody)
+	case func(*bytes.Buffer) error:
+		b := getBuffer()
+		if _, err = io.CopyBuffer(b, respbody, make([]byte, 1024)); err == nil {
+			err = r(b)
 		}
-
-		if _, err = CopyNBuffer(buf, resp.Body, resp.ContentLength, nil); err == nil {
-			err = json.Unmarshal(buf.Bytes(), respBody[0])
-		}
-
-		if err != nil {
-			err = NewHTTPClientError(method, url, resp.StatusCode, err, buf.String())
-		}
+		putBuffer(b)
+	default:
+		panic(fmt.Errorf("unknown response body type '%T'", respBody))
 	}
 
+	if err != nil {
+		err = NewHTTPClientError(method, url, resp.StatusCode, err)
+	}
+
+	return err
+}
+
+func readAll(r io.Reader) (data string, err error) {
+	buf := getBuffer()
+	_, err = io.CopyBuffer(buf, r, make([]byte, 1024))
+	data = buf.String()
+	putBuffer(buf)
 	return
 }
