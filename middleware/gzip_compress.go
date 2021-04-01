@@ -16,17 +16,17 @@ package middleware
 
 import (
 	"compress/gzip"
-	"io"
-	"io/ioutil"
+	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/xgfone/ship/v4"
 )
 
 // GZipConfig is used to configure the GZIP middleware.
 type GZipConfig struct {
-	// Level is the compression level.
+	// Level is the compression level, range [-1, 9].
 	//
 	// Default: -1 (default compression level)
 	Level int
@@ -39,6 +39,26 @@ func Gzip(config *GZipConfig) Middleware {
 		conf = *config
 	}
 
+	if conf.Level < gzip.HuffmanOnly || conf.Level > gzip.BestCompression {
+		panic(fmt.Errorf("gzip: invalid compression level '%d'", conf.Level))
+	}
+
+	gpool := sync.Pool{New: func() interface{} {
+		w, err := gzip.NewWriterLevel(nil, conf.Level)
+		if err != nil {
+			panic(err)
+		}
+		return &gzipResponse{w: w}
+	}}
+
+	releaseGzipResponse := func(r *gzipResponse) { r.w.Close(); gpool.Put(r) }
+	acquireGzipResponse := func(w http.ResponseWriter) (r *gzipResponse) {
+		r = gpool.Get().(*gzipResponse)
+		r.ResponseWriter = w
+		r.w.Reset(w)
+		return
+	}
+
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
 			if strings.Contains(ctx.GetHeader(ship.HeaderAcceptEncoding), "gzip") {
@@ -46,24 +66,9 @@ func Gzip(config *GZipConfig) Middleware {
 				ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
 
 				resp := ctx.ResponseWriter()
-				writer := ship.GetResponseFromPool(resp)
-				newWriter, err := gzip.NewWriterLevel(writer, conf.Level)
-				if err != nil {
-					return err
-				}
-
-				defer func() {
-					if writer.Size == 0 {
-						ctx.DelHeader(ship.HeaderContentEncoding)
-						ctx.SetResponse(resp)
-						newWriter.Reset(ioutil.Discard)
-					}
-					newWriter.Close()
-					ship.PutResponseIntoPool(writer)
-				}()
-
-				gzipWriter := &gzipResponseWriter{Writer: newWriter, ResponseWriter: resp}
-				ctx.SetResponse(gzipWriter)
+				gresp := acquireGzipResponse(resp)
+				defer releaseGzipResponse(gresp)
+				ctx.SetResponse(gresp)
 			}
 
 			return next(ctx)
@@ -71,26 +76,10 @@ func Gzip(config *GZipConfig) Middleware {
 	}
 }
 
-type gzipResponseWriter struct {
-	io.Writer
+type gzipResponse struct {
 	http.ResponseWriter
+	w *gzip.Writer
 }
 
-func (g *gzipResponseWriter) WriteHeader(statusCode int) {
-	if statusCode == http.StatusNoContent {
-		g.Header().Del(ship.HeaderContentEncoding)
-	}
-	g.Header().Del(ship.HeaderContentLength)
-	g.ResponseWriter.WriteHeader(statusCode)
-}
-
-func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-	if g.Header().Get(ship.HeaderContentType) == "" {
-		g.Header().Set(ship.HeaderContentType, http.DetectContentType(b))
-	}
-	return g.Writer.Write(b)
-}
-
-func (g *gzipResponseWriter) Flush() {
-	g.Writer.(*gzip.Writer).Flush()
-}
+func (g *gzipResponse) Write(b []byte) (int, error) { return g.w.Write(b) }
+func (g *gzipResponse) Flush()                      { g.w.Flush() }
