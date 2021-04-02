@@ -69,7 +69,7 @@ func TestBodyLimit(t *testing.T) {
 	}
 
 	// Based on content length (within limit)
-	if err := BodyLimit(limit)(handler)(ctx); err != nil {
+	if err := BodyLenLimit(limit)(handler)(ctx); err != nil {
 		t.Error(err)
 	} else if rec.Code != http.StatusOK {
 		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
@@ -81,7 +81,7 @@ func TestBodyLimit(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
 	ctx = s.AcquireContext(req, rec)
-	he := BodyLimit(6)(handler)(ctx).(ship.HTTPServerError)
+	he := BodyLenLimit(6)(handler)(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("StatusCode: expect %d, got %d",
 			http.StatusRequestEntityTooLarge, he.Code)
@@ -91,7 +91,7 @@ func TestBodyLimit(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
 	ctx = s.AcquireContext(req, rec)
-	if err := BodyLimit(limit)(handler)(ctx); err != nil {
+	if err := BodyLenLimit(limit)(handler)(ctx); err != nil {
 		t.Error(err)
 	} else if rec.Code != http.StatusOK {
 		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
@@ -103,7 +103,7 @@ func TestBodyLimit(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(bs)))
 	rec = httptest.NewRecorder()
 	ctx = s.AcquireContext(req, rec)
-	he = BodyLimit(6)(handler)(ctx).(ship.HTTPServerError)
+	he = BodyLenLimit(6)(handler)(ctx).(ship.HTTPServerError)
 	if he.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("StatusCode: expect %d, got %d",
 			http.StatusRequestEntityTooLarge, he.Code)

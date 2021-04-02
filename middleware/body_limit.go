@@ -21,10 +21,10 @@ import (
 	"github.com/xgfone/ship/v4"
 )
 
-// BodyLimit is used to limit the maximum body of the request.
-func BodyLimit(maxBodySize int64) Middleware {
+// BodyLenLimit is used to limit the maximum body of the request.
+func BodyLenLimit(maxBodySize int64) Middleware {
 	if maxBodySize < 1 {
-		panic("BodyLimit: maxBodySize must be greater than 0")
+		panic("BodyLenLimit: maxBodySize must be greater than 0")
 	}
 
 	pool := newLimitedReaderPool(maxBodySize)
