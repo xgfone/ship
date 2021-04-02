@@ -17,6 +17,7 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,8 +34,7 @@ func TestGzip(t *testing.T) {
 
 	// Skip if no Accept-Encoding header
 	handler := Gzip(nil)(func(ctx *ship.Context) error {
-		ctx.Response().Write([]byte("test"))
-		return nil
+		return ctx.Text(200, "test")
 	})
 
 	handler(ctx)
@@ -76,20 +76,21 @@ func TestGzipNoContent(t *testing.T) {
 
 	if err := handler(ctx); err != nil {
 		t.Error(err)
-	} else if rec.Header().Get(ship.HeaderContentEncoding) != "" {
-		t.Fail()
-	} else if rec.Header().Get(ship.HeaderContentType) != "" {
-		t.Fail()
-	} else if rec.Body.Len() != 0 {
-		t.Fail()
+	} else if ce := rec.Header().Get(ship.HeaderContentEncoding); ce != "gzip" {
+		t.Errorf("expect the header Content-Encoding '%s', but got '%s'", "gzip", ce)
+	} else if ct := rec.Header().Get(ship.HeaderContentType); ct != "" {
+		t.Errorf("unexpect the header Content-Type, but got '%s'", ct)
+	} else if r, err := gzip.NewReader(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
+	} else if data, err := io.ReadAll(r); err != nil {
+		t.Errorf("got an unexpected error when reading gzip data: %s", err)
+	} else if s := string(data); s != "" {
+		t.Errorf("unexpect response data, but got '%s'", s)
 	}
 }
 
 func TestGzipErrorReturned(t *testing.T) {
-	buf := bytes.NewBuffer(nil)
-	s := ship.New()
-	s.Logger = ship.NewLoggerFromWriter(buf, "", 0)
-	s.Use(Gzip(nil))
+	s := ship.New().Use(Gzip(nil), HandleError())
 	s.Route("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -97,8 +98,49 @@ func TestGzipErrorReturned(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, rec.Code)
-	} else if rec.Header().Get(ship.HeaderContentEncoding) != "" {
-		t.Fail()
+		t.Errorf("expect statuscode '%d', but got '%d'", http.StatusNotFound, rec.Code)
+	} else if ce := rec.Header().Get(ship.HeaderContentEncoding); ce != "gzip" {
+		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
+	} else if r, err := gzip.NewReader(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
+	} else if data, err := io.ReadAll(r); err != nil {
+		t.Errorf("got an unexpected error when reading gzip data: %s", err)
+	} else if s := string(data); s != "Not Found" {
+		t.Errorf("expect response data '%s', but got '%s'", "Not Found", s)
+	}
+}
+
+func TestGzipDomains(t *testing.T) {
+	s := ship.New().Use(Gzip(&GZipConfig{Domains: []string{"www1.example.com"}}))
+	s.Route("/").GET(ship.OkHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "www1.example.com"
+	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	if ce := rec.Header().Get(ship.HeaderContentEncoding); ce != "gzip" {
+		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
+	} else if r, err := gzip.NewReader(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
+	} else if data, err := io.ReadAll(r); err != nil {
+		t.Errorf("got an unexpected error when reading gzip data: %s", err)
+	} else if s := string(data); s != "OK" {
+		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "www2.example.com"
+	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	if rec.Header().Get(ship.HeaderContentEncoding) == "gzip" {
+		t.Errorf("unexpect the header Conent-Encoding 'gzip'")
+	} else if data, err := io.ReadAll(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when reading response data: %s", err)
+	} else if s := string(data); s != "OK" {
+		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
 	}
 }
