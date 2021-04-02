@@ -75,7 +75,7 @@ func (s *Ship) getRoutes(host string, r Router, rs []RouteInfo) []RouteInfo {
 
 // Routes returns the information of all the routes.
 func (s *Ship) Routes() (routes []RouteInfo) {
-	s.rlock()
+	s.Lock.RLock()
 	nodefault := true
 	routes = make([]RouteInfo, 0, s.hostManager.Sum+1)
 	s.hostManager.Range(func(host string, router Router) {
@@ -87,7 +87,7 @@ func (s *Ship) Routes() (routes []RouteInfo) {
 	if nodefault {
 		routes = s.getRoutes(s.defaultHost, s.defaultRouter, routes)
 	}
-	s.runlock()
+	s.Lock.RUnlock()
 	return
 }
 
@@ -123,7 +123,7 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 	}
 
 	var router Router
-	s.lock()
+	s.Lock.Lock()
 	if ri.Host == "" {
 		router = s.defaultRouter
 	} else if router = s.hostManager.Router(ri.Host); router == nil {
@@ -133,7 +133,7 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 			router, err = s.hostManager.Add(ri.Host, s.newRouter())
 		}
 	}
-	s.unlock()
+	s.Lock.Unlock()
 
 	if err != nil {
 		return RouteError{RouteInfo: ri, Err: err}
@@ -176,13 +176,13 @@ func (s *Ship) DelRoute(ri RouteInfo) (err error) {
 	}
 
 	var r Router
-	s.lock()
+	s.Lock.Lock()
 	if ri.Host == "" {
 		r = s.defaultRouter
 	} else if r = s.hostManager.Router(ri.Host); r == nil && ri.Host == s.defaultHost {
 		r = s.defaultRouter
 	}
-	s.unlock()
+	s.Lock.Unlock()
 
 	if r != nil {
 		if err = r.Del(ri.Name, ri.Method, ri.Path); err != nil {

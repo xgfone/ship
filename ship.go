@@ -38,13 +38,14 @@ type Router = router.Router
 type Ship struct {
 	*Runner
 
-	// If not nil, it will be locked and unlocked during access the routers.
-	// So you can modify the routes concurrently and safely during running.
+	// Lock is used to access the host routers concurrently and thread-safely.
 	//
-	// Notice: if using the lock, you should also use the locked Router.
+	// Notice: It doesn't ensure that it's safe to access the routes
+	// in a certain router concurrently and thread-safely.
+	// But you maybe use the locked Router, such as router.LockRouter.
 	//
-	// Default: nil
-	Lock *sync.RWMutex
+	// Default: NewNoopRWLocker()
+	Lock RWLocker
 
 	// The initialization capacity of Context.Data.
 	//
@@ -126,6 +127,7 @@ func New() *Ship {
 	s.URLParamMaxNum = 4
 	s.MiddlewareMaxNum = 256
 
+	s.Lock = NewNoopRWLocker()
 	s.Runner = NewRunner("", s)
 	s.Session = NewMemorySession()
 	s.NotFound = NotFoundHandler()
@@ -173,6 +175,7 @@ func (s *Ship) Clone() *Ship {
 	newShip.handler = newShip.executeRouter
 
 	// Public
+	newShip.Lock = NewNoopRWLocker()
 	newShip.Prefix = s.Prefix
 	newShip.NotFound = s.NotFound
 	newShip.HandleError = s.HandleError
@@ -202,30 +205,6 @@ func (s *Ship) Clone() *Ship {
 	newShip.SetBufferSize(2048)
 	newShip.SetNewRouter(s.newRouter)
 	return newShip
-}
-
-func (s *Ship) lock() {
-	if s.Lock != nil {
-		s.Lock.Lock()
-	}
-}
-
-func (s *Ship) unlock() {
-	if s.Lock != nil {
-		s.Lock.Unlock()
-	}
-}
-
-func (s *Ship) rlock() {
-	if s.Lock != nil {
-		s.Lock.RLock()
-	}
-}
-
-func (s *Ship) runlock() {
-	if s.Lock != nil {
-		s.Lock.RUnlock()
-	}
 }
 
 //----------------------------------------------------------------------------
@@ -340,7 +319,7 @@ func (s *Ship) Use(middlewares ...Middleware) *Ship {
 
 // Routers returns the routers with their host.
 func (s *Ship) Routers() (routers map[string]Router) {
-	s.rlock()
+	s.Lock.RLock()
 	if _len := s.hostManager.Len() + 1; _len == 1 {
 		routers = map[string]Router{s.defaultHost: s.defaultRouter}
 	} else {
@@ -350,7 +329,7 @@ func (s *Ship) Routers() (routers map[string]Router) {
 			routers[host] = router
 		})
 	}
-	s.runlock()
+	s.Lock.RUnlock()
 	return
 }
 
@@ -358,13 +337,13 @@ func (s *Ship) Routers() (routers map[string]Router) {
 //
 // If host is empty, return the default router.
 func (s *Ship) Router(host string) (r Router) {
-	s.rlock()
+	s.Lock.RLock()
 	if host == "" {
 		r = s.defaultRouter
 	} else if r = s.hostManager.Router(host); r == nil && host == s.defaultHost {
 		r = s.defaultRouter
 	}
-	s.runlock()
+	s.Lock.RUnlock()
 	return
 }
 
@@ -376,18 +355,18 @@ func (s *Ship) SetDefaultRouter(host string, router Router) {
 	if router == nil {
 		panic("Ship.SetDefaultRouter: router must not be nil")
 	}
-	s.lock()
+	s.Lock.Lock()
 	s.defaultHost, s.defaultRouter = host, router
-	s.unlock()
+	s.Lock.Unlock()
 }
 
 // GetDefaultRouter returns the default host domain and router.
 //
 // For the default default router, the host is "".
 func (s *Ship) GetDefaultRouter() (host string, router Router) {
-	s.rlock()
+	s.Lock.RLock()
 	host, router = s.defaultHost, s.defaultRouter
-	s.runlock()
+	s.Lock.RUnlock()
 	return
 }
 
@@ -401,18 +380,18 @@ func (s *Ship) AddHost(host string, r Router) (Router, error) {
 		r = s.newRouter()
 	}
 
-	s.lock()
+	s.Lock.Lock()
 	r, err := s.hostManager.Add(host, r)
-	s.unlock()
+	s.Lock.Unlock()
 	return r, err
 }
 
 // DelHost deletes the host router.
 func (s *Ship) DelHost(host string) {
 	if host != "" {
-		s.lock()
+		s.Lock.Lock()
 		s.hostManager.Del(host)
-		s.unlock()
+		s.Lock.Unlock()
 	}
 }
 
@@ -466,21 +445,13 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	var host string
 	var router Router
 
-	if s.Lock == nil {
-		if s.hostManager.Sum == 0 || req.Host == "" {
-			host, router = s.defaultHost, s.defaultRouter
-		} else if host, router = s.hostManager.Match(req.Host); host == "" {
-			host, router = s.defaultHost, s.defaultRouter
-		}
-	} else {
-		s.Lock.RLock()
-		if s.hostManager.Sum == 0 || req.Host == "" {
-			host, router = s.defaultHost, s.defaultRouter
-		} else if host, router = s.hostManager.Match(req.Host); host == "" {
-			host, router = s.defaultHost, s.defaultRouter
-		}
-		s.Lock.RUnlock()
+	s.Lock.RLock()
+	if s.hostManager.Sum == 0 || req.Host == "" {
+		host, router = s.defaultHost, s.defaultRouter
+	} else if host, router = s.hostManager.Match(req.Host); host == "" {
+		host, router = s.defaultHost, s.defaultRouter
 	}
+	s.Lock.RUnlock()
 
 	// Optimize the function call, which is equal to
 	//
