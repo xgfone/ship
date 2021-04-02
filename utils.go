@@ -303,72 +303,62 @@ func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err er
 }
 
 // GetText is the same as GetJSON, but get the response body as the string.
+//
+// No request body, and has response body if successfully.
 func GetText(url string) (body string, err error) {
 	err = Request(context.Background(), http.MethodGet, url, nil, nil, &body)
 	return
 }
 
 // GetJSON is the same as RequestJSON, but use the method GET instead.
-func GetJSON(url string, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodGet, url, nil, nil, r)
+//
+// No request body, and has response body if successfully.
+func GetJSON(url string, resp interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodGet, url, nil, nil, resp)
 }
 
 // PostJSON is the same as RequestJSON, but use the method POST instead.
-func PostJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodPost, url, nil, req, r)
+//
+// Has request body, and has response body if successfully.
+func PostJSON(url string, req interface{}, resp interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodPost, url, nil, req, resp)
 }
 
 // PutJSON is the same as RequestJSON, but use the method PUT instead.
-func PutJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodPut, url, nil, req, r)
+//
+// Has request body, and no response body.
+func PutJSON(url string, req interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodPut, url, nil, req, nil)
 }
 
 // PatchJSON is the same as RequestJSON, but use the method PATCH instead.
-func PatchJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodPatch, url, nil, req, r)
+//
+// Has request body, and has response body if successfully.
+func PatchJSON(url string, req interface{}, resp interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodPatch, url, nil, req, resp)
 }
 
 // DeleteJSON is the same as RequestJSON, but use the method DELETE instead.
-func DeleteJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodDelete, url, nil, req, r)
+//
+// May has request body, and may has response body.
+func DeleteJSON(url string, req interface{}, resp interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodDelete, url, nil, req, resp)
 }
 
 // HeadJSON is the same as RequestJSON, but use the method HEADE instead.
-func HeadJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodHead, url, nil, req, r)
+//
+// No request body, and no response body.
+func HeadJSON(url string) (respHeader http.Header, err error) {
+	r := func(r *http.Response) error { respHeader = r.Header; return nil }
+	err = RequestJSON(context.Background(), http.MethodHead, url, nil, nil, r)
+	return
 }
 
 // OptionsJSON is the same as RequestJSON, but use the method OPTIONS instead.
-func OptionsJSON(url string, req interface{}, resp ...interface{}) (err error) {
-	var r interface{}
-	if len(resp) > 0 {
-		r = resp[0]
-	}
-	return RequestJSON(context.Background(), http.MethodOptions, url, nil, req, r)
+//
+// No request body, and has response body if successfully.
+func OptionsJSON(url string, resp interface{}) (err error) {
+	return RequestJSON(context.Background(), http.MethodOptions, url, nil, nil, resp)
 }
 
 // RequestJSON is the same as Request, but encodes the request
