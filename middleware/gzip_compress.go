@@ -30,9 +30,26 @@ type GZipConfig struct {
 	//
 	// Default: -1 (default compression level)
 	Level int
+
+	// Domains is the host domains enabling the gzip compression.
+	// If empty, compress all the requests to all the host domains.
+	//
+	// Notnice: for the current implementation, it matches the domains exactly.
+	//
+	// Default: nil
+	Domains []string
 }
 
 // Gzip returns a middleware to compress the response body by GZIP.
+//
+// Notice:
+//   1. the returned gzip middleware will always compress it,
+//      no matter whether the response body is empty or not.
+//   2. the gzip middleware must be the last to handle the response.
+//      If returning an error stands for the failure result, therefore,
+//      it should be handled before compressing the response body,
+//      that's, the error handler middleware must be appended
+//      after the GZip middleware.
 func Gzip(config *GZipConfig) Middleware {
 	var conf GZipConfig
 	if config != nil {
@@ -62,13 +79,15 @@ func Gzip(config *GZipConfig) Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
 			if strings.Contains(ctx.GetHeader(ship.HeaderAcceptEncoding), "gzip") {
-				ctx.AddHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
-				ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
+				if len(conf.Domains) == 0 || ship.InStrings(splitHost(ctx.Host()), conf.Domains) {
+					ctx.AddHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
+					ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
 
-				resp := ctx.ResponseWriter()
-				gresp := acquireGzipResponse(resp)
-				defer releaseGzipResponse(gresp)
-				ctx.SetResponse(gresp)
+					resp := ctx.ResponseWriter()
+					gresp := acquireGzipResponse(resp)
+					defer releaseGzipResponse(gresp)
+					ctx.SetResponse(gresp)
+				}
 			}
 
 			return next(ctx)
@@ -83,3 +102,8 @@ type gzipResponse struct {
 
 func (g *gzipResponse) Write(b []byte) (int, error) { return g.w.Write(b) }
 func (g *gzipResponse) Flush()                      { g.w.Flush() }
+
+func splitHost(hostport string) (host string) {
+	host, _ = ship.SplitHostPort(hostport)
+	return
+}
