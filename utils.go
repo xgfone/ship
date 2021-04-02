@@ -380,6 +380,7 @@ func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
 //   - json.Unmarshaler: read and parse the response body as the JSON.
 //   - func(io.Reader) error: call the function with the response body.
 //   - func(*bytes.Buffer) error: read the response body into the buffer and call the function.
+//   - func(*http.Response) error: call the function with the response.
 //
 // Notice: if the encoding of the response body is gzip, it will decode it firstly.
 func Request(ctx context.Context, method, url string, reqHeader http.Header,
@@ -444,6 +445,9 @@ func Request(ctx context.Context, method, url string, reqHeader http.Header,
 		_, err = io.CopyBuffer(r, respbody, make([]byte, 1024))
 	case func(io.Reader) error:
 		err = r(respbody)
+	case func(*http.Response) error:
+		resp.Body = respbody
+		err = r(resp)
 	case func(*bytes.Buffer) error:
 		b := getBuffer()
 		if _, err = io.CopyBuffer(b, respbody, make([]byte, 1024)); err == nil {
