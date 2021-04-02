@@ -96,6 +96,51 @@ func DisalbeRedirect(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
+// InStrings reports whether s is in the string slice ss or not.
+func InStrings(s string, ss []string) bool {
+	for i, _len := 0, len(ss); i < _len; i++ {
+		if s == ss[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// SplitHostPort separates host and port. If the port is not valid, it returns
+// the entire input as host, and it doesn't check the validity of the host.
+// Unlike net.SplitHostPort, but per RFC 3986, it requires ports to be numeric.
+func SplitHostPort(hostport string) (host, port string) {
+	host = hostport
+
+	colon := strings.LastIndexByte(host, ':')
+	if colon != -1 && validOptionalPort(host[colon:]) {
+		host, port = host[:colon], host[colon+1:]
+	}
+
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+
+	return
+}
+
+// validOptionalPort reports whether port is either an empty string
+// or matches /^:\d*$/
+func validOptionalPort(port string) bool {
+	if port == "" {
+		return true
+	}
+	if port[0] != ':' {
+		return false
+	}
+	for _, b := range port[1:] {
+		if b < '0' || b > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 var (
 	errInvalidTagValue    = errors.New("invalid tag value")
 	errNotPointerToStruct = errors.New("the argument must be a pointer to struct")
