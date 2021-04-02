@@ -421,10 +421,17 @@ func (s *Ship) DelHost(host string) {
 //----------------------------------------------------------------------------
 
 func (s *Ship) handleErrorDefault(ctx *Context, err error) {
-	if !ctx.res.Wrote {
+	if ctx.res.Wrote {
+		ctx.Logger().Errorf("unknown error: method=%s, url=%s, err=%s",
+			ctx.Method(), ctx.RequestURI(), err)
+	} else {
 		switch e := err.(type) {
 		case HTTPServerError:
-			ctx.BlobText(e.Code, e.CT, e.Error())
+			if e.CT == "" {
+				ctx.BlobText(e.Code, MIMETextPlain, e.Error())
+			} else {
+				ctx.BlobText(e.Code, e.CT, e.Error())
+			}
 		default:
 			ctx.NoContent(http.StatusInternalServerError)
 		}
