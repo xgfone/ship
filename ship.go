@@ -346,7 +346,7 @@ func (s *Ship) Routers() (routers map[string]Router) {
 	} else {
 		routers = make(map[string]Router, _len)
 		routers[s.defaultHost] = s.defaultRouter
-		s.hostManager.Each(func(host string, router Router) {
+		s.hostManager.Range(func(host string, router Router) {
 			routers[host] = router
 		})
 	}

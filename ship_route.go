@@ -78,7 +78,7 @@ func (s *Ship) Routes() (routes []RouteInfo) {
 	s.rlock()
 	nodefault := true
 	routes = make([]RouteInfo, 0, s.hostManager.Sum+1)
-	s.hostManager.Each(func(host string, router Router) {
+	s.hostManager.Range(func(host string, router Router) {
 		routes = s.getRoutes(host, router, routes)
 		if nodefault && host == s.defaultHost {
 			nodefault = false

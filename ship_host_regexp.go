@@ -38,7 +38,7 @@ func (rr *reHostRouter) Len() int {
 	return len(rr.hosts)
 }
 
-func (rr *reHostRouter) Each(f func(string, Router)) {
+func (rr *reHostRouter) Range(f func(string, Router)) {
 	for rehost, router := range rr.hosts {
 		f(rehost, router.router)
 	}

@@ -24,8 +24,8 @@ type RegexpHostRouter interface {
 	// Len returns the number of the regexp host routers.
 	Len() int
 
-	// Each is used to traverse all the regexp host routers.
-	Each(func(regexpHost string, router Router))
+	// Range is used to traverse all the regexp host routers.
+	Range(func(regexpHost string, router Router))
 
 	// Add adds and returns the regexp host router.
 	//
@@ -67,14 +67,14 @@ func (hm *hostManager) Len() int {
 	return len(hm.ehosts) + len(hm.fhosts) + hm.rhosts.Len()
 }
 
-func (hm *hostManager) Each(f func(string, Router)) {
+func (hm *hostManager) Range(f func(string, Router)) {
 	for host, router := range hm.ehosts {
 		f(host, router)
 	}
 	for host, router := range hm.fhosts {
 		f(host, router)
 	}
-	hm.rhosts.Each(f)
+	hm.rhosts.Range(f)
 }
 
 func (hm *hostManager) Router(host string) Router {
