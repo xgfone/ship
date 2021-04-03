@@ -302,67 +302,59 @@ func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err er
 	return
 }
 
-// GetText is the same as GetJSON, but get the response body as the string.
-//
-// No request body, and has response body if successfully.
+// GetText is the same as GetJSON, but get the response body as the string,
+// which has no request body but has the response body if successfully.
 func GetText(url string) (body string, err error) {
 	err = Request(context.Background(), http.MethodGet, url, nil, nil, &body)
 	return
 }
 
-// GetJSON is the same as RequestJSON, but use the method GET instead.
-//
-// No request body, and has response body if successfully.
+// GetJSON is the same as RequestJSON, but use the method GET instead,
+// which has no request body but has the response body if successfully.
 func GetJSON(url string, resp interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodGet, url, nil, nil, resp)
 }
 
-// PostJSON is the same as RequestJSON, but use the method POST instead.
-//
-// Has request body, and has response body if successfully.
+// PostJSON is the same as RequestJSON, but use the method POST instead,
+// which has the request body and the response body if successfully.
 func PostJSON(url string, req interface{}, resp interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodPost, url, nil, req, resp)
 }
 
-// PutJSON is the same as RequestJSON, but use the method PUT instead.
-//
-// Has request body, and no response body.
+// PutJSON is the same as RequestJSON, but use the method PUT instead,
+// which has the request body but no response body.
 func PutJSON(url string, req interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodPut, url, nil, req, nil)
 }
 
-// PatchJSON is the same as RequestJSON, but use the method PATCH instead.
-//
-// Has request body, and has response body if successfully.
+// PatchJSON is the same as RequestJSON, but use the method PATCH instead,
+// which has the request body and the response body if successfully.
 func PatchJSON(url string, req interface{}, resp interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodPatch, url, nil, req, resp)
 }
 
-// DeleteJSON is the same as RequestJSON, but use the method DELETE instead.
-//
-// May has request body, and may has response body.
+// DeleteJSON is the same as RequestJSON, but use the method DELETE instead,
+// which may has the request body and the response body.
 func DeleteJSON(url string, req interface{}, resp interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodDelete, url, nil, req, resp)
 }
 
-// HeadJSON is the same as RequestJSON, but use the method HEADE instead.
-//
-// No request body, and no response body.
+// HeadJSON is the same as RequestJSON, but use the method HEADE instead,
+// which has no request or response body.
 func HeadJSON(url string) (respHeader http.Header, err error) {
 	r := func(r *http.Response) error { respHeader = r.Header; return nil }
 	err = RequestJSON(context.Background(), http.MethodHead, url, nil, nil, r)
 	return
 }
 
-// OptionsJSON is the same as RequestJSON, but use the method OPTIONS instead.
-//
-// No request body, and has response body if successfully.
+// OptionsJSON is the same as RequestJSON, but use the method OPTIONS instead,
+// which has no request body but has the response body if successfully.
 func OptionsJSON(url string, resp interface{}) (err error) {
 	return RequestJSON(context.Background(), http.MethodOptions, url, nil, nil, resp)
 }
 
 // RequestJSON is the same as Request, but encodes the request
-// and decodes response body as JSON。
+// and decodes response body as JSON.
 func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
 	reqBody, respBody interface{}) error {
 	if len(reqHeader) == 0 {
@@ -404,7 +396,12 @@ func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
 
 // Request sends the http request and parses the response body into respBody.
 //
-// reqBody must be one of types: nil, []byte, string, io.Reader.
+// reqBody must be one of types:
+//   - nil
+//   - []byte
+//   - string
+//   - io.Reader
+//   - func() (io.Reader, error)
 //
 // respBody must be one of types:
 //   - nil: ignore the response body.
@@ -419,7 +416,7 @@ func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
 //
 // Notice: if the encoding of the response body is gzip, it will decode it firstly.
 func Request(ctx context.Context, method, url string, reqHeader http.Header,
-	reqBody, respBody interface{}) error {
+	reqBody, respBody interface{}) (err error) {
 	var body io.Reader
 	switch data := reqBody.(type) {
 	case nil:
@@ -429,8 +426,12 @@ func Request(ctx context.Context, method, url string, reqHeader http.Header,
 		body = bytes.NewBufferString(data)
 	case io.Reader:
 		body = data
+	case func() (io.Reader, error):
+		if body, err = data(); err != nil {
+			return NewHTTPClientError(method, url, 0, err)
+		}
 	default:
-		return fmt.Errorf("unknown request body type '%T'", reqBody)
+		panic(fmt.Errorf("unknown request body type '%T'", reqBody))
 	}
 
 	req, err := NewRequestWithContext(ctx, method, url, body)
