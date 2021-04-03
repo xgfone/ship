@@ -32,38 +32,43 @@ func (r Route) String() string {
 	return fmt.Sprintf("Route(name=%s, method=%s, path=%s)", r.Name, r.Method, r.Path)
 }
 
-// Router stands for a router management.
+// Router is a router manager based on the path with the optional method.
 type Router interface {
-	// Routes returns the list of all the routes.
-	Routes() []Route
-
-	// URL generates a URL by the url name and parameters.
-	URL(name string, params ...interface{}) string
-
-	// Add adds a route and returns the number of the parameters
-	// if there are the parameters in the route.
+	// Routes uses the filter to filter and return the routes if it returns true.
 	//
-	// If method is empty, the implementation should add the handler
-	// for all the methods that it supports.
+	// Return all the routes if filter is nil.
+	Routes(filter func(name, path, method string) bool) []Route
+
+	// Path generates a url path by the path name and parameters.
 	//
-	// For keeping consistent, the parameter should start with ":" or "*".
-	// ":" stands for the single parameter, and "*" stands for the wildcard.
-	Add(name, method, path string, handler interface{}) (paramNum int, err error)
+	// Return "" if there is not the route path named name.
+	Path(name string, params ...interface{}) string
+
+	// Add adds the route and returns the number of the parameters
+	// if there are the parameters in the route path.
+	//
+	// name is the name of the path, which is optional and must be unique
+	// if not empty.
+	//
+	// If method is empty, handler is the handler of all the methods supported
+	// by the implementation. Or, it is only that of the given method.
+	//
+	// For the parameter in the path, the format is determined by the implementation.
+	Add(name, path, method string, handler interface{}) (paramNum int, err error)
 
 	// Del deletes the given route.
 	//
-	// If name is not empty, lookup the path by it instead.
-	//
 	// If method is empty, deletes all the routes associated with the path.
-	// Or only delete the given method for the path.
-	Del(name, method, path string) (err error)
+	// Or, only delete the given method for the path.
+	Del(path, method string) (err error)
 
-	// Find searchs and returns the handler and the number of the url path
-	// paramethers. For the paramethers, they are put into pnames and pvalues.
+	// Match matches the route by path and method, puts the path parameters
+	// into pnames and pvalues, then returns the handler and the number
+	// of the path paramethers.
 	//
 	// If pnames or pvalues is empty, it will ignore the path paramethers
 	// when finding the route handler.
 	//
 	// Return (nil, 0) if not found the route handler.
-	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
+	Match(path, method string, pnames, pvalues []string) (handler interface{}, pn int)
 }

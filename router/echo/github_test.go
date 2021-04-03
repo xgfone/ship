@@ -24,12 +24,12 @@ func TestGithubAPI(t *testing.T) {
 	var handler bool
 	router := NewRouter(nil)
 	for _, r := range githubAPI {
-		if n, _ := router.Add(r.Path, r.Method, r.Path, handler); n > maxParamNum {
+		if n, _ := router.Add(r.Path, r.Path, r.Method, handler); n > maxParamNum {
 			maxParamNum = n
 		}
 	}
 
-	if _len := len(router.Routes()); _len != 203 {
+	if _len := len(router.Routes(nil)); _len != 203 {
 		t.Errorf("expected 203 routes, but got '%d'", _len)
 	}
 
@@ -37,7 +37,7 @@ func TestGithubAPI(t *testing.T) {
 		pnames := make([]string, 8)
 		pvalues := make([]string, 8)
 
-		if h, n := router.Find(r.Method, r.Path, pnames, pvalues); h == nil {
+		if h, n := router.Match(r.Path, r.Method, pnames, pvalues); h == nil {
 			t.Error("no found handler", r.Path)
 		} else if strings.IndexByte(r.Path, ':') > 0 && n == 0 {
 			t.Fail()
@@ -45,9 +45,9 @@ func TestGithubAPI(t *testing.T) {
 	}
 
 	for _, r := range githubAPI {
-		router.Del("", r.Method, r.Path)
+		router.Del(r.Path, r.Method)
 	}
-	if _len := len(router.Routes()); _len != 0 {
+	if _len := len(router.Routes(nil)); _len != 0 {
 		t.Errorf("expected no route, but got '%d'", _len)
 	}
 	if len(router.routes) > 0 {

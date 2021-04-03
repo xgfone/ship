@@ -320,7 +320,7 @@ func (s *Ship) Use(middlewares ...Middleware) *Ship {
 // Routers returns the routers with their host.
 func (s *Ship) Routers() (routers map[string]Router) {
 	s.Lock.RLock()
-	if _len := s.hostManager.Len() + 1; _len == 1 {
+	if _len := s.hostManager.Sum + 1; _len == 1 {
 		routers = map[string]Router{s.defaultHost: s.defaultRouter}
 	} else {
 		routers = make(map[string]Router, _len)
@@ -422,7 +422,7 @@ func (s *Ship) executeRouter(c *Context) error {
 		return s.RouterExecutor(c)
 	}
 
-	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	h, n := c.router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
 	if h == nil {
 		return c.notFound(c)
 	}

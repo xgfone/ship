@@ -121,17 +121,19 @@ func (mh *methodHandler) DelHandler(method string) { mh.AddHandler(method, nil) 
 func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 	switch method {
 	case "": // For Any Method
-		mh.get = handler
-		mh.put = handler
-		mh.post = handler
-		mh.head = handler
-		mh.patch = handler
-		mh.trace = handler
-		mh.delete = handler
-		mh.options = handler
-		mh.connect = handler
-		mh.propfind = handler
-		mh.report = handler
+		*mh = methodHandler{
+			get:      handler,
+			put:      handler,
+			post:     handler,
+			head:     handler,
+			patch:    handler,
+			trace:    handler,
+			delete:   handler,
+			options:  handler,
+			connect:  handler,
+			propfind: handler,
+			report:   handler,
+		}
 	case http.MethodGet:
 		mh.get = handler
 	case http.MethodPut:
@@ -351,8 +353,18 @@ type Config struct {
 	RemoveTrailingSlash bool
 }
 
-// Router is the registry of all registered routes for request matching
-// and URL path parameter parsing.
+// Router is the registry of all registered routes to match the request
+// with the url method and path, which supports one or more path parameters.
+//
+// For the single parameter, it starts with ":" followed by the parameter name,
+// such as "/v1/:first/path/:second/to/:third".
+//
+// For the wildcard parameter, its starts with "*" followed by the optional
+// parameter name. If no the parameter name, it is "*" by default. such as
+// "/v1/path/to/*" or "/v1/path/to/*wildcard".
+//
+// Moreover, the single and wildcard parameters may used in combination.
+// But the wildcard parameter must be the last.
 type Router struct {
 	conf    Config
 	tree    *node
@@ -378,8 +390,8 @@ func NewRouter(c *Config) *Router {
 	}
 }
 
-// URL returns a url by the name and the params.
-func (r *Router) URL(name string, params ...interface{}) (url string) {
+// Path returns a url path by the path name and the parameters.
+func (r *Router) Path(name string, params ...interface{}) (url string) {
 	path := r.routes[name]
 	if path == "" {
 		return ""
@@ -421,25 +433,28 @@ func (r *Router) URL(name string, params ...interface{}) (url string) {
 }
 
 // Routes returns the list of all the routes.
-func (r *Router) Routes() []router.Route {
-	routes := make([]router.Route, 0, 64)
-	return r.getRoutes(r.tree, routes)
+func (r *Router) Routes(filter func(name, path, method string) bool) []router.Route {
+	routes := make([]router.Route, 0, 32)
+	return r.getRoutes(r.tree, routes, filter)
 }
 
-func (r *Router) getRoutes(n *node, routes []router.Route) []router.Route {
+func (r *Router) getRoutes(n *node, routes []router.Route,
+	filter func(string, string, string) bool) []router.Route {
 	if n.ppath != "" {
 		for _, route := range n.handlers.Routes() {
-			routes = append(routes, router.Route{
-				Name:    n.name,
-				Path:    n.ppath,
-				Method:  route.Method,
-				Handler: route.Handler,
-			})
+			if filter == nil || filter(n.name, n.ppath, route.Method) {
+				routes = append(routes, router.Route{
+					Name:    n.name,
+					Path:    n.ppath,
+					Method:  route.Method,
+					Handler: route.Handler,
+				})
+			}
 		}
 	}
 
 	for _, cn := range n.children {
-		routes = r.getRoutes(cn, routes)
+		routes = r.getRoutes(cn, routes, filter)
 	}
 	return routes
 }
@@ -450,7 +465,7 @@ func (r *Router) getRoutes(n *node, routes []router.Route) []router.Route {
 //
 // If method is empty, it'll override the handlers of all the supported methods
 // with h.
-func (r *Router) Add(name, method, path string, h interface{}) (n int, err error) {
+func (r *Router) Add(name, path, method string, h interface{}) (n int, err error) {
 	if h == nil {
 		return 0, fmt.Errorf("route handler must not be nil")
 	}
@@ -635,9 +650,9 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 	}
 }
 
-// Find lookups a handler registered for method and path,
+// Match lookups a handler registered for method and path,
 // which also parses the path for the parameters.
-func (r *Router) Find(method, path string, pnames, pvalues []string) (h interface{}, pn int) {
+func (r *Router) Match(path, method string, pnames, pvalues []string) (h interface{}, pn int) {
 	if r.conf.RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
@@ -792,10 +807,7 @@ func (r *Router) Find(method, path string, pnames, pvalues []string) (h interfac
 /// ----------------------------------------------------------------------- ///
 
 // Del deletes the given route.
-func (r *Router) Del(name, method, path string) (err error) {
-	if name != "" {
-		path = r.routes[name]
-	}
+func (r *Router) Del(path, method string) (err error) {
 	if path != "" {
 		err = r.delRoute(path, method)
 	}

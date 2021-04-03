@@ -59,7 +59,7 @@ func (ri RouteInfo) checkPath() error {
 }
 
 func (s *Ship) getRoutes(host string, r Router, rs []RouteInfo) []RouteInfo {
-	for _, route := range r.Routes() {
+	for _, route := range r.Routes(nil) {
 		ch := route.Handler.(RouteInfo)
 		rs = append(rs, RouteInfo{
 			Host:    host,
@@ -137,10 +137,10 @@ func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 
 	if err != nil {
 		return RouteError{RouteInfo: ri, Err: err}
-	} else if n, e := router.Add(ri.Name, ri.Method, ri.Path, ri); e != nil {
+	} else if n, e := router.Add(ri.Name, ri.Path, ri.Method, ri); e != nil {
 		err = RouteError{RouteInfo: ri, Err: e}
 	} else if n > s.URLParamMaxNum {
-		router.Del(ri.Name, ri.Method, ri.Path)
+		router.Del(ri.Path, ri.Method)
 		err = RouteError{RouteInfo: ri, Err: errors.New("too many url params")}
 	}
 
@@ -185,7 +185,7 @@ func (s *Ship) DelRoute(ri RouteInfo) (err error) {
 	s.Lock.Unlock()
 
 	if r != nil {
-		if err = r.Del(ri.Name, ri.Method, ri.Path); err != nil {
+		if err = r.Del(ri.Path, ri.Method); err != nil {
 			err = RouteError{RouteInfo: ri, Err: err}
 		}
 	}

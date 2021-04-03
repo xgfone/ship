@@ -209,7 +209,7 @@ func (c *Context) Router() Router { return c.router }
 
 // FindRoute finds the route from the router.
 func (c *Context) FindRoute() (ok bool) {
-	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	h, n := c.router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
 	if ok = h != nil; ok {
 		c.plen = n
 		switch ri := h.(type) {
@@ -229,7 +229,7 @@ func (c *Context) FindRoute() (ok bool) {
 // SetRouter must be called before calling Execute, which be done
 // by the framework.
 func (c *Context) Execute() error {
-	h, n := c.router.Find(c.req.Method, c.req.URL.Path, c.pnames, c.pvalues)
+	h, n := c.router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
 	if h == nil {
 		return c.notFound(c)
 	}
@@ -258,11 +258,11 @@ func (c *Context) NotFoundHandler() Handler { return c.notFound }
 // URL
 //----------------------------------------------------------------------------
 
-// URL generates an URL by route name and provided parameters.
+// URLPath generates a url path by the route path name and provided parameters.
 //
-// Return "" if there is no the route named name.
-func (c *Context) URL(name string, params ...interface{}) string {
-	return c.router.URL(name, params...)
+// Return "" if there is not the route named name.
+func (c *Context) URLPath(name string, params ...interface{}) string {
+	return c.router.Path(name, params...)
 }
 
 //----------------------------------------------------------------------------

@@ -40,29 +40,29 @@ func TestRemoveTrailingSlash(t *testing.T) {
 	}
 
 	r := NewRouter(&Config{RemoveTrailingSlash: true})
-	if _, err := r.Add("", http.MethodGet, "/v1/path/", true); err != nil {
+	if _, err := r.Add("", "/v1/path/", http.MethodGet, true); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(); len(rs) != 1 {
+	} else if rs := r.Routes(nil); len(rs) != 1 {
 		t.Error(rs)
 	}
 
-	if h, _ := r.Find(http.MethodGet, "/v1/path/", nil, nil); h == nil {
+	if h, _ := r.Match("/v1/path/", http.MethodGet, nil, nil); h == nil {
 		t.Error("no route")
 	}
-	if h, _ := r.Find(http.MethodGet, "/v1/path", nil, nil); h == nil {
+	if h, _ := r.Match("/v1/path", http.MethodGet, nil, nil); h == nil {
 		t.Error("no route")
 	}
 
-	if err := r.Del("", http.MethodGet, "/v1/path/"); err != nil {
+	if err := r.Del("/v1/path/", http.MethodGet); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(); len(rs) != 0 {
+	} else if rs := r.Routes(nil); len(rs) != 0 {
 		t.Error(rs)
 	}
 
-	r.Add("", http.MethodGet, "/v1/path/", true)
-	if err := r.Del("", http.MethodGet, "/v1/path"); err != nil {
+	r.Add("", "/v1/path/", http.MethodGet, true)
+	if err := r.Del("/v1/path", http.MethodGet); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(); len(rs) != 0 {
+	} else if rs := r.Routes(nil); len(rs) != 0 {
 		t.Error(rs)
 	}
 }
@@ -74,20 +74,20 @@ func TestRouter(t *testing.T) {
 	var pnames, pvalues []string
 
 	router := NewRouter(nil)
-	router.Add("static", "GET", "/static", handler)
-	router.Add("param", "POST", "/test/:name", handler)
+	router.Add("static", "/static", "GET", handler)
+	router.Add("param", "/test/:name", "POST", handler)
 
-	if v := router.URL("param", "Aaron"); v != "/test/Aaron" {
+	if v := router.Path("param", "Aaron"); v != "/test/Aaron" {
 		t.Errorf("expected '/test/Aaron', got '%s'", v)
 	}
 
-	if h, _ = router.Find("GET", "/static", nil, nil); h == nil {
+	if h, _ = router.Match("/static", "GET", nil, nil); h == nil {
 		t.Error("no route handler for 'GET /static'")
 	}
 
 	pnames = make([]string, 1)
 	pvalues = make([]string, 1)
-	if h, n = router.Find("POST", "/test/Aaron", pnames, pvalues); h == nil {
+	if h, n = router.Match("/test/Aaron", "POST", pnames, pvalues); h == nil {
 		t.Error("no route handler for 'POST /test/Aaron'")
 	} else if n == 0 {
 		t.Errorf("no paramether number")
@@ -99,8 +99,8 @@ func TestRouter(t *testing.T) {
 
 	pnames = make([]string, 1)
 	pvalues = make([]string, 1)
-	router.Add("", "GET", "/static1/*", handler)
-	if h, n = router.Find("GET", "/static1/path/to/file", pnames, pvalues); h == nil {
+	router.Add("", "/static1/*", "GET", handler)
+	if h, n = router.Match("/static1/path/to/file", "GET", pnames, pvalues); h == nil {
 		t.Error("no route handler for 'GET /static1/path/to/file'")
 	} else if n != 1 || pnames[0] != "*" || pvalues[0] != "path/to/file" {
 		t.Errorf("expected dir 'path/to/file', but got '%s'", pvalues[0])
@@ -108,8 +108,8 @@ func TestRouter(t *testing.T) {
 
 	pnames = make([]string, 1)
 	pvalues = make([]string, 1)
-	router.Add("", "GET", "/static2/*filepath", handler)
-	if h, n = router.Find("GET", "/static2/path/to/file", pnames, pvalues); h == nil {
+	router.Add("", "/static2/*filepath", "GET", handler)
+	if h, n = router.Match("/static2/path/to/file", "GET", pnames, pvalues); h == nil {
 		t.Error("no route handler for 'GET /static2/path/to/file'")
 	} else if n != 1 || pnames[0] != "filepath" {
 		t.Errorf("ParamName: expect '%s', got '%s'", "filepath", pnames[0])
@@ -117,9 +117,18 @@ func TestRouter(t *testing.T) {
 		t.Errorf("ParamValue: expected dir 'path/to/file', but got '%s'", pvalues[0])
 	}
 
-	if h, _ := router.Find("POST", "/test/param", nil, nil); h == nil {
+	if h, _ := router.Match("/test/param", "POST", nil, nil); h == nil {
 		t.Error("not found the handler")
 	}
+
+	routes := router.Routes(func(n, _, _ string) bool { return n == "param" })
+	if len(routes) != 1 {
+		t.Error(routes)
+	} else if r := routes[0]; r.Method != "POST" || r.Path != "/test/:name" {
+		t.Errorf("expect method='%s', path='%s', but got method='%s', path='%s'",
+			"POST", "/test/:name", r.Method, r.Path)
+	}
+
 }
 
 func TestRouterAnyMethod(t *testing.T) {
@@ -129,17 +138,17 @@ func TestRouterAnyMethod(t *testing.T) {
 	handler4 := 4
 
 	router := NewRouter(nil)
-	router.Add("", "GET", "/path1", handler1)
-	router.Add("", "PUT", "/path2", handler2)
-	router.Add("", "POST", "/path2", handler3)
-	router.Add("", "", "/path2", handler4)
+	router.Add("", "/path1", "GET", handler1)
+	router.Add("", "/path2", "PUT", handler2)
+	router.Add("", "/path2", "POST", handler3)
+	router.Add("", "/path2", "", handler4)
 
-	if rs := router.Routes(); len(rs) != 12 {
+	if rs := router.Routes(nil); len(rs) != 12 {
 		t.Error(rs)
 	}
 
-	router.Del("", "POST", "/path2")
-	if rs := router.Routes(); len(rs) != 11 {
+	router.Del("/path2", "POST")
+	if rs := router.Routes(nil); len(rs) != 11 {
 		t.Error(rs)
 	} else {
 		for _, r := range rs {
@@ -150,8 +159,8 @@ func TestRouterAnyMethod(t *testing.T) {
 		}
 	}
 
-	router.Del("", "", "/path2")
-	if rs := router.Routes(); len(rs) != 1 || rs[0].Path != "/path1" {
+	router.Del("/path2", "")
+	if rs := router.Routes(nil); len(rs) != 1 || rs[0].Path != "/path1" {
 		t.Error(rs)
 	}
 }

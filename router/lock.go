@@ -29,37 +29,37 @@ type lockRouter struct {
 	router Router
 }
 
-func (r *lockRouter) Routes() []Route {
+func (r *lockRouter) Routes(filter func(string, string, string) bool) []Route {
 	r.lock.RLock()
-	routes := r.router.Routes()
+	routes := r.router.Routes(filter)
 	r.lock.RUnlock()
 	return routes
 }
 
-func (r *lockRouter) URL(name string, params ...interface{}) string {
+func (r *lockRouter) Path(name string, params ...interface{}) string {
 	r.lock.RLock()
-	url := r.router.URL(name, params...)
+	url := r.router.Path(name, params...)
 	r.lock.RUnlock()
 	return url
 }
 
-func (r *lockRouter) Add(name, method, path string, handler interface{}) (int, error) {
+func (r *lockRouter) Add(name, path, method string, handler interface{}) (int, error) {
 	r.lock.Lock()
-	num, err := r.router.Add(name, method, path, handler)
+	num, err := r.router.Add(name, path, method, handler)
 	r.lock.Unlock()
 	return num, err
 }
 
-func (r *lockRouter) Del(name, method, path string) (err error) {
+func (r *lockRouter) Del(path, method string) (err error) {
 	r.lock.Lock()
-	err = r.router.Del(name, method, path)
+	err = r.router.Del(path, method)
 	r.lock.Unlock()
 	return
 }
 
-func (r *lockRouter) Find(m, p string, ns, vs []string) (interface{}, int) {
+func (r *lockRouter) Match(path, method string, ns, vs []string) (interface{}, int) {
 	r.lock.RLock()
-	h, n := r.router.Find(m, p, ns, vs)
+	h, n := r.router.Match(path, method, ns, vs)
 	r.lock.RUnlock()
 	return h, n
 }
