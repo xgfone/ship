@@ -17,7 +17,7 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,7 +82,7 @@ func TestGzipNoContent(t *testing.T) {
 		t.Errorf("unexpect the header Content-Type, but got '%s'", ct)
 	} else if r, err := gzip.NewReader(rec.Body); err != nil {
 		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
-	} else if data, err := io.ReadAll(r); err != nil {
+	} else if data, err := ioutil.ReadAll(r); err != nil {
 		t.Errorf("got an unexpected error when reading gzip data: %s", err)
 	} else if s := string(data); s != "" {
 		t.Errorf("unexpect response data, but got '%s'", s)
@@ -103,7 +103,7 @@ func TestGzipErrorReturned(t *testing.T) {
 		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
 	} else if r, err := gzip.NewReader(rec.Body); err != nil {
 		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
-	} else if data, err := io.ReadAll(r); err != nil {
+	} else if data, err := ioutil.ReadAll(r); err != nil {
 		t.Errorf("got an unexpected error when reading gzip data: %s", err)
 	} else if s := string(data); s != "Not Found" {
 		t.Errorf("expect response data '%s', but got '%s'", "Not Found", s)
@@ -124,7 +124,7 @@ func TestGzipDomains(t *testing.T) {
 		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
 	} else if r, err := gzip.NewReader(rec.Body); err != nil {
 		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
-	} else if data, err := io.ReadAll(r); err != nil {
+	} else if data, err := ioutil.ReadAll(r); err != nil {
 		t.Errorf("got an unexpected error when reading gzip data: %s", err)
 	} else if s := string(data); s != "OK" {
 		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
@@ -138,7 +138,7 @@ func TestGzipDomains(t *testing.T) {
 
 	if rec.Header().Get(ship.HeaderContentEncoding) == "gzip" {
 		t.Errorf("unexpect the header Conent-Encoding 'gzip'")
-	} else if data, err := io.ReadAll(rec.Body); err != nil {
+	} else if data, err := ioutil.ReadAll(rec.Body); err != nil {
 		t.Errorf("got an unexpected error when reading response data: %s", err)
 	} else if s := string(data); s != "OK" {
 		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
