@@ -395,6 +395,15 @@ func (s *Ship) DelHost(host string) {
 	}
 }
 
+// Hosts returns all the hosts except for the default.
+func (s *Ship) Hosts() (hosts []string) {
+	s.Lock.RLock()
+	hosts = make([]string, 0, s.hostManager.Sum)
+	s.hostManager.Range(func(h string, _ Router) { hosts = append(hosts, h) })
+	s.Lock.RUnlock()
+	return
+}
+
 //----------------------------------------------------------------------------
 // Handle Request
 //----------------------------------------------------------------------------
