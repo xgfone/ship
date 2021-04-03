@@ -374,6 +374,20 @@ type Router struct {
 }
 
 // NewRouter returns a new Router instance with the config.
+//
+// Supported methods:
+//   - GET
+//   - PUT
+//   - HEAD
+//   - POST
+//   - PATCH
+//   - TRACE
+//   - DELETE
+//   - CONNECT
+//   - OPTIONS
+//   - PROPFIND
+//   - REPORT
+//
 func NewRouter(c *Config) *Router {
 	var conf Config
 	if c != nil {

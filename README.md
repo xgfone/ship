@@ -97,7 +97,7 @@ Notice: you can register the same handler with more than one method by `Route(pa
 ```go
 func main() {
     router := ship.New()
-    router.R("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
+    router.Route("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
     router.Start(":8080").Wait()
 }
 ```
@@ -107,7 +107,7 @@ or use the mapping from method to handler:
 ```go
 func main() {
     router := ship.New()
-    router.R("/path/to").Map(map[string]ship.Handler{
+    router.Route("/path/to").Map(map[string]ship.Handler{
         "GET": getHandler,
         "POST": postHandler,
         "DELETE": deleteHandler,
@@ -123,7 +123,7 @@ You can name the route when registering it, then you can build a URL by the name
 func main() {
     router := ship.New()
     router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
-        fmt.Println(ctx.URL("get_url", ctx.URLParam("id")))
+        fmt.Println(ctx.URLPath("get_url", ctx.URLParam("id")))
         return nil
     })
     router.Start(":8080").Wait()
@@ -139,7 +139,7 @@ func main() {
 
     // The Content-Type header of the request to /path2 must be application/json,
     // Or it will return 404.
-    router.R("/path2").HasHeader("Content-Type", "application/json").POST(handler)
+    router.Route("/path2").HasHeader("Content-Type", "application/json").POST(handler)
     router.Start(":8080").Wait()
 }
 ```
@@ -178,9 +178,9 @@ func main() {
     app := ship.New()
     app.RouteFilter = filter
 
-    app.Group("/prefix").R("/name").Name("test").GET(handler) // Register the route
-    app.Group("/prefix").R("/noname").GET(handler)            // Don't register the route
-    app.R("/no_group").GET(handler)                           // Don't register the route
+    app.Group("/prefix").Route("/name").Name("test").GET(handler) // Register the route
+    app.Group("/prefix").Route("/noname").GET(handler)            // Don't register the route
+    app.Route("/no_group").GET(handler)                           // Don't register the route
 }
 ```
 
@@ -196,7 +196,7 @@ func main() {
     app.RouteModifier = modifier
 
     // Register the path as "/prefix/path".
-    app.R("/path").Name("test").GET(handler)
+    app.Route("/path").Name("test").GET(handler)
 }
 ```
 
@@ -455,7 +455,7 @@ import (
 
 func main() {
 	app := ship.New()
-	app.R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
+	app.Route("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
 	app.Start(":8080").Wait()
 }
 ```
@@ -480,7 +480,7 @@ func DisableBuiltinCollector() {
 func main() {
 	DisableBuiltinCollector()
 	app := ship.New()
-	app.R("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
+	app.Route("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
 	app.Start(":8080").Wait()
 }
 ```
@@ -533,7 +533,7 @@ func Prometheus(gatherer ...prometheus.Gatherer) ship.Handler {
 
 func main() {
 	DisableBuiltinCollector()
-	ship.New().R("/metrics").GET(Prometheus()).Ship().Start(":8080").Wait()
+	ship.New().Route("/metrics").GET(Prometheus()).Ship().Start(":8080").Wait()
 }
 ```
 
@@ -740,38 +740,43 @@ You can appoint your own implementation by implementing the interface [`Router`]
 
 ```go
 type Router interface {
-	// Routes returns the list of all the routes.
-	Routes() []Route
-
-	// URL generates a URL by the url name and parameters.
-	URL(name string, params ...interface{}) string
-
-	// Add adds a route and returns the number of the parameters
-	// if there are the parameters in the route.
+	// Routes uses the filter to filter and return the routes if it returns true.
 	//
-	// If method is empty, the implementation should add the handler
-	// for all the methods that it supports.
+	// Return all the routes if filter is nil.
+	Routes(filter func(name, path, method string) bool) []Route
+
+	// Path generates a url path by the path name and parameters.
 	//
-	// For keeping consistent, the parameter should start with ":" or "*".
-	// ":" stands for the single parameter, and "*" stands for the wildcard.
-	Add(name, method, path string, handler interface{}) (paramNum int, err error)
+	// Return "" if there is not the route path named name.
+	Path(name string, params ...interface{}) string
+
+	// Add adds the route and returns the number of the parameters
+	// if there are the parameters in the route path.
+	//
+	// name is the name of the path, which is optional and must be unique
+	// if not empty.
+	//
+	// If method is empty, handler is the handler of all the methods supported
+	// by the implementation. Or, it is only that of the given method.
+	//
+	// For the parameter in the path, the format is determined by the implementation.
+	Add(name, path, method string, handler interface{}) (paramNum int, err error)
 
 	// Del deletes the given route.
 	//
-	// If name is not empty, lookup the path by it instead.
-	//
 	// If method is empty, deletes all the routes associated with the path.
-	// Or only delete the given method for the path.
-	Del(name, method, path string) (err error)
+	// Or, only delete the given method for the path.
+	Del(path, method string) (err error)
 
-	// Find searchs and returns the handler and the number of the url path
-	// paramethers. For the paramethers, they are put into pnames and pvalues.
+	// Match matches the route by path and method, puts the path parameters
+	// into pnames and pvalues, then returns the handler and the number
+	// of the path paramethers.
 	//
 	// If pnames or pvalues is empty, it will ignore the path paramethers
 	// when finding the route handler.
 	//
 	// Return (nil, 0) if not found the route handler.
-	Find(method, path string, pnames, pvalues []string) (handler interface{}, pn int)
+	Match(path, method string, pnames, pvalues []string) (handler interface{}, pn int)
 }
 ```
 
