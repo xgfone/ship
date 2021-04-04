@@ -379,7 +379,7 @@ func RequestJSON(ctx context.Context, method, url string, reqHeader http.Header,
 		buf := getBuffer()
 		defer putBuffer(buf)
 		if err := json.NewEncoder(buf).Encode(reqBody); err != nil {
-			return err
+			return NewHTTPClientError(method, url, 0, err)
 		}
 		reqBody = buf
 	}
