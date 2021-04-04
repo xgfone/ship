@@ -22,12 +22,27 @@ import (
 
 // RouteInfo is used to represent the information of the registered route.
 type RouteInfo struct {
-	// If Host is empty, it is the route of the default host router.
-	Host    string      `json:"host,omitempty" xml:"host,omitempty"`
-	Name    string      `json:"name,omitempty" xml:"name,omitempty"`
-	Path    string      `json:"path,omitempty" xml:"path,omitempty"`
-	Method  string      `json:"method,omitempty" xml:"method,omitempty"`
-	Handler Handler     `json:"-" xml:"-"`
+	// The host is used to isolate the routes. And the different host
+	// maybe has the same routes.
+	//
+	// If Host is empty, it represents the default host.
+	Host string `json:"host,omitempty" xml:"host,omitempty"`
+
+	// Path and Method represent the unique route in a certain host.
+	//
+	// Path maybe contain the parameters, which is determined by the underlying
+	// router. And if Method is empty, it stands for all the methods.
+	Path   string `json:"path,omitempty" xml:"path,omitempty"`
+	Method string `json:"method,omitempty" xml:"method,omitempty"`
+
+	// Name is the name of the path, which may be empty to represent no name.
+	Name string `json:"name,omitempty" xml:"name,omitempty"`
+
+	// Handler is the handler of the route to handle the request.
+	Handler Handler `json:"-" xml:"-"`
+
+	// CtxData is any additional context data, which is passed to the handler
+	// and you can access it by Context.RouteInfo.CtxData in the handler.
 	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
 }
 
