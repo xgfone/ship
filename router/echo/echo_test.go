@@ -77,7 +77,13 @@ func TestRouter(t *testing.T) {
 	router.Add("static", "/static", "GET", handler)
 	router.Add("param", "/test/:name", "POST", handler)
 
+	if v := router.Path("param"); v != "/test/:name" {
+		t.Errorf("expected '/test/:name', got '%s'", v)
+	}
 	if v := router.Path("param", "Aaron"); v != "/test/Aaron" {
+		t.Errorf("expected '/test/Aaron', got '%s'", v)
+	}
+	if v := router.Path("param", "Aaron", "none"); v != "/test/Aaron" {
 		t.Errorf("expected '/test/Aaron', got '%s'", v)
 	}
 
