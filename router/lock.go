@@ -17,7 +17,7 @@ package router
 import "sync"
 
 // NewLockRouter returns a new lock Router based on the original router r.
-// So you can access and modify the routes concurrently and safely.
+// So it's safe to access and modify the routes concurrently and safely.
 //
 // Notice: the wrapped router must not panic.
 func NewLockRouter(r Router) Router { return &lockRouter{router: r} }

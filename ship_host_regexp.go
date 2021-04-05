@@ -26,8 +26,7 @@ type reHostRouter struct {
 }
 
 // NewRegexpHostRouter returns a new RegexpHostRouter, which uses the stdlib
-// "regexp" to implement the regular expression syntax of Golang, but you can
-// customize it to implement yourself regular expression syntax.
+// "regexp" to implement the regular expression syntax of Golang.
 //
 // For the golang regexp syntax, see https://pkg.go.dev/regexp/syntax.
 func NewRegexpHostRouter() RegexpHostRouter {

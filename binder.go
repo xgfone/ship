@@ -96,8 +96,8 @@ func XMLBinder() Binder {
 
 // FormBinder returns a Form binder to bind the Form request.
 //
-// Notice: The bound value must be a pointer to a struct.
-// You can modify the name of the field by the tag, which is "form" by default.
+// Notice: The bound value must be a pointer to a struct with the tag
+// named tag, which is "form" by default.
 func FormBinder(maxMemory int64, tag ...string) Binder {
 	_tag := "form"
 	if len(tag) > 0 && tag[0] != "" {
@@ -119,8 +119,8 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 
 // QueryBinder returns a query binder to bind the query parameters..
 //
-// Notice: The bound value must be a pointer to a struct.
-// You can modify the name of the field by the tag, which is "query" by default.
+// Notice: The bound value must be a pointer to a struct with the tag
+// named tag, which is "query" by default.
 func QueryBinder(tag ...string) Binder {
 	_tag := "query"
 	if len(tag) > 0 && tag[0] != "" {

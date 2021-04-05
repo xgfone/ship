@@ -42,7 +42,7 @@ type RouteInfo struct {
 	Handler Handler `json:"-" xml:"-"`
 
 	// CtxData is any additional context data, which is passed to the handler
-	// and you can access it by Context.RouteInfo.CtxData in the handler.
+	// and it can be accessed by Context.RouteInfo.CtxData in the handler.
 	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
 }
 

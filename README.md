@@ -64,7 +64,7 @@ The route path supports the parameters like `:paramName`, `*` or `*restParamName
 - `/path/to/*` or `/path/to/*all` matches the path `/path/to/abc`, `/path/to/abc/efg`, `/path/to/xyz`, `/path/to/xyz/123`, etc. And `*` or `*all` is equal to `abc`, `abc/efg`, `xyz`, or `xzy/123`. **Notice:** `*` or `*restParamName` must be the last one of the route path.
 - `/path/:param/to/*` matches the path `/path/abc/to/efg`, `/path/abc/to/efg/123`, etc. And `:param` is equal to `abc`, and `*` is equal to `efg` or `efg/123`
 
-For the parameter, you can use `Context.URLParam(paramName)` to get it.
+For the parameter, it can be accessed by `Context.URLParam(paramName)`.
 
 - For `*`, the parameter name is `*`, like `Context.URLParam("*")`.
 - For `*restParamName`, the parameter name is `restParamName`, like `Context.URLParam(restParamName)`.
@@ -117,7 +117,7 @@ func main() {
 ```
 
 #### Naming route and building URL
-You can name the route when registering it, then you can build a URL by the name.
+When registering the route, it can be named with a name, then build a url path by the name.
 
 ```go
 func main() {
@@ -221,7 +221,7 @@ func main() {
 }
 ```
 
-You can register a middleware to run before finding the router. You may affect the router finding by registering **Before** middleware. For example,
+You can register a **Before** middleware to be run before finding the router to affect the route match. For example,
 
 ```go
 package main
@@ -460,7 +460,7 @@ func main() {
 }
 ```
 
-You can disable or remove the default collectors like this.
+The default collectors can be disabled or removed like this.
 ```go
 package main
 
@@ -485,7 +485,7 @@ func main() {
 }
 ```
 
-The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metrics: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, you can rewrite it like this.
+The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metrics: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, it can be rewrote like this.
 ```go
 package main
 

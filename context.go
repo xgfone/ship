@@ -111,10 +111,9 @@ type Context struct {
 
 	// Data is used to store many key-value pairs about the context.
 	//
-	// Data maybe asks the system to allocate many memories.
-	// If the interim context value is too few and you don't want the system
-	// to allocate many memories, the three context variables is for you
-	// and you can consider them as the context register to use.
+	// Data maybe asks the system to allocate many memories. In order
+	// to avoid it and if the interim context values is too few,
+	// the context also defines three variables to resolve it.
 	//
 	// Notice: when the new request is coming, they will be reset to nil.
 	Key1 interface{}
@@ -659,7 +658,7 @@ func (c *Context) BasicAuth() (username, password string, ok bool) {
 //
 //   1. It will sort the content by the q-factor weighting.
 //   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
-//      So you can use it to match the prefix.
+//      So it can be used to match the prefix.
 //   3. If the value is "*/*", it will be amended as "".
 //
 func (c *Context) Accept() []string {
