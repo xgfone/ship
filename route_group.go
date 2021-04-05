@@ -43,12 +43,12 @@ func newRouteGroup(s *Ship, pprefix, prefix, host string, mws ...Middleware) *Ro
 	}
 }
 
-// Host returns a new sub-group with the virtual host.
+// Host returns a new route sub-group with the virtual host.
 func (s *Ship) Host(host string) *RouteGroup {
 	return newRouteGroup(s, s.Prefix, "", host, s.mws...)
 }
 
-// Group returns a new sub-group.
+// Group returns a new route sub-group with the group prefix.
 func (s *Ship) Group(prefix string) *RouteGroup {
 	return newRouteGroup(s, s.Prefix, prefix, "", s.mws...)
 }
@@ -69,7 +69,7 @@ func (g *RouteGroup) Use(middlewares ...Middleware) *RouteGroup {
 	return g
 }
 
-// Group returns a new sub-group.
+// Group returns a new route sub-group.
 func (g *RouteGroup) Group(prefix string, middlewares ...Middleware) *RouteGroup {
 	return newRouteGroup(g.ship, g.prefix, prefix, g.host, append(g.mdwares, middlewares...)...)
 }
@@ -80,9 +80,9 @@ func (g *RouteGroup) CtxData(data interface{}) *RouteGroup {
 	return g
 }
 
-// Route returns a new route, then you can customize and register it.
+// Route returns a new route, which is used to build and register the route.
 //
-// You must call Route.Method() or its short method.
+// You should call Route.Method() or its short method to register it.
 func (g *RouteGroup) Route(path string) *Route {
 	return newRoute(g.ship, g, g.prefix, g.host, path, g.ctxdata, g.mdwares...)
 }
@@ -90,7 +90,9 @@ func (g *RouteGroup) Route(path string) *Route {
 // NoMiddlewares clears all the middlewares and returns itself.
 func (g *RouteGroup) NoMiddlewares() *RouteGroup { g.mdwares = nil; return g }
 
-// AddRoutes adds the routes by RouteInfo.
+// AddRoutes registers a set of the routes.
+//
+// It will panic with it if there is an error when adding the routes.
 func (g *RouteGroup) AddRoutes(ris ...RouteInfo) *RouteGroup {
 	for i, ri := range ris {
 		ris[i].Path = g.Route(ri.Path).path
@@ -99,7 +101,9 @@ func (g *RouteGroup) AddRoutes(ris ...RouteInfo) *RouteGroup {
 	return g
 }
 
-// DelRoutes deletes the routes by RouteInfo.
+// DelRoutes deletes a set of the registered routes.
+//
+// It will panic with it if there is an error when deleting the routes.
 func (g *RouteGroup) DelRoutes(ris ...RouteInfo) *RouteGroup {
 	for i, ri := range ris {
 		ris[i].Path = g.Route(ri.Path).path

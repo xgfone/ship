@@ -348,10 +348,11 @@ func (s *Ship) Router(host string) (r Router) {
 }
 
 // SetDefaultRouter resets the default router with the host domain.
-// If the router is nil, it only resets the default host domain.
+// If the router is nil, it only resets the default host domain and
+// uses the original default router.
 //
-// If no host router matches the request host, use the default router
-// to find the route handler to handle the request.
+// If no host router matches the request host, the default router
+// will be used to find the route handler to handle the request.
 func (s *Ship) SetDefaultRouter(host string, router Router) {
 	s.Lock.Lock()
 	s.defaultHost = host
@@ -371,9 +372,10 @@ func (s *Ship) GetDefaultRouter() (host string, router Router) {
 	return
 }
 
-// AddHost adds and returns the new host router.
+// AddHost adds the router with the host and returns it if it does not exist;
+// or, do nothing and return the existed router.
 //
-// If existed, return it and do nothing. If router is nil, new one firstly.
+// If router is nil, new one firstly.
 func (s *Ship) AddHost(host string, r Router) (Router, error) {
 	if host == "" {
 		return nil, errors.New("the host must not be empty")
@@ -388,6 +390,8 @@ func (s *Ship) AddHost(host string, r Router) (Router, error) {
 }
 
 // DelHost deletes the host router.
+//
+// If the host is empty or the host router does not exist, do nothing.
 func (s *Ship) DelHost(host string) {
 	if host != "" {
 		s.Lock.Lock()

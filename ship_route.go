@@ -107,6 +107,8 @@ func (s *Ship) Routes() (routes []RouteInfo) {
 }
 
 // AddRoutes registers a set of the routes.
+//
+// It will panic with it if there is an error when adding the routes.
 func (s *Ship) AddRoutes(ris ...RouteInfo) {
 	for _, ri := range ris {
 		if err := s.AddRoute(ri); err != nil {
@@ -116,6 +118,8 @@ func (s *Ship) AddRoutes(ris ...RouteInfo) {
 }
 
 // DelRoutes deletes a set of the registered routes.
+//
+// It will panic with it if there is an error when deleting the routes.
 func (s *Ship) DelRoutes(ris ...RouteInfo) {
 	for _, ri := range ris {
 		if err := s.DelRoute(ri); err != nil {
@@ -125,8 +129,6 @@ func (s *Ship) DelRoutes(ris ...RouteInfo) {
 }
 
 // AddRoute registers the route.
-//
-// Only "Path", "Method" and "Handler" are mandatory, and others are optional.
 func (s *Ship) AddRoute(ri RouteInfo) (err error) {
 	ok, err := s.checkRouteInfo(&ri)
 	if err != nil {
@@ -179,11 +181,12 @@ func (s *Ship) checkRouteInfo(ri *RouteInfo) (ok bool, err error) {
 	return
 }
 
-// DelRoute deletes the registered route, which only needs "Host", "Name",
-// "Path" and "Method", and others are ignored.
+// DelRoute deletes the registered route, which only uses "Host", "Path"
+// and "Method", and others are ignored.
 //
-// If Name is not empty, lookup the path by it instead of Path.
 // If Method is empty, deletes all the routes associated with the path.
+//
+// If the route does not exist, do nothing and return nil.
 func (s *Ship) DelRoute(ri RouteInfo) (err error) {
 	ok, err := s.checkRouteInfo(&ri)
 	if !ok || err != nil {

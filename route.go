@@ -58,9 +58,9 @@ func newRoute(s *Ship, g *RouteGroup, prefix, host, path string,
 	}
 }
 
-// Route returns a new route, then you can customize and register it.
+// Route returns a new route, which is used to build and register the route.
 //
-// You must call Route.Method() or its short method.
+// You should call Route.Method() or its short method to register it.
 func (s *Ship) Route(path string) *Route {
 	return newRoute(s, nil, s.Prefix, "", path, nil, s.mws...)
 }
@@ -111,9 +111,7 @@ func (r *Route) Use(middlewares ...Middleware) *Route {
 // HasHeader checks whether the request contains the request header.
 // If no, the request will be rejected.
 //
-// If the header value is given, it will be tested to match.
-//
-// Example
+// If the header value is given, it will be tested to match, for example
 //
 //     s := ship.New()
 //     // The request must contains the header "Content-Type: application/json".
@@ -200,11 +198,9 @@ func (r *Route) RouteInfo(handler Handler, methods ...string) []RouteInfo {
 	return r.toRouteInfo(r.name, r.host, r.path, handler, methods...)
 }
 
-// Method sets the methods and registers the route.
+// Method registers the routes with the handler and methods.
 //
-// If methods is nil, it will register all the supported methods for the route.
-//
-// Notice: The method must be called at last.
+// It will panic with it if there is an error when adding the routes.
 func (r *Route) Method(handler Handler, methods ...string) *Route {
 	r.ship.AddRoutes(r.RouteInfo(handler, methods...)...)
 	return r
