@@ -78,7 +78,9 @@ func (hm *hostManager) Range(f func(string, Router)) {
 }
 
 func (hm *hostManager) Router(host string) Router {
-	if router, ok := hm.ehosts[host]; ok {
+	if host == "" {
+		return nil
+	} else if router, ok := hm.ehosts[host]; ok {
 		return router
 	} else if router, ok := hm.fhosts[host]; ok {
 		return router

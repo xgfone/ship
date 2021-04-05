@@ -348,15 +348,17 @@ func (s *Ship) Router(host string) (r Router) {
 }
 
 // SetDefaultRouter resets the default router with the host domain.
-// If the router is nil, it only resets the default host domain and
-// uses the original default router.
+// If the router is nil, it lookups the router by the host, and uses
+// the default host router instead if failing to lookup it.
 //
-// If no host router matches the request host, the default router
-// will be used to find the route handler to handle the request.
+// When matching the route, if no host router matches the request host,
+// the default router will be used to find the route to handle the request.
 func (s *Ship) SetDefaultRouter(host string, router Router) {
 	s.Lock.Lock()
 	s.defaultHost = host
 	if router != nil {
+		s.defaultRouter = router
+	} else if router = s.hostManager.Router(host); router != nil {
 		s.defaultRouter = router
 	}
 	s.Lock.Unlock()
