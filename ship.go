@@ -419,17 +419,12 @@ func (s *Ship) handleErrorDefault(ctx *Context, err error) {
 	if ctx.res.Wrote {
 		ctx.Logger().Errorf("unknown error: method=%s, url=%s, err=%s",
 			ctx.Method(), ctx.RequestURI(), err)
+	} else if se, ok := err.(HTTPServerError); !ok {
+		ctx.NoContent(http.StatusInternalServerError)
+	} else if se.CT == "" {
+		ctx.BlobText(se.Code, MIMETextPlain, se.Error())
 	} else {
-		switch e := err.(type) {
-		case HTTPServerError:
-			if e.CT == "" {
-				ctx.BlobText(e.Code, MIMETextPlain, e.Error())
-			} else {
-				ctx.BlobText(e.Code, e.CT, e.Error())
-			}
-		default:
-			ctx.NoContent(http.StatusInternalServerError)
-		}
+		ctx.BlobText(se.Code, se.CT, se.Error())
 	}
 }
 
