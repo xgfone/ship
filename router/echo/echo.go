@@ -365,15 +365,6 @@ type Config struct {
 //
 // Moreover, the single and wildcard parameters may used in combination.
 // But the wildcard parameter must be the last.
-type Router struct {
-	conf    Config
-	tree    *node
-	bufpool sync.Pool
-	maxnum  int               // The maximum number of the parameter
-	routes  map[string]string // Name -> Path
-}
-
-// NewRouter returns a new Router instance with the config.
 //
 // Supported methods:
 //   - GET
@@ -388,6 +379,17 @@ type Router struct {
 //   - PROPFIND
 //   - REPORT
 //
+type Router struct {
+	conf    Config
+	tree    *node
+	bufpool sync.Pool
+	maxnum  int               // The maximum number of the parameter
+	routes  map[string]string // Name -> Path
+}
+
+// NewRouter returns a new Router instance with the config.
+//
+// If c is nil, use the default configuration.
 func NewRouter(c *Config) *Router {
 	var conf Config
 	if c != nil {
@@ -446,7 +448,8 @@ func (r *Router) Path(name string, params ...interface{}) (url string) {
 	return
 }
 
-// Routes returns the list of all the routes.
+// Routes returns the list of the routes, which are filtered by the filter
+// if it returns true.
 func (r *Router) Routes(filter func(name, path, method string) bool) []router.Route {
 	routes := make([]router.Route, 0, 32)
 	return r.getRoutes(r.tree, routes, filter)
