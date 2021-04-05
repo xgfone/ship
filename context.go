@@ -37,10 +37,10 @@ var MaxMemoryLimit int64 = 32 << 20 // 32MB
 
 var contenttypes = map[string][]string{}
 
-// AddContentTypeToSlice add a rule to convert contentType to contentTypeSlice.
-// So you can call SetContentType to set the Content-Type to contentTypeSlice
-// by contentType to avoid to allocate the memory.
-func AddContentTypeToSlice(contentType string, contentTypeSlice []string) {
+// AddContentTypeMapping add a content type mapping to convert contentType
+// to contentTypeSlice, then call SetContentType to set the Content-Type
+// to contentTypeSlice by contentType to avoid to allocate the memory.
+func AddContentTypeMapping(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
 		panic(fmt.Errorf("the Content-Type is empty"))
 	}
