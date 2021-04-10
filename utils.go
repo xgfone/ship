@@ -161,10 +161,9 @@ var (
 	errNotPointerToStruct = errors.New("the argument must be a pointer to struct")
 )
 
-// SetStructFieldToDefault sets the default value of the fields of the struct v
-// to the value of the tag "default" of the fields when the field value is ZERO.
-//
-// If v is not a struct, it does nothing; and not a pointer to struct, panic.
+// SetStructFieldToDefault sets the default value of the fields of the pointer
+// to struct v to the value of the tag "default" of the fields when the field
+// value is ZERO.
 //
 // For the type of the field, it only supports some base types as follow:
 //   string
@@ -185,6 +184,7 @@ var (
 //   interface{ SetDefault(_default interface{}) error }
 //   time.Time      // Format: A. Integer(UTC); B. String(RFC3339)
 //   time.Duration  // Format: A. Integer(ms);  B. String(time.ParseDuration)
+//   pointer to the types above
 //
 // Notice: If the tag value starts with ".", it represents a field name and
 // the default value of current field is set to the value of that field.
@@ -213,11 +213,21 @@ func setDefault(vf reflect.Value) (err error) {
 	vt := vf.Type()
 	for i, _len := 0, vt.NumField(); i < _len; i++ {
 		fieldv := vf.Field(i)
+
+		tag := strings.TrimSpace(vt.Field(i).Tag.Get("default"))
+		if fieldv.Kind() == reflect.Ptr {
+			if !fieldv.IsNil() {
+				fieldv = fieldv.Elem()
+			} else if tag != "" {
+				fieldv.Set(reflect.New(fieldv.Type().Elem()))
+				fieldv = fieldv.Elem()
+			}
+		}
+
 		if !fieldv.CanSet() {
 			continue
 		}
 
-		tag := strings.TrimSpace(vt.Field(i).Tag.Get("default"))
 		switch v := fieldv.Interface().(type) {
 		case string:
 			if v == "" && tag != "" {

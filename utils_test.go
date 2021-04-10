@@ -50,6 +50,11 @@ func ExampleSetStructFieldToDefault() {
 		DurationStr time.Duration `default:"2s"`
 		TimeInt     time.Time     `default:"1618059388"`
 		TimeStr     time.Time     `default:"2021-04-10T12:56:28Z"`
+
+		NoneP       *int
+		IntPtr      *int           `default:"456"`
+		TimePtr     *time.Time     `default:"2021-04-10T12:56:28Z"`
+		DurationPtr *time.Duration `default:"3s"`
 	}
 
 	s := S{Structs: make([]Struct, 2)}
@@ -79,6 +84,10 @@ func ExampleSetStructFieldToDefault() {
 	fmt.Println(s.DurationStr)
 	fmt.Println(s.TimeInt.UTC().Format(time.RFC3339))
 	fmt.Println(s.TimeStr.UTC().Format(time.RFC3339))
+	fmt.Println(s.NoneP == nil)
+	fmt.Println(*s.IntPtr)
+	fmt.Println(s.TimePtr.UTC().Format(time.RFC3339))
+	fmt.Println(*s.DurationPtr)
 
 	// Output:
 	// <nil>
@@ -105,4 +114,8 @@ func ExampleSetStructFieldToDefault() {
 	// 2s
 	// 2021-04-10T12:56:28Z
 	// 2021-04-10T12:56:28Z
+	// true
+	// 456
+	// 2021-04-10T12:56:28Z
+	// 3s
 }
