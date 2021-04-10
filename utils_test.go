@@ -14,7 +14,10 @@
 
 package ship
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func ExampleSetStructFieldToDefault() {
 	type Struct struct {
@@ -42,6 +45,11 @@ func ExampleSetStructFieldToDefault() {
 		Struct  Struct
 		Structs []Struct
 		_       int `default:"-"`
+
+		DurationInt time.Duration `default:"1000"`
+		DurationStr time.Duration `default:"2s"`
+		TimeInt     time.Time     `default:"1618059388"`
+		TimeStr     time.Time     `default:"2021-04-10T12:56:28Z"`
 	}
 
 	s := S{Structs: make([]Struct, 2)}
@@ -67,6 +75,10 @@ func ExampleSetStructFieldToDefault() {
 	fmt.Println(s.Struct.InnerInt)
 	fmt.Println(s.Structs[0].InnerInt)
 	fmt.Println(s.Structs[1].InnerInt)
+	fmt.Println(s.DurationInt)
+	fmt.Println(s.DurationStr)
+	fmt.Println(s.TimeInt.UTC().Format(time.RFC3339))
+	fmt.Println(s.TimeStr.UTC().Format(time.RFC3339))
 
 	// Output:
 	// <nil>
@@ -89,4 +101,8 @@ func ExampleSetStructFieldToDefault() {
 	// 123
 	// 123
 	// 123
+	// 1s
+	// 2s
+	// 2021-04-10T12:56:28Z
+	// 2021-04-10T12:56:28Z
 }

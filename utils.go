@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var bufpool = sync.Pool{
@@ -94,6 +95,20 @@ func CopyNBuffer(dst io.Writer, src io.Reader, n int64, buf []byte) (written int
 // and just return it to the caller.
 func DisalbeRedirect(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
+}
+
+// IsInteger reports whether s is the integer or not.
+func IsInteger(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for i, _len := 0, len(s); i < _len; i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // InStrings reports whether s is in the string slice ss or not.
@@ -168,6 +183,8 @@ var (
 //   struct
 //   struct slice
 //   interface{ SetDefault(_default interface{}) error }
+//   time.Time      // Format: A. Integer(UTC); B. String(RFC3339)
+//   time.Duration  // Format: A. Integer(ms);  B. String(time.ParseDuration)
 //
 // Notice: If the tag value starts with ".", it represents a field name and
 // the default value of current field is set to the value of that field.
@@ -232,19 +249,22 @@ func setDefault(vf reflect.Value) (err error) {
 			err = setFieldFloat(vf, fieldv, float64(v), tag)
 		case float64:
 			err = setFieldFloat(vf, fieldv, v, tag)
+		case time.Duration:
+			err = setFieldDuration(vf, fieldv, v, tag)
+		case time.Time:
+			err = setFieldTime(vf, fieldv, v, tag)
 		case setDefaulter:
 			if tag != "" {
 				err = v.SetDefault(tag)
 			}
-
 		default:
 			switch fieldv.Kind() {
 			case reflect.Struct:
 				err = setDefault(fieldv)
 			case reflect.Slice:
 				for i, _len := 0, fieldv.Len(); i < _len; i++ {
-					if _fieldv := fieldv.Index(i); _fieldv.Kind() == reflect.Struct {
-						if err = setDefault(_fieldv); err != nil {
+					if f := fieldv.Index(i); f.Kind() == reflect.Struct {
+						if err = setDefault(f); err != nil {
 							return
 						}
 					}
@@ -297,6 +317,44 @@ func setFieldFloat(structv, fieldv reflect.Value, v float64, tag string) (err er
 			fieldv.Set(structv.FieldByName(tag))
 		} else if v, err = strconv.ParseFloat(tag, 64); err == nil {
 			fieldv.SetFloat(v)
+		}
+	}
+	return
+}
+
+func setFieldTime(structv, fieldv reflect.Value, v time.Time, tag string) (err error) {
+	if v.IsZero() && tag != "" {
+		if tag[0] == '.' {
+			if tag = tag[1:]; tag == "" {
+				return errInvalidTagValue
+			}
+			fieldv.Set(structv.FieldByName(tag))
+		} else if IsInteger(tag) {
+			var i int64
+			if i, err = strconv.ParseInt(tag, 10, 64); err == nil {
+				fieldv.Set(reflect.ValueOf(time.Unix(i, 0)))
+			}
+		} else if v, err = time.Parse(time.RFC3339, tag); err == nil {
+			fieldv.Set(reflect.ValueOf(v))
+		}
+	}
+	return
+}
+
+func setFieldDuration(structv, fieldv reflect.Value, v time.Duration, tag string) (err error) {
+	if v == 0 && tag != "" {
+		if tag[0] == '.' {
+			if tag = tag[1:]; tag == "" {
+				return errInvalidTagValue
+			}
+			fieldv.Set(structv.FieldByName(tag))
+		} else if IsInteger(tag) {
+			var i int64
+			if i, err = strconv.ParseInt(tag, 10, 64); err == nil {
+				fieldv.SetInt(i * int64(time.Millisecond))
+			}
+		} else if v, err = time.ParseDuration(tag); err == nil {
+			fieldv.SetInt(int64(v))
 		}
 	}
 	return
