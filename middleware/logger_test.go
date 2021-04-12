@@ -16,10 +16,12 @@ package middleware
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/xgfone/ship/v4"
 )
@@ -48,7 +50,35 @@ func TestLogger(t *testing.T) {
 	} else if ss[0] != "[I] handler" {
 		t.Errorf("expected '[I] handler', but got '%s'", ss[0])
 	} else if s := strings.Join(strings.Split(ss[1], ", ")[1:5], ", "); s !=
-		`code=200, method=GET, path=/test, reqbody=body` {
+		`method=GET, path=/test, reqbody=body, code=200` {
 		t.Error(s)
+	}
+}
+
+func TestLoggerLog(t *testing.T) {
+	router := ship.New()
+
+	var reqlog string
+	router.Use(Logger(&LoggerConfig{
+		LogReqBody: true,
+		Log: func(r *http.Request, _ bool, reqBody string, code int,
+			_ time.Time, _ time.Duration, err error) {
+			reqlog = fmt.Sprintf("method=%s, uri=%s, reqbody=%s, code=%d, err=%v",
+				r.Method, r.RequestURI, reqBody, code, err)
+		},
+	}))
+
+	router.Route("/test").GET(func(ctx *ship.Context) error {
+		ctx.Logger().Infof("handler")
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", bytes.NewBufferString("body"))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	expect := "method=GET, uri=/test, reqbody=body, code=200, err=<nil>"
+	if expect != reqlog {
+		t.Error(reqlog)
 	}
 }

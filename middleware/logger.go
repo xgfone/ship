@@ -29,6 +29,15 @@ type LoggerConfig struct {
 	//
 	// Default: false
 	LogReqBody bool
+
+	// Log is used to log the request.
+	//
+	// If LogReqBody is false, hasReqBody is false and reqBody is empty.
+	// Or, hasReqBody is true and reqBody is the body of the request.
+	//
+	// Default: use Context.Logger() to log the request.
+	Log func(req *http.Request, hasReqBody bool, reqBody string,
+		statusCode int, startTime time.Time, cost time.Duration, err error)
 }
 
 // Logger returns a new logger middleware that will log the request.
@@ -47,7 +56,7 @@ func Logger(config *LoggerConfig) Middleware {
 				body := bufferBody{Closer: ctx.Body(), Buffer: buf}
 				_, err = ship.CopyNBuffer(body.Buffer, ctx.Body(), ctx.ContentLength(), nil)
 				if err != nil {
-					return
+					return ship.ErrBadRequest.New(err)
 				}
 
 				bodyFmt = ", reqbody="
@@ -61,8 +70,8 @@ func Logger(config *LoggerConfig) Middleware {
 
 			req := ctx.Request()
 			code := ctx.StatusCode()
-			errmsg := ""
 
+			var lerr error
 			switch e := err.(type) {
 			case nil:
 			case ship.HTTPServerError:
@@ -70,21 +79,26 @@ func Logger(config *LoggerConfig) Middleware {
 					code = e.Code
 				}
 				if e.Code >= 400 {
-					errmsg = e.Error()
+					lerr = err
 				}
 			default:
-				errmsg = e.Error()
+				lerr = err
 				if !ctx.IsResponded() {
 					code = http.StatusInternalServerError
 				}
 			}
 
-			if errmsg == "" {
-				ctx.Logger().Infof("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s",
-					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, start.Unix(), cost)
+			if conf.Log != nil {
+				conf.Log(req, conf.LogReqBody, bodyCnt, code, start, cost, lerr)
+			} else if code < 400 {
+				ctx.Logger().Infof("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
+					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
+			} else if code < 500 {
+				ctx.Logger().Warnf("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
+					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
 			} else {
-				ctx.Logger().Errorf("addr=%s, code=%d, method=%s, path=%s%s%s, starttime=%d, cost=%s, err=%s",
-					req.RemoteAddr, code, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, start.Unix(), cost, errmsg)
+				ctx.Logger().Errorf("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
+					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
 			}
 
 			return
