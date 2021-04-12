@@ -111,7 +111,9 @@ func TestGzipErrorReturned(t *testing.T) {
 }
 
 func TestGzipDomains(t *testing.T) {
-	s := ship.New().Use(Gzip(&GZipConfig{Domains: []string{"www1.example.com"}}))
+	s := ship.New().Use(Gzip(&GZipConfig{Domains: []string{
+		"www1.example.com", "*.suffix.com", "www.prefix.*",
+	}}))
 	s.Route("/").GET(ship.OkHandler())
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -140,6 +142,38 @@ func TestGzipDomains(t *testing.T) {
 		t.Errorf("unexpect the header Conent-Encoding 'gzip'")
 	} else if data, err := ioutil.ReadAll(rec.Body); err != nil {
 		t.Errorf("got an unexpected error when reading response data: %s", err)
+	} else if s := string(data); s != "OK" {
+		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "www.suffix.com"
+	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	if ce := rec.Header().Get(ship.HeaderContentEncoding); ce != "gzip" {
+		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
+	} else if r, err := gzip.NewReader(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
+	} else if data, err := ioutil.ReadAll(r); err != nil {
+		t.Errorf("got an unexpected error when reading gzip data: %s", err)
+	} else if s := string(data); s != "OK" {
+		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "www.prefix.com"
+	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+
+	if ce := rec.Header().Get(ship.HeaderContentEncoding); ce != "gzip" {
+		t.Errorf("expect the header Conent-Encoding '%s', but got '%s'", "gzip", ce)
+	} else if r, err := gzip.NewReader(rec.Body); err != nil {
+		t.Errorf("got an unexpected error when newing gzip reader: %s", err)
+	} else if data, err := ioutil.ReadAll(r); err != nil {
+		t.Errorf("got an unexpected error when reading gzip data: %s", err)
 	} else if s := string(data); s != "OK" {
 		t.Errorf("expect response data '%s', but got '%s'", "OK", s)
 	}

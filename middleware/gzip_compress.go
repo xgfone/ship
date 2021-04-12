@@ -34,7 +34,10 @@ type GZipConfig struct {
 	// Domains is the host domains enabling the gzip compression.
 	// If empty, compress all the requests to all the host domains.
 	//
-	// Notnice: for the current implementation, it matches the domains exactly.
+	// The domain name supports the exact, prefix and suffix match. For example,
+	//   Exact:  www.example.com
+	//   Prefix: www.example.*
+	//   Suffix: *.example.com
 	//
 	// Default: nil
 	Domains []string
@@ -76,10 +79,45 @@ func Gzip(config *GZipConfig) Middleware {
 		return
 	}
 
+	var exactDomains []string
+	var prefixDomains []string
+	var suffixDomains []string
+	for _, domain := range conf.Domains {
+		if domain == "" {
+			panic("GZip: empty domain")
+		} else if strings.HasPrefix(domain, "*.") {
+			suffixDomains = append(suffixDomains, domain[1:])
+		} else if strings.HasSuffix(domain, ".*") {
+			prefixDomains = append(prefixDomains, domain[:len(domain)-1])
+		} else {
+			exactDomains = append(exactDomains, domain)
+		}
+	}
+
+	noDomain := len(conf.Domains) == 0
+	matchDomain := func(host string) bool {
+		for i, _len := 0, len(exactDomains); i < _len; i++ {
+			if exactDomains[i] == host {
+				return true
+			}
+		}
+		for i, _len := 0, len(prefixDomains); i < _len; i++ {
+			if strings.HasPrefix(host, prefixDomains[i]) {
+				return true
+			}
+		}
+		for i, _len := 0, len(suffixDomains); i < _len; i++ {
+			if strings.HasSuffix(host, suffixDomains[i]) {
+				return true
+			}
+		}
+		return false
+	}
+
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
 			if strings.Contains(ctx.GetHeader(ship.HeaderAcceptEncoding), "gzip") {
-				if len(conf.Domains) == 0 || ship.InStrings(splitHost(ctx.Host()), conf.Domains) {
+				if noDomain || matchDomain(splitHost(ctx.Host())) {
 					ctx.AddHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
 					ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
 
