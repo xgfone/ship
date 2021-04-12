@@ -53,6 +53,7 @@ func Logger(config *LoggerConfig) Middleware {
 			var bodyCnt string
 			if conf.LogReqBody {
 				buf := ctx.AcquireBuffer()
+				defer ctx.ReleaseBuffer(buf)
 				body := bufferBody{Closer: ctx.Body(), Buffer: buf}
 				_, err = ship.CopyNBuffer(body.Buffer, ctx.Body(), ctx.ContentLength(), nil)
 				if err != nil {
