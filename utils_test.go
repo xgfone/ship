@@ -119,3 +119,33 @@ func ExampleSetStructFieldToDefault() {
 	// 2021-04-10T12:56:28Z
 	// 3s
 }
+
+func ExampleSplitHostPort() {
+	var host, port string
+
+	host, port = SplitHostPort("www.example.com")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	host, port = SplitHostPort("www.example.com:80")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	host, port = SplitHostPort(":80")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	host, port = SplitHostPort("1.2.3.4:80")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	host, port = SplitHostPort("[fe80::1122:3344:5566:7788]")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	host, port = SplitHostPort("[fe80::1122:3344:5566:7788]:80")
+	fmt.Printf("Host: %s, Port: %s#\n", host, port)
+
+	// Output:
+	// Host: www.example.com, Port: #
+	// Host: www.example.com, Port: 80#
+	// Host: , Port: 80#
+	// Host: 1.2.3.4, Port: 80#
+	// Host: fe80::1122:3344:5566:7788, Port: #
+	// Host: fe80::1122:3344:5566:7788, Port: 80#
+}
