@@ -416,15 +416,14 @@ func (s *Ship) Hosts() (hosts []string) {
 //----------------------------------------------------------------------------
 
 func (s *Ship) handleErrorDefault(ctx *Context, err error) {
-	if ctx.res.Wrote {
-		ctx.Logger().Errorf("unknown error: method=%s, url=%s, err=%s",
-			ctx.Method(), ctx.RequestURI(), err)
-	} else if se, ok := err.(HTTPServerError); !ok {
-		ctx.NoContent(http.StatusInternalServerError)
-	} else if se.CT == "" {
-		ctx.BlobText(se.Code, MIMETextPlain, se.Error())
-	} else {
-		ctx.BlobText(se.Code, se.CT, se.Error())
+	if !ctx.res.Wrote {
+		if se, ok := err.(HTTPServerError); !ok {
+			ctx.NoContent(http.StatusInternalServerError)
+		} else if se.CT == "" {
+			ctx.BlobText(se.Code, MIMETextPlain, se.Error())
+		} else {
+			ctx.BlobText(se.Code, se.CT, se.Error())
+		}
 	}
 }
 
