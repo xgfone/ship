@@ -1,8 +1,6 @@
-# ship [![Build Status](https://api.travis-ci.com/xgfone/ship.svg?branch=master)](https://travis-ci.com/github/xgfone/ship) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/ship)](https://pkg.go.dev/github.com/xgfone/ship) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
+# ship [![Build Status](https://api.travis-ci.com/xgfone/ship.svg?branch=master)](https://travis-ci.com/github/xgfone/ship) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/ship/v5)](https://pkg.go.dev/github.com/xgfone/ship/v5) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
-`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
-
-`ship` has been stable, and the current version is `v4` and support Go `1.11+`.
+`ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework supporting Go `1.11+`. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
 
 ## Features
@@ -18,10 +16,16 @@
 - ......
 
 
+### Components
+- `Ship` is the pure router framework based on the method and the path, including `Middleware`, `Context`, `Router`, etc.
+- `HostManager` and `HostHandler` are the vhost manager and the standard http handler with the vhost manager.
+- `Runner` is the runner to start the http server with the standard http handler.
+
+
 ## Install
 
 ```shell
-go get -u github.com/xgfone/ship/v4
+go get -u github.com/xgfone/ship/v5
 ```
 
 
@@ -31,16 +35,31 @@ go get -u github.com/xgfone/ship/v4
 // example.go
 package main
 
-import "github.com/xgfone/ship/v4"
+import (
+	"github.com/xgfone/ship/v5"
+	"github.com/xgfone/ship/v5/middleware"
+)
 
 func main() {
 	router := ship.New()
-	router.Route("/ping").GET(func(ctx *ship.Context) error {
-		return ctx.JSON(200, map[string]interface{}{"message": "pong"})
+	router.Use(middleware.Logger(), middleware.Recover()) // Use the middlewares.
+
+	router.Route("/ping").GET(func(c *ship.Context) error {
+		return c.JSON(200, map[string]interface{}{"message": "pong"})
+	})
+
+	group := router.Group("/group")
+	group.Route("/ping").GET(func(c *ship.Context) error {
+		return c.Text(200, "group")
+	})
+
+	subgroup := group.Group("/subgroup")
+	subgroup.Route("/ping").GET(func(c *ship.Context) error {
+		return c.Text(200, "subgroup")
 	})
 
 	// Start the HTTP server.
-	router.Start(":8080").Wait()
+	ship.StartServer(":8080", router)
 	// or
 	// http.ListenAndServe(":8080", router)
 }
@@ -53,6 +72,12 @@ $ go run example.go
 ```shell
 $ curl http://127.0.0.1:8080/ping
 {"message":"pong"}
+
+$ curl http://127.0.0.1:8080/group/ping
+group
+
+$ curl http://127.0.0.1:8080/group/subgroup/ping
+subgroup
 ```
 
 ### Route Path
@@ -64,28 +89,29 @@ The route path supports the parameters like `:paramName`, `*` or `*restParamName
 - `/path/to/*` or `/path/to/*all` matches the path `/path/to/abc`, `/path/to/abc/efg`, `/path/to/xyz`, `/path/to/xyz/123`, etc. And `*` or `*all` is equal to `abc`, `abc/efg`, `xyz`, or `xzy/123`. **Notice:** `*` or `*restParamName` must be the last one of the route path.
 - `/path/:param/to/*` matches the path `/path/abc/to/efg`, `/path/abc/to/efg/123`, etc. And `:param` is equal to `abc`, and `*` is equal to `efg` or `efg/123`
 
-For the parameter, it can be accessed by `Context.URLParam(paramName)`.
+For the parameter, it can be accessed by `Context.Param(paramName)`.
 
-- For `*`, the parameter name is `*`, like `Context.URLParam("*")`.
-- For `*restParamName`, the parameter name is `restParamName`, like `Context.URLParam(restParamName)`.
+- For `*`, the parameter name is `*`, like `Context.Param("*")`.
+- For `*restParamName`, the parameter name is `restParamName`, like `Context.Param(restParamName)`.
 
 
 ## API Example
 
-### `Router`
-#### Using `CONNECT`, `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTION`
+### Route Builder
+#### Using `CONNECT`, `HEAD`, `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`
 
 ```go
 func main() {
-    router := ship.New()
-    router.Route("/path/get").GET(getHandler)
-    router.Route("/path/put").PUT(putHandler)
-    router.Route("/path/post").POST(postHandler)
-    router.Route("/path/patch").PATCH(patchHandler)
-    router.Route("/path/delete").DELETE(deleteHandler)
-    router.Route("/path/option").OPTIONS(optionHandler)
-    router.Route("/path/connect").CONNECT(connectHandler)
-    router.Start(":8080").Wait()
+	router := ship.New()
+	router.Route("/path/get").GET(getHandler)
+	router.Route("/path/put").PUT(putHandler)
+	router.Route("/path/head").HEAD(headHandler)
+	router.Route("/path/post").POST(postHandler)
+	router.Route("/path/patch").PATCH(patchHandler)
+	router.Route("/path/delete").DELETE(deleteHandler)
+	router.Route("/path/option").OPTIONS(optionHandler)
+	router.Route("/path/connect").CONNECT(connectHandler)
+	ship.StartServer(":8080", router)
 }
 ```
 
@@ -96,197 +122,218 @@ Notice: you can register the same handler with more than one method by `Route(pa
 
 ```go
 func main() {
-    router := ship.New()
-    router.Route("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
-    router.Start(":8080").Wait()
+	router := ship.New()
+	router.Route("/path/to").GET(getHandler).POST(postHandler).DELETE(deleteHandler)
+	ship.StartServer(":8080", router)
 }
 ```
 
-or use the mapping from method to handler:
+
+#### Use the mapping of the route methods
+```go
+func main() {
+	router := ship.New()
+	router.Route("/path/to").Map(map[string]ship.Handler{
+		"GET": getHandler,
+		"POST": postHandler,
+		"DELETE": deleteHandler,
+	})
+	ship.StartServer(":8080", router)
+}
+```
+
+
+#### Name the route
+When registering the route, it can be named with a name.
 
 ```go
 func main() {
-    router := ship.New()
-    router.Route("/path/to").Map(map[string]ship.Handler{
-        "GET": getHandler,
-        "POST": postHandler,
-        "DELETE": deleteHandler,
-    })
-    router.Start(":8080").Wait()
+	router := ship.New()
+	router.Route("/path/:id").Name("get_url").GET(func(c *ship.Context) error {
+		fmt.Println(c.URL("get_url", c.Param("id")))
+		return nil
+	})
+	ship.StartServer(":8080", router)
 }
 ```
 
-#### Naming route and building URL
-When registering the route, it can be named with a name, then build a url path by the name.
 
-```go
-func main() {
-    router := ship.New()
-    router.Route("/path/:id").Name("get_url").GET(func(ctx *ship.Context) error {
-        fmt.Println(ctx.URLPath("get_url", ctx.URLParam("id")))
-        return nil
-    })
-    router.Start(":8080").Wait()
-}
-```
-
-#### Add the Header filter
-
-```go
-func main() {
-    router := ship.New()
-    handler := func(ctx *ship.Context) error { return nil }
-
-    // The Content-Type header of the request to /path2 must be application/json,
-    // Or it will return 404.
-    router.Route("/path2").HasHeader("Content-Type", "application/json").POST(handler)
-    router.Start(":8080").Wait()
-}
-```
-
-#### Using `SubRouter`
-
-```go
-func main() {
-    router := ship.New().Use(middleware.Logger(nil), middleware.Recover())
-
-    // v1 SubRouter, which will inherit the middlewares of the parent router.
-    v1 := router.Group("/v1")
-    v1.Route("/get/path").GET(getHandler)
-
-    // v2 SubRouter, which won't inherit the middlewares of the parent router.
-    v2 := router.Group("/v2").NoMiddlewares().Use(MyAuthMiddleware())
-    v2.Route("/post/path").POST(postHandler)
-
-    router.Start(":8080").Wait()
-}
-```
-
-#### Filter the unacceptable route
-```go
-func filter(ri ship.RouteInfo) bool {
-    if ri.Name == "" {
-        return true
-    } else if !strings.HasPrefix(ri.Path, "/prefix/") {
-        return true
-    }
-    return false
-}
-
-func main() {
-    // Don't register the router without name.
-    app := ship.New()
-    app.RouteFilter = filter
-
-    app.Group("/prefix").Route("/name").Name("test").GET(handler) // Register the route
-    app.Group("/prefix").Route("/noname").GET(handler)            // Don't register the route
-    app.Route("/no_group").GET(handler)                           // Don't register the route
-}
-```
-
-#### Modify the registered route
-```go
-func modifier(ri ship.RouteInfo) ship.RouteInfo {
-    ri.Path = "/prefix" + ri.Path
-    return ri
-}
-
-func main() {
-    app := ship.New()
-    app.RouteModifier = modifier
-
-    // Register the path as "/prefix/path".
-    app.Route("/path").Name("test").GET(handler)
-}
-```
-
-### Using `Middleware`
+#### Use the route group
 
 ```go
 package main
 
 import (
-    "net/http"
-
-    "github.com/xgfone/ship/v4"
-    "github.com/xgfone/ship/v4/middleware"
+	"github.com/xgfone/ship/v5"
+	"github.com/xgfone/ship/v5/middleware"
 )
 
-func main() {
-    // We disable the default error log because we have used the Logger middleware.
-    app := ship.New().Use(middleware.Logger(nil), middleware.Recover())
-    app.Use(MyAuthMiddleware())
-    app.Route("/url/path").GET(handler)
-    app.Start(":8080").Wait()
+// MyAuthMiddleware returns a middleare to authenticate the request.
+func MyAuthMiddleware() ship.Middleware {
+	return func(next ship.Handler) ship.Handler {
+		return func(c *ship.Context) error {
+			// TODO: authenticate the request.
+			return next(c)
+		}
+	}
 }
-```
-
-You can register a **Before** middleware to be run before finding the router to affect the route match. For example,
-
-```go
-package main
-
-import (
-    "net/http"
-
-    "github.com/xgfone/ship/v4"
-    "github.com/xgfone/ship/v4/middleware"
-)
-
-func RemovePathPrefix(prefix string) ship.Middleware {
-    if len(prefix) < 2 || prefix[len(prefix)-1] == "/" {
-        panic(fmt.Errorf("invalid prefix: '%s'", prefix))
-    }
-
-    return func(next ship.Handler) Handler {
-        return func(ctx *ship.Context) error {
-            req := ctx.Request()
-            req.URL.Path = strings.TrimPrefix(req.URL.Path, prefix)
-        }
-    }
-}
-
-func main() {
-    router := ship.New()
-
-    // Use and Before have no interference each other.
-    router.Use(middleware.Logger(nil))
-    router.Pre(RemovePathPrefix("/static"))
-    router.Use(middleware.Recover())
-
-    router.Route("/url/path").GET(handler)
-    router.Start(":8080").Wait()
-}
-```
-
-### Add the Virtual Host
-
-```go
-package main
-
-import "github.com/xgfone/ship/v4"
 
 func main() {
 	router := ship.New()
-	router.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "default") })
+	router.Use(middleware.Logger(), middleware.Recover())
+
+	// v1 Group, which will inherit the middlewares of the parent router.
+	v1 := router.Group("/v1")
+	v1.Route("/get").GET(func(c *ship.Context) error { return nil }) // Route: GET /v1/get
+
+	// v2 Group, which won't inherit the middlewares of the parent router.
+	v2 := router.Group("/v2").ResetMiddlewares(MyAuthMiddleware())
+	v2.Route("/post").POST(func(c *ship.Context) error { return nil }) // Route: POST /v2/post
+
+	// For sub-group of v2 Group.
+	v2g := v2.Group("/child")
+	v2g.Route("/path").GET(func(c *ship.Context) error { return nil }) // Route: GET /v2/child/path
+
+	ship.StartServer(":8080", router)
+}
+```
+
+#### Filter the unacceptable routes
+```go
+package main
+
+import (
+	"strings"
+
+	"github.com/xgfone/ship/v5"
+)
+
+func filter(ri ship.Route) bool {
+	if ri.Name == "" || !strings.HasPrefix(ri.Path, "/prefix/") {
+		return true
+	}
+	return false
+}
+
+func main() {
+	handler := func(c *ship.Context) error { return nil }
+
+	router := ship.New()
+	router.RouteFilter = filter // Don't register the router without name.
+
+	router.Group("/prefix").Route("/name").Name("test").GET(handler) // Register the route
+	router.Group("/prefix").Route("/noname").GET(handler)            // Don't register the route
+	router.Route("/no_group").GET(handler)                           // Don't register the route
+
+	ship.StartServer(":8080", router)
+}
+```
+
+#### Modify the route before registering it
+```go
+package main
+
+import "github.com/xgfone/ship/v5"
+
+func modifier(ri ship.Route) ship.Route {
+	ri.Path = "/prefix" + ri.Path
+	return ri
+}
+
+func main() {
+	handler := func(c *ship.Context) error { return nil }
+
+	router := ship.New()
+	router.RouteModifier = modifier
+	router.Route("/path").Name("test").GET(handler) // Register the path as "/prefix/path".
+
+	ship.StartServer(":8080", router)
+}
+```
+
+
+### Use `Middleware`
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/xgfone/ship/v5"
+	"github.com/xgfone/ship/v5/middleware"
+)
+
+// RemovePathPrefix returns a middleware to remove the prefix from the request path.
+func RemovePathPrefix(prefix string) ship.Middleware {
+	if len(prefix) < 2 || prefix[len(prefix)-1] == '/' {
+		panic(fmt.Errorf("invalid prefix: '%s'", prefix))
+	}
+
+	return func(next ship.Handler) ship.Handler {
+		return func(c *ship.Context) error {
+			req := c.Request()
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, prefix)
+			return next(c)
+		}
+	}
+}
+
+func main() {
+	router := ship.New()
+
+	// Execute the middlewares before finding the route.
+	router.Pre(RemovePathPrefix("/static"))
+
+	// Execute the middlewares after finding the route.
+	router.Use(middleware.Logger(), middleware.Recover())
+
+	handler := func(c *ship.Context) error { return nil }
+	router.Route("/path1").GET(handler)
+	router.Route("/path2").GET(handler)
+	router.Route("/path3").GET(handler)
+
+	ship.StartServer(":8080", router)
+}
+```
+
+### Use the virtual host
+
+```go
+package main
+
+import (
+	"github.com/xgfone/ship/v5"
+)
+
+func main() {
+	vhosts := ship.NewHostManagerHandler(nil)
+
+	_default := ship.New()
+	_default.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "default") })
+	vhosts.SetDefaultHost("", _default)
 
 	// Exact Match Host
-	vhost1 := router.Host("www.host1.example.com")
+	vhost1 := ship.New()
 	vhost1.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost1") })
+	vhosts.AddHost("www.host1.example.com", vhost1)
 
 	// Suffix Match Host
-	vhost2 := router.Host("*.host2.example.com")
+	vhost2 := ship.New()
 	vhost2.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost2") })
+	vhosts.AddHost("*.host2.example.com", vhost2)
 
 	// Prefix Match Host
-	vhost3 := router.Host("www.host3.*")
+	vhost3 := ship.New()
 	vhost3.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost3") })
+	vhosts.AddHost("www.host3.*", vhost3)
 
 	// Regexp Match Host by using Go regexp package
-	vhost4 := router.Host(`www\.[a-zA-z0-9]+\.example\.com`)
+	vhost4 := ship.New()
 	vhost4.Route("/").GET(func(c *ship.Context) error { return c.Text(200, "vhost4") })
+	vhosts.AddHost(`www\.[a-zA-z0-9]+\.example\.com`, vhost4)
 
-	router.Start(":8080").Wait()
+	ship.StartServer(":8080", vhosts)
 }
 ```
 
@@ -312,69 +359,78 @@ vhost4
 ```go
 package main
 
-import (
-	"net/http"
+import "github.com/xgfone/ship/v5"
 
-	"github.com/xgfone/ship/v4"
-)
-
-func responder(ctx *ship.Context, args ...interface{}) error {
+func responder(c *ship.Context, args ...interface{}) error {
 	switch len(args) {
 	case 0:
-		return ctx.NoContent(http.StatusOK)
+		return c.NoContent(200)
 	case 1:
 		switch v := args[0].(type) {
 		case int:
-			return ctx.NoContent(v)
+			return c.NoContent(v)
 		case string:
-			return ctx.Text(http.StatusOK, v)
+			return c.Text(200, v)
 		}
 	case 2:
 		switch v0 := args[0].(type) {
 		case int:
-			return ctx.Text(v0, "%v", args[1])
+			return c.Text(v0, "%v", args[1])
 		}
 	}
-	return ctx.NoContent(http.StatusInternalServerError)
+	return c.NoContent(500)
 }
 
 func main() {
-	app := ship.New()
-	app.Responder = responder
-	app.Route("/path1").GET(func(c *ship.Context) error { return c.Respond() })
-	app.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
-	app.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
-	app.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
-	app.Start(":8080").Wait()
+	router := ship.New()
+	router.Responder = responder
+	router.Route("/path1").GET(func(c *ship.Context) error { return c.Respond() })
+	router.Route("/path2").GET(func(c *ship.Context) error { return c.Respond(200) })
+	router.Route("/path3").GET(func(c *ship.Context) error { return c.Respond("Hello, World") })
+	router.Route("/path4").GET(func(c *ship.Context) error { return c.Respond(200, "Hello, World") })
+	ship.StartServer(":8080", router)
 }
 ```
 
-### Bind JSON, XML or Form data form payload
-
-`ship` supply a default data binding to bind the JSON, XML or Form data from payload.
-
+### Bind JSON, XML or Form data from the request payload
 ```go
+package main
+
+import "github.com/xgfone/ship/v5"
+
+// Login is the login information.
 type Login struct {
-    Username string `json:"username" xml:"username"`
-    Password string `json:"password" xml:"password"`
+	Username string `json:"username" xml:"username"`
+	Password string `json:"password" xml:"password"`
 }
 
 func main() {
-    router := ship.Default()
+	router := ship.Default()
+	router.Route("/login").POST(func(c *ship.Context) (err error) {
+		var login Login
+		if err = c.Bind(&login); err != nil {
+			return ship.ErrBadRequest.New(err)
+		}
+		return c.Text(200, "username=%s, password=%s", login.Username, login.Password)
+	})
 
-    router.Route("/login").POST(func(ctx *ship.Context) error {
-        var login Login
-        if err := ctx.Bind(&login); err != nil {
-            return err
-        }
-        ...
-    })
-
-    router.Start(":8080").Wait()
+	ship.StartServer(":8080", router)
 }
 ```
 
-### Render JSON, XML, HTML or other format data
+```shell
+$ curl http://127.0.0.1:8080/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"xgfone","password":"123456"}'
+username=xgfone, password=123456
+
+$ curl http://127.0.0.1:8080/login \
+    -H 'Content-Type: application/xml' \
+    -d '<login><username>xgfone</username><password>123456</password></login>'
+username=xgfone, password=123456
+```
+
+### Render HTML template
 
 In the directory `/path/to/templates`, there is a template file named `index.tmpl` as follow:
 ```html
@@ -386,17 +442,13 @@ In the directory `/path/to/templates`, there is a template file named `index.tmp
     </body>
 </html>
 ```
-So we load it as the template by the stdlib `html/template`, and render it as the HTML content.
 
 ```go
 package main
 
 import (
-	"fmt"
-
-	"github.com/xgfone/ship/v4"
-	"github.com/xgfone/ship/v4/render"
-	"github.com/xgfone/ship/v4/render/template"
+	"github.com/xgfone/ship/v5"
+	"github.com/xgfone/ship/v5/render/template"
 )
 
 func main() {
@@ -405,31 +457,13 @@ func main() {
 	tmplRender := template.NewHTMLTemplateRender(loader)
 
 	router := ship.Default()
-	router.Renderer.(*render.MuxRenderer).Add(".tmpl", tmplRender)
-
-	// For JSON
-	router.Route("/json").GET(func(ctx *ship.Context) error {
-		if ctx.QueryParam("pretty") == "1" {
-			return ctx.JSONPretty(200, map[string]interface{}{"msg": "json"}, "    ")
-		}
-		return ctx.JSON(200, map[string]interface{}{"msg": "json"})
-	})
-
-	// For XML
-	router.Route("/xml").GET(func(ctx *ship.Context) error {
-		if ctx.QueryParam("pretty") == "1" {
-			return ctx.XMLPretty(200, []string{"msg", "xml"}, "    ")
-		}
-		return ctx.XML(200, []string{"msg", "xml"})
-	})
-
-	// For HTML
-	router.Route("/html").GET(func(ctx *ship.Context) error {
-		return ctx.RenderOk("index.tmpl", "Hello World")
+	router.Renderer.(*ship.MuxRenderer).Add(".tmpl", tmplRender)
+	router.Route("/html").GET(func(c *ship.Context) error {
+		return c.RenderOk("index.tmpl", "Hello World")
 	})
 
 	// Start the HTTP server.
-	router.Start(":8080").Wait()
+	ship.StartServer(":8080", router)
 }
 ```
 
@@ -444,306 +478,17 @@ When accessing `http://127.0.0.1:8080/html`, it returns
 </html>
 ```
 
-### Prometheus Metric
-```go
-package main
-
-import (
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v4"
-)
-
-func main() {
-	app := ship.New()
-	app.Route("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
-	app.Start(":8080").Wait()
-}
-```
-
-The default collectors can be disabled or removed like this.
-```go
-package main
-
-import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xgfone/ship/v4"
-)
-
-// DisableBuiltinCollector removes the collectors that the default prometheus
-// register registered.
-func DisableBuiltinCollector() {
-	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	prometheus.Unregister(prometheus.NewGoCollector())
-}
-
-func main() {
-	DisableBuiltinCollector()
-	app := ship.New()
-	app.Route("/metrics").GET(ship.FromHTTPHandler(promhttp.Handler()))
-	app.Start(":8080").Wait()
-}
-```
-
-The default prometheus HTTP handler, `promhttp.Handler()`, will collect two metrics: `promhttp_metric_handler_requests_in_flight` and `promhttp_metric_handler_requests_total{code="200/500/503"}`. However, it can be rewrote like this.
-```go
-package main
-
-import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/expfmt"
-	"github.com/xgfone/ship/v4"
-)
-
-// DisableBuiltinCollector removes the collectors that the default prometheus
-// register registered.
-func DisableBuiltinCollector() {
-	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	prometheus.Unregister(prometheus.NewGoCollector())
-}
-
-// Prometheus returns a prometheus handler.
-//
-// if missing gatherer, it is prometheus.DefaultGatherer by default.
-func Prometheus(gatherer ...prometheus.Gatherer) ship.Handler {
-	gather := prometheus.DefaultGatherer
-	if len(gatherer) > 0 && gatherer[0] != nil {
-		gather = gatherer[0]
-	}
-
-	return func(ctx *ship.Context) error {
-		mfs, err := gather.Gather()
-		if err != nil {
-			return err
-		}
-
-		ct := expfmt.Negotiate(ctx.Request().Header)
-		ctx.SetContentType(string(ct))
-		enc := expfmt.NewEncoder(ctx, ct)
-
-		for _, mf := range mfs {
-			if err = enc.Encode(mf); err != nil {
-				ctx.Logger().Errorf("failed to encode prometheus metric: %s", err)
-			}
-		}
-
-		return nil
-	}
-}
-
-func main() {
-	DisableBuiltinCollector()
-	ship.New().Route("/metrics").GET(Prometheus()).Ship().Start(":8080").Wait()
-}
-```
-
-### OpenTracing
-```go
-import (
-	"fmt"
-	"net/http"
-	"net/url"
-
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	"github.com/xgfone/ship/v4"
-)
-
-// OpenTracingOption is used to configure the OpenTracingServer.
-type OpenTracingOption struct {
-	Tracer        opentracing.Tracer // Default: opentracing.GlobalTracer()
-	ComponentName string             // Default: "net/http"
-
-	// URLTagFunc is used to get the value of the tag "http.url".
-	// Default: url.String()
-	URLTagFunc func(*url.URL) string
-
-	// SpanFilter is used to filter the span if returning true.
-	// Default: return false
-	SpanFilter func(*http.Request) bool
-
-	// OperationNameFunc is used to the operation name.
-	// Default: fmt.Sprintf("HTTP %s %s", r.Method, r.URL.Path)
-	OperationNameFunc func(*http.Request) string
-
-	// SpanObserver is used to do extra things of the span for the request.
-	//
-	// For example,
-	//    OpenTracingOption {
-	//        SpanObserver: func(*http.Request, opentracing.Span) {
-	//            ext.PeerHostname.Set(span, req.Host)
-	//        },
-	//    }
-	//
-	// Default: Do nothing.
-	SpanObserver func(*http.Request, opentracing.Span)
-}
-
-// Init initializes the OpenTracingOption.
-func (o *OpenTracingOption) Init() {
-	if o.ComponentName == "" {
-		o.ComponentName = "net/http"
-	}
-	if o.URLTagFunc == nil {
-		o.URLTagFunc = func(u *url.URL) string { return u.String() }
-	}
-	if o.SpanFilter == nil {
-		o.SpanFilter = func(r *http.Request) bool { return false }
-	}
-	if o.SpanObserver == nil {
-		o.SpanObserver = func(*http.Request, opentracing.Span) {}
-	}
-	if o.OperationNameFunc == nil {
-		o.OperationNameFunc = func(r *http.Request) string {
-			return fmt.Sprintf("HTTP %s %s", r.Method, r.URL.Path)
-		}
-	}
-}
-
-// GetTracer returns the OpenTracing tracker.
-func (o *OpenTracingOption) GetTracer() opentracing.Tracer {
-	if o.Tracer == nil {
-		return opentracing.GlobalTracer()
-	}
-	return o.Tracer
-}
-
-// NewOpenTracingRoundTripper returns a new OpenTracingRoundTripper.
-func NewOpenTracingRoundTripper(rt http.RoundTripper, opt *OpenTracingOption) *OpenTracingRoundTripper {
-	var o OpenTracingOption
-	if opt != nil {
-		o = *opt
-	}
-	o.Init()
-	return &OpenTracingRoundTripper{RoundTripper: rt, OpenTracingOption: o}
-}
-
-// WrappedRoundTripper returns the wrapped http.RoundTripper.
-func (rt *OpenTracingRoundTripper) WrappedRoundTripper() http.RoundTripper {
-	return rt.RoundTripper
-}
-
-func (rt *OpenTracingRoundTripper) roundTrip(req *http.Request) (*http.Response, error) {
-	if rt.RoundTripper == nil {
-		return http.DefaultTransport.RoundTrip(req)
-	}
-	return rt.RoundTripper.RoundTrip(req)
-}
-
-// RoundTrip implements the interface http.RounderTripper.
-func (rt *OpenTracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if rt.SpanFilter(req) {
-		return rt.roundTrip(req)
-	}
-
-	operationName := rt.OperationNameFunc(req)
-	sp, ctx := opentracing.StartSpanFromContext(req.Context(), operationName)
-	ext.HTTPMethod.Set(sp, req.Method)
-	ext.Component.Set(sp, rt.ComponentName)
-	ext.HTTPUrl.Set(sp, rt.URLTagFunc(req.URL))
-	rt.SpanObserver(req, sp)
-	defer sp.Finish()
-
-	carrier := opentracing.HTTPHeadersCarrier(req.Header)
-	rt.GetTracer().Inject(sp.Context(), opentracing.HTTPHeaders, carrier)
-
-	return rt.roundTrip(req.WithContext(ctx))
-}
-
-// OpenTracing is a middleware to support the OpenTracing.
-func OpenTracing(opt *OpenTracingOption) Middleware {
-	var o OpenTracingOption
-	if opt != nil {
-		o = *opt
-	}
-	o.Init()
-
-	const format = opentracing.HTTPHeaders
-	return func(next ship.Handler) ship.Handler {
-		return func(ctx *ship.Context) (err error) {
-			req := ctx.Request()
-			if o.SpanFilter(req) {
-				return next(ctx)
-			}
-
-			tracer := o.GetTracer()
-			sc, _ := tracer.Extract(format, opentracing.HTTPHeadersCarrier(req.Header))
-			sp := tracer.StartSpan(o.OperationNameFunc(req), ext.RPCServerOption(sc))
-
-			ext.HTTPMethod.Set(sp, req.Method)
-			ext.Component.Set(sp, o.ComponentName)
-			ext.HTTPUrl.Set(sp, o.URLTagFunc(req.URL))
-			o.SpanObserver(req, sp)
-
-			req = req.WithContext(opentracing.ContextWithSpan(req.Context(), sp))
-			ctx.SetRequest(req)
-
-			defer func() {
-				if e := recover(); e != nil {
-					ext.Error.Set(sp, true)
-					sp.Finish()
-					panic(e)
-				}
-
-				statusCode := ctx.StatusCode()
-				if !ctx.IsResponded() {
-					switch e := err.(type) {
-					case nil:
-					case ship.HTTPError:
-						statusCode = e.Code
-					default:
-						statusCode = 500
-					}
-				}
-
-				ext.HTTPStatusCode.Set(sp, uint16(statusCode))
-				if statusCode >= 500 {
-					ext.Error.Set(sp, true)
-				}
-				sp.Finish()
-			}()
-
-			err = next(ctx)
-			return err
-		}
-	}
-}
-
-func init() {
-	// TODO: Initialize the global OpenTracing tracer.
-
-	// Replace the default global RoundTripper.
-	http.DefaultTransport = NewOpenTracingRoundTripper(http.DefaultTransport, nil)
-}
-
-func main() {
-	app := ship.Default()
-	app.Use(OpenTracing(nil))
-	app.Route("/").GET(func(c *ship.Context) error {
-		ctx := c.Request().Context() // ctx contains the parent span context
-		req, err := http.NewRequestWithContext(ctx, METHOD, URL, BODY)
-		if err != nil {
-			return
-		}
-		// TODO with req ...
-	})
-	app.Start(":8080").Wait()
-}
-```
-
 
 ## Route Management
 
-`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v4/router/echo?tab=doc#NewRouter).
+`ship` supply a default implementation based on [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) to manage the route with **Zero Garbage** (See [Benchmark](#benchmark)), which refers to [echo](https://github.com/labstack/echo), that's, [`NewRouter()`](https://pkg.go.dev/github.com/xgfone/ship/v5/router/echo?tab=doc#NewRouter).
 
-You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v4/router?tab=doc#Router).
+You can appoint your own implementation by implementing the interface [`Router`](https://pkg.go.dev/github.com/xgfone/ship/v5/router?tab=doc#Router).
 
 ```go
 type Router interface {
-	// Routes uses the filter to filter and return the routes if it returns true.
-	//
-	// Return all the routes if filter is nil.
-	Routes(filter func(name, path, method string) bool) []Route
+	// Range traverses all the registered routes.
+	Range(func(name, path, method string, handler interface{}))
 
 	// Path generates a url path by the path name and parameters.
 	//
@@ -782,9 +527,14 @@ type Router interface {
 
 ```go
 func main() {
-    NewMyRouter := func() ship.Router { return ... }
-    router := ship.New().SetNewRouter(NewMyRouter)
-    // ...
+	NewMyRouter := func() (router ship.Router) {
+		// TODO: new a Router.
+		return
+	}
+
+	router := ship.New()
+	router.Router = NewMyRouter()
+	// ...
 }
 ```
 

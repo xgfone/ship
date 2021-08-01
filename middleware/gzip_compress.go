@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 // GZipConfig is used to configure the GZIP middleware.
@@ -116,10 +116,10 @@ func Gzip(config *GZipConfig) Middleware {
 
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
-			if strings.Contains(ctx.GetHeader(ship.HeaderAcceptEncoding), "gzip") {
+			if strings.Contains(ctx.GetReqHeader(ship.HeaderAcceptEncoding), "gzip") {
 				if noDomain || matchDomain(splitHost(ctx.Host())) {
-					ctx.AddHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
-					ctx.SetHeader(ship.HeaderContentEncoding, "gzip")
+					ctx.AddRespHeader(ship.HeaderVary, ship.HeaderAcceptEncoding)
+					ctx.SetRespHeader(ship.HeaderContentEncoding, "gzip")
 
 					resp := ctx.ResponseWriter()
 					gresp := acquireGzipResponse(resp)

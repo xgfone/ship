@@ -15,29 +15,10 @@
 // Package router supplies a router interface ane some implementations.
 package router
 
-import "fmt"
-
-// Route represents the information of the registered route.
-type Route struct {
-	Name    string
-	Path    string
-	Method  string
-	Handler interface{}
-}
-
-func (r Route) String() string {
-	if r.Name == "" {
-		return fmt.Sprintf("Route(method=%s, path=%s)", r.Method, r.Path)
-	}
-	return fmt.Sprintf("Route(name=%s, method=%s, path=%s)", r.Name, r.Method, r.Path)
-}
-
 // Router is a router manager based on the path with the optional method.
 type Router interface {
-	// Routes uses the filter to filter and return the routes if it returns true.
-	//
-	// Return all the routes if filter is nil.
-	Routes(filter func(name, path, method string) bool) []Route
+	// Range traverses all the registered routes.
+	Range(func(name, path, method string, handler interface{}))
 
 	// Path generates a url path by the path name and parameters.
 	//

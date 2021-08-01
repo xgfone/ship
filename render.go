@@ -26,15 +26,13 @@ type Renderer interface {
 	Render(w http.ResponseWriter, name string, code int, data interface{}) error
 }
 
-type rendererFunc func(http.ResponseWriter, string, int, interface{}) error
+// RendererFunc is the function type implementing the interface Renderer.
+type RendererFunc func(http.ResponseWriter, string, int, interface{}) error
 
-func (f rendererFunc) Render(w http.ResponseWriter, name string, code int, data interface{}) error {
+// Render implements the interface Renderer.
+func (f RendererFunc) Render(w http.ResponseWriter, name string, code int,
+	data interface{}) error {
 	return f(w, name, code, data)
-}
-
-// RendererFunc converts a function to Renderer.
-func RendererFunc(f func(http.ResponseWriter, string, int, interface{}) error) Renderer {
-	return rendererFunc(f)
 }
 
 // MuxRenderer is a multiplexer for kinds of Renderers.
@@ -76,9 +74,10 @@ func (mr *MuxRenderer) Del(suffix string) {
 
 // Render implements the interface Renderer, which will get the renderer
 // the name suffix then render the content.
-func (mr *MuxRenderer) Render(w http.ResponseWriter, name string, code int, data interface{}) error {
+func (mr *MuxRenderer) Render(w http.ResponseWriter, name string, code int,
+	data interface{}) error {
 	if renderer := mr.Get(name); renderer != nil {
 		return renderer.Render(w, name, code, data)
 	}
-	return fmt.Errorf("not support the renderer named '%s'", name)
+	return fmt.Errorf("unknown renderer named '%s'", name)
 }

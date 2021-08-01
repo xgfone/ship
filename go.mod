@@ -1,3 +1,3 @@
-module github.com/xgfone/ship/v4
+module github.com/xgfone/ship/v5
 
 go 1.11

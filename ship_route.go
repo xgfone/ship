@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-// RouteInfo is used to represent the information of the registered route.
-type RouteInfo struct {
-	// The host is used to isolate the routes. And the different host
-	// maybe has the same routes.
-	//
-	// If Host is empty, it represents the default host.
-	Host string `json:"host,omitempty" xml:"host,omitempty"`
+var (
+	errInvalidHandler   = errors.New("handler must not be nil")
+	errTooManyURLParams = errors.New("too many url params")
+)
 
+// Route is used to represent the information of the registered route.
+type Route struct {
 	// Path and Method represent the unique route in a certain host.
 	//
 	// Path maybe contain the parameters, which is determined by the underlying
@@ -41,77 +40,47 @@ type RouteInfo struct {
 	// Handler is the handler of the route to handle the request.
 	Handler Handler `json:"-" xml:"-"`
 
-	// CtxData is any additional context data, which is passed to the handler
-	// and it can be accessed by Context.RouteInfo.CtxData in the handler.
-	CtxData interface{} `json:"ctxdata,omitempty" xml:"ctxdata,omitempty"`
+	// Data is any additional data associated with the route.
+	Data interface{} `json:"data,omitempty" xml:"data,omitempty"`
 }
 
-func (ri RouteInfo) String() string {
-	if ri.Host == "" {
-		if ri.Name == "" {
-			return fmt.Sprintf("RouteInfo(method=%s, path=%s)", ri.Method, ri.Path)
-		}
-		return fmt.Sprintf("RouteInfo(name=%s, method=%s, path=%s)",
-			ri.Name, ri.Method, ri.Path)
-	} else if ri.Name == "" {
-		return fmt.Sprintf("RouteInfo(host=%s, method=%s, path=%s)",
-			ri.Host, ri.Method, ri.Path)
+func (r Route) String() string {
+	if r.Name == "" {
+		return fmt.Sprintf("RouteInfo(method=%s, path=%s)", r.Method, r.Path)
 	}
-	return fmt.Sprintf("RouteInfo(host=%s, name=%s, method=%s, path=%s)",
-		ri.Host, ri.Name, ri.Method, ri.Path)
+
+	return fmt.Sprintf("RouteInfo(name=%s, method=%s, path=%s)",
+		r.Name, r.Method, r.Path)
 }
 
-func (ri RouteInfo) checkPath() error {
-	if len(ri.Path) == 0 || ri.Path[0] != '/' {
-		return fmt.Errorf("path '%s' must start with '/'", ri.Path)
+func (r Route) checkPath() error {
+	if len(r.Path) == 0 || r.Path[0] != '/' {
+		return fmt.Errorf("path '%s' must start with '/'", r.Path)
 	}
 
-	if i := strings.Index(ri.Path, "//"); i != -1 {
-		return fmt.Errorf("bad path '%s' contains duplicate // at index:%d", ri.Path, i)
+	if i := strings.Index(r.Path, "//"); i != -1 {
+		return fmt.Errorf("bad path '%s' contains duplicate // at index:%d",
+			r.Path, i)
 	}
 
 	return nil
 }
 
-func (s *Ship) getRoutes(host string, r Router, rs []RouteInfo) []RouteInfo {
-	for _, route := range r.Routes(nil) {
-		ch := route.Handler.(RouteInfo)
-		rs = append(rs, RouteInfo{
-			Host:    host,
-			Name:    route.Name,
-			Path:    route.Path,
-			Method:  route.Method,
-			Handler: ch.Handler,
-			CtxData: ch.CtxData,
-		})
-	}
-	return rs
-}
-
 // Routes returns the information of all the routes.
-func (s *Ship) Routes() (routes []RouteInfo) {
-	s.Lock.RLock()
-	nodefault := true
-	routes = make([]RouteInfo, 0, s.hostManager.Sum+1)
-	s.hostManager.Range(func(host string, router Router) {
-		routes = s.getRoutes(host, router, routes)
-		if nodefault && host == s.defaultHost {
-			nodefault = false
-		}
+func (s *Ship) Routes() (routes []Route) {
+	routes = make([]Route, 0, 16)
+	s.Router.Range(func(name, path, method string, handler interface{}) {
+		routes = append(routes, handler.(Route))
 	})
-	if nodefault {
-		routes = s.getRoutes(s.defaultHost, s.defaultRouter, routes)
-	}
-	s.Lock.RUnlock()
 	return
 }
 
 // AddRoutes registers a set of the routes.
 //
 // It will panic with it if there is an error when adding the routes.
-func (s *Ship) AddRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		if err := s.AddRoute(ri); err != nil {
+func (s *Ship) AddRoutes(routes ...Route) {
+	for _, r := range routes {
+		if err := s.AddRoute(r); err != nil {
 			panic(err)
 		}
 	}
@@ -120,92 +89,66 @@ func (s *Ship) AddRoutes(ris ...RouteInfo) {
 // DelRoutes deletes a set of the registered routes.
 //
 // It will panic with it if there is an error when deleting the routes.
-func (s *Ship) DelRoutes(ris ...RouteInfo) {
-	for _, ri := range ris {
-		if err := s.DelRoute(ri); err != nil {
+func (s *Ship) DelRoutes(routes ...Route) {
+	for _, r := range routes {
+		if err := s.DelRoute(r); err != nil {
 			panic(err)
 		}
 	}
 }
 
 // AddRoute registers the route.
-func (s *Ship) AddRoute(ri RouteInfo) (err error) {
-	ok, err := s.checkRouteInfo(&ri)
-	if err != nil {
-		return RouteError{RouteInfo: ri, Err: err}
-	} else if !ok {
+func (s *Ship) AddRoute(r Route) (err error) {
+	ok, err := s.checkRouteInfo(&r)
+	if err != nil || !ok {
 		return
-	} else if ri.Handler == nil {
-		return RouteError{RouteInfo: ri, Err: errors.New("handler must not be nil")}
+	} else if r.Handler == nil {
+		return RouteError{Route: r, Err: errInvalidHandler}
 	}
 
-	var router Router
-	s.Lock.Lock()
-	if ri.Host == "" {
-		router = s.defaultRouter
-	} else if router = s.hostManager.Router(ri.Host); router == nil {
-		if ri.Host == s.defaultHost {
-			router = s.defaultRouter
-		} else {
-			router, err = s.hostManager.Add(ri.Host, s.newRouter())
-		}
-	}
-	s.Lock.Unlock()
-
-	if err != nil {
-		return RouteError{RouteInfo: ri, Err: err}
-	} else if n, e := router.Add(ri.Name, ri.Path, ri.Method, ri); e != nil {
-		err = RouteError{RouteInfo: ri, Err: e}
+	if n, _err := s.Router.Add(r.Name, r.Path, r.Method, r); _err != nil {
+		err = RouteError{Route: r, Err: _err}
 	} else if n > s.URLParamMaxNum {
-		router.Del(ri.Path, ri.Method)
-		err = RouteError{RouteInfo: ri, Err: errors.New("too many url params")}
+		s.Router.Del(r.Path, r.Method)
+		err = RouteError{Route: r, Err: errTooManyURLParams}
 	}
 
 	return
 }
 
-func (s *Ship) checkRouteInfo(ri *RouteInfo) (ok bool, err error) {
-	ri.Method = strings.ToUpper(ri.Method)
-	if s.RouteModifier != nil {
-		*ri = s.RouteModifier(*ri)
-	}
-
-	if s.RouteFilter != nil && s.RouteFilter(*ri) {
-		return
-	}
-
-	if err = ri.checkPath(); err == nil {
-		ok = true
-	}
-
-	return
-}
-
-// DelRoute deletes the registered route, which only uses "Host", "Path"
-// and "Method", and others are ignored.
+// DelRoute deletes the registered route, which only uses "Path" and "Method",
+// and others are ignored.
 //
 // If Method is empty, deletes all the routes associated with the path.
 //
 // If the route does not exist, do nothing and return nil.
-func (s *Ship) DelRoute(ri RouteInfo) (err error) {
-	ok, err := s.checkRouteInfo(&ri)
+func (s *Ship) DelRoute(r Route) (err error) {
+	ok, err := s.checkRouteInfo(&r)
 	if !ok || err != nil {
 		return
 	}
 
-	var r Router
-	s.Lock.Lock()
-	if ri.Host == "" {
-		r = s.defaultRouter
-	} else if r = s.hostManager.Router(ri.Host); r == nil && ri.Host == s.defaultHost {
-		r = s.defaultRouter
+	if err = s.Router.Del(r.Path, r.Method); err != nil {
+		err = RouteError{Route: r, Err: err}
 	}
-	s.Lock.Unlock()
 
-	if r != nil {
-		if err = r.Del(ri.Path, ri.Method); err != nil {
-			err = RouteError{RouteInfo: ri, Err: err}
-		}
+	return
+}
+
+func (s *Ship) checkRouteInfo(r *Route) (ok bool, err error) {
+	r.Method = strings.ToUpper(r.Method)
+	if s.RouteModifier != nil {
+		*r = s.RouteModifier(*r)
+	}
+
+	if s.RouteFilter != nil && s.RouteFilter(*r) {
+		return
+	}
+
+	if err = r.checkPath(); err == nil {
+		ok = true
+	} else {
+		err = RouteError{Route: *r, Err: err}
 	}
 
 	return

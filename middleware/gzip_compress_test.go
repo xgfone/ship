@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 func TestGzip(t *testing.T) {
@@ -90,8 +90,11 @@ func TestGzipNoContent(t *testing.T) {
 }
 
 func TestGzipErrorReturned(t *testing.T) {
-	s := ship.New().Use(Gzip(nil), HandleError())
-	s.Route("/").GET(func(ctx *ship.Context) error { return ship.ErrNotFound })
+	s := ship.New()
+	s.Use(Gzip(nil))
+	s.Route("/").GET(func(ctx *ship.Context) error {
+		return ctx.Text(http.StatusNotFound, "Not Found")
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(ship.HeaderAcceptEncoding, "gzip")
@@ -111,7 +114,8 @@ func TestGzipErrorReturned(t *testing.T) {
 }
 
 func TestGzipDomains(t *testing.T) {
-	s := ship.New().Use(Gzip(&GZipConfig{Domains: []string{
+	s := ship.New()
+	s.Use(Gzip(&GZipConfig{Domains: []string{
 		"www1.example.com", "*.suffix.com", "www.prefix.*",
 	}}))
 	s.Route("/").GET(ship.OkHandler())

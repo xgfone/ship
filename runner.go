@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -32,12 +33,28 @@ var DefaultSignals = []os.Signal{
 	syscall.SIGINT,
 }
 
+// OnceRunner is used to run the task only once, which is different from
+// sync.Once, the second calling does not wait until the first calling finishes.
+type OnceRunner struct {
+	done uint32
+	task func()
+}
+
+// NewOnceRunner returns a new OnceRunner.
+func NewOnceRunner(task func()) *OnceRunner { return &OnceRunner{task: task} }
+
+// Run runs the task.
+func (r *OnceRunner) Run() {
+	if atomic.CompareAndSwapUint32(&r.done, 0, 1) {
+		r.task()
+	}
+}
+
 // Runner is a HTTP Server runner.
 type Runner struct {
 	Name      string
 	Logger    Logger
 	Server    *http.Server
-	Handler   http.Handler
 	Signals   []os.Signal
 	ConnState func(net.Conn, http.ConnState)
 
@@ -47,13 +64,36 @@ type Runner struct {
 	stopfs []*OnceRunner
 }
 
+// StartServer is convenient function to new a runner to start the http server.
+func StartServer(addr string, handler http.Handler) {
+	NewRunner(handler).Start(addr)
+}
+
+// StartServerTLS is the same as StartServer, and tries to start the http server
+// with the cert and key file. If certFile or keyFile is empty, however, it is
+// equal to StartServer.
+func StartServerTLS(addr string, handler http.Handler, certFile, keyFile string) {
+	NewRunner(handler).Start(addr, certFile, keyFile)
+}
+
 // NewRunner returns a new Runner.
-func NewRunner(name string, handler http.Handler) *Runner {
+//
+// If the handler is a ship, it will set the name and the logger of runner
+// to those of ship.
+func NewRunner(handler http.Handler) *Runner {
+	var name string
+	var logger Logger
+	if s, ok := handler.(*Ship); ok {
+		name = s.Name
+		logger = s.Logger
+	}
+
 	r := &Runner{
 		Name:    name,
+		Logger:  logger,
 		Server:  &http.Server{Handler: handler},
 		Signals: DefaultSignals,
-		Handler: handler, done: make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 
 	r.shut = NewOnceRunner(r.runShutdown)
@@ -61,20 +101,18 @@ func NewRunner(name string, handler http.Handler) *Runner {
 	return r
 }
 
-// Link registers the shutdown function between itself and other,
-// then returns itself.
-func (r *Runner) Link(other *Runner) *Runner {
+// Link registers the shutdown function between itself and other.
+func (r *Runner) Link(other *Runner) {
 	other.RegisterOnShutdown(r.Stop)
-	return r.RegisterOnShutdown(other.Stop)
+	r.RegisterOnShutdown(other.Stop)
 }
 
-// RegisterOnShutdown registers some functions to run when the http server is
-// shut down.
-func (r *Runner) RegisterOnShutdown(functions ...func()) *Runner {
+// RegisterOnShutdown registers some shutdown functions to run
+// when the http server is shut down.
+func (r *Runner) RegisterOnShutdown(functions ...func()) {
 	for _, f := range functions {
 		r.stopfs = append(r.stopfs, NewOnceRunner(f))
 	}
-	return r
 }
 
 // Shutdown stops the HTTP server.
@@ -94,27 +132,16 @@ func (r *Runner) runStopfs() {
 	}
 }
 
-// Wait waits until all the registered shutdown functions have finished.
-func (r *Runner) Wait() { <-r.done }
-
-// Start starts a HTTP server with addr and ends when the server is closed.
+// Start starts a HTTP server with addr until it is closed.
 //
 // If tlsFiles is not nil, it must be certFile and keyFile. For example,
 //    runner := NewRunner()
 //    runner.Start(":80", certFile, keyFile)
-func (r *Runner) Start(addr string, tlsFiles ...string) *Runner {
+func (r *Runner) Start(addr string, tlsFiles ...string) {
 	var cert, key string
 	if len(tlsFiles) == 2 && tlsFiles[0] != "" && tlsFiles[1] != "" {
 		cert = tlsFiles[0]
 		key = tlsFiles[1]
-	}
-
-	if r.Server == nil {
-		r.Server = &http.Server{Addr: addr, Handler: r.Handler}
-	}
-
-	if r.Server.Handler == nil {
-		r.Server.Handler = r.Handler
 	}
 
 	if addr != "" {
@@ -122,19 +149,6 @@ func (r *Runner) Start(addr string, tlsFiles ...string) *Runner {
 	}
 
 	r.startServer(cert, key)
-	return r
-}
-
-func (r *Runner) handleSignals() {
-	if len(r.Signals) > 0 {
-		ss := make(chan os.Signal, 1)
-		signal.Notify(ss, r.Signals...)
-		for {
-			<-ss
-			r.Stop()
-			return
-		}
-	}
 }
 
 func (r *Runner) startServer(certFile, keyFile string) {
@@ -144,42 +158,14 @@ func (r *Runner) startServer(certFile, keyFile string) {
 		panic("Runner: Server.Handler is nil")
 	}
 
-	defer r.Stop()
-	name := r.Name
-	server := r.Server
-	logger := r.Logger
-
-	if logger != nil {
-		if name == "" {
-			logger.Infof("The HTTP Server is running on %s", server.Addr)
-		} else {
-			logger.Infof("The HTTP Server [%s] is running on %s", name, server.Addr)
-		}
+	name, server := r.Name, r.Server
+	if name == "" {
+		r.infof("The HTTP Server is running on %s", server.Addr)
+	} else {
+		r.infof("The HTTP Server [%s] is running on %s", name, server.Addr)
 	}
 
-	var err error
-	// server.RegisterOnShutdown(r.Stop)
-	r.RegisterOnShutdown(func() {
-		if logger == nil {
-			return
-		}
-
-		if err == nil || err == http.ErrServerClosed {
-			if name == "" {
-				logger.Infof("The HTTP Server listening on %s is shutdown", server.Addr)
-			} else {
-				logger.Infof("The HTTP Server [%s] listening on %s is shutdown", name, server.Addr)
-			}
-		} else {
-			if name == "" {
-				logger.Errorf("The HTTP Server is listening on %s shutdown: %s", server.Addr, err)
-			} else {
-				logger.Errorf("The HTTP Server [%s] listening on %s is shutdown: %s", name, server.Addr, err)
-			}
-		}
-	})
-
-	go r.handleSignals()
+	go r.handleSignals(r.done)
 
 	var isTLS bool
 	if certFile != "" && keyFile != "" {
@@ -190,9 +176,56 @@ func (r *Runner) startServer(certFile, keyFile string) {
 		isTLS = true
 	}
 
+	var err error
 	if isTLS {
 		err = server.ListenAndServeTLS(certFile, keyFile)
 	} else {
 		err = server.ListenAndServe()
+	}
+
+	r.Stop()
+	<-r.done
+
+	if err == nil || err == http.ErrServerClosed {
+		if name == "" {
+			r.infof("The HTTP Server listening on %s is shutdown", server.Addr)
+		} else {
+			r.infof("The HTTP Server [%s] listening on %s is shutdown",
+				name, server.Addr)
+		}
+	} else {
+		if name == "" {
+			r.errorf("The HTTP Server listening on %s is shutdown: %s",
+				server.Addr, err)
+		} else {
+			r.errorf("The HTTP Server [%s] listening on %s is shutdown: %s",
+				name, server.Addr, err)
+		}
+	}
+}
+
+func (r *Runner) infof(format string, args ...interface{}) {
+	if r.Logger != nil {
+		r.Logger.Infof(format, args...)
+	}
+}
+
+func (r *Runner) errorf(format string, args ...interface{}) {
+	if r.Logger != nil {
+		r.Logger.Errorf(format, args...)
+	}
+}
+
+func (r *Runner) handleSignals(exit <-chan struct{}) {
+	if len(r.Signals) > 0 {
+		ss := make(chan os.Signal, 1)
+		signal.Notify(ss, r.Signals...)
+
+		select {
+		case <-exit:
+			return
+		case <-ss:
+			r.Stop()
+		}
 	}
 }

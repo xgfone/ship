@@ -22,13 +22,10 @@ import (
 
 // Some non-HTTP Errors
 var (
-	ErrMissingContentType    = errors.New("missing the header 'Content-Type'")
-	ErrRendererNotRegistered = errors.New("renderer not registered")
-	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
-	ErrInvalidSession        = errors.New("invalid session")
-	ErrSessionNotExist       = errors.New("session does not exist")
-	ErrNoSessionSupport      = errors.New("no session support")
-	ErrNoResponder           = errors.New("no responder")
+	ErrMissingContentType  = errors.New("missing the header 'Content-Type'")
+	ErrInvalidRedirectCode = errors.New("invalid redirect status code")
+	ErrSessionNotExist     = errors.New("session does not exist")
+	ErrInvalidSession      = errors.New("invalid session")
 )
 
 // Some HTTP error.
@@ -55,19 +52,21 @@ var (
 
 // ErrSkip is not an error, which is used to suggest that the middeware should
 // skip and return it back to the outer middleware to handle.
-//
-// Notice: it is only a suggestion.
 var ErrSkip = errors.New("skip")
 
 // RouteError represents a route error when adding a route.
 type RouteError struct {
-	RouteInfo
 	Err error
+	Route
 }
 
 func (re RouteError) Error() string {
-	return fmt.Sprintf("%s: name=%s, path=%s, method=%s, host=%s",
-		re.Err, re.Name, re.Path, re.Method, re.Host)
+	if re.Name == "" {
+		return fmt.Sprintf("%s: path=%s, method=%s", re.Err, re.Path, re.Method)
+	}
+
+	return fmt.Sprintf("%s: name=%s, path=%s, method=%s",
+		re.Err, re.Name, re.Path, re.Method)
 }
 
 // HTTPServerError represents a server error with HTTP Status Code.
@@ -90,10 +89,10 @@ func (e HTTPServerError) Error() string { return e.Err.Error() }
 // Unwrap unwraps the inner error.
 func (e HTTPServerError) Unwrap() error { return e.Err }
 
-// NewCT returns a new HTTPError with the new ContentType ct.
+// NewCT returns a new HTTPServerError with the new ContentType ct.
 func (e HTTPServerError) NewCT(ct string) HTTPServerError { e.CT = ct; return e }
 
-// New returns a new HTTPError with the new error.
+// New returns a new HTTPServerError with the new error.
 func (e HTTPServerError) New(err error) HTTPServerError { e.Err = err; return e }
 
 // Newf is equal to New(fmt.Errorf(msg, args...)).
@@ -104,7 +103,7 @@ func (e HTTPServerError) Newf(msg string, args ...interface{}) HTTPServerError {
 	return e.New(fmt.Errorf(msg, args...))
 }
 
-// HTTPClientError represents an error about the http client response.
+// HTTPClientError represents an response error from the http client.
 type HTTPClientError struct {
 	Code   int    `json:"code" xml:"code"`
 	Method string `json:"method" xml:"method"`

@@ -33,17 +33,17 @@ type File interface {
 	Ext() string
 }
 
-type tmplFile struct {
+type file struct {
 	name string
 	data []byte
 	ext  string
 }
 
 // NewFile returns a File based on the given information.
-func NewFile(name, ext string, data []byte) File { return tmplFile{name, data, ext} }
-func (f tmplFile) Name() string                  { return f.name }
-func (f tmplFile) Data() []byte                  { return f.data }
-func (f tmplFile) Ext() string                   { return f.ext }
+func NewFile(name, ext string, data []byte) File { return file{name, data, ext} }
+func (f file) Name() string                      { return f.name }
+func (f file) Data() []byte                      { return f.data }
+func (f file) Ext() string                       { return f.ext }
 
 // Loader is used to load the template file from the disk.
 type Loader interface {
@@ -82,15 +82,15 @@ func NewDirLoaderWithFilter(filter FileFilter, dirs ...string) Loader {
 		}
 	}
 
-	return tmplLoader{dirs: _dirs, filter: filter}
+	return loader{dirs: _dirs, filter: filter}
 }
 
-type tmplLoader struct {
+type loader struct {
 	dirs   []string
 	filter FileFilter
 }
 
-func (l tmplLoader) Load(name string) (File, error) {
+func (l loader) Load(name string) (File, error) {
 	for _, dir := range l.dirs {
 		filename := filepath.Join(dir, name)
 		if _, err := os.Stat(filename); err != nil {
@@ -102,7 +102,7 @@ func (l tmplLoader) Load(name string) (File, error) {
 	return nil, nil
 }
 
-func (l tmplLoader) LoadAll() (files []File, err error) {
+func (l loader) LoadAll() (files []File, err error) {
 	for _, dir := range l.dirs {
 		err = filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
@@ -124,7 +124,7 @@ func (l tmplLoader) LoadAll() (files []File, err error) {
 	return
 }
 
-func (l tmplLoader) loadFile(prefix, filename string) (File, error) {
+func (l loader) loadFile(prefix, filename string) (File, error) {
 	if l.filter(filename) {
 		return nil, nil
 	}
@@ -173,8 +173,7 @@ func (r *HTMLTemplateRender) Debug(debug bool) *HTMLTemplateRender {
 	return r
 }
 
-// Lock enables the lock to reload the templates safely and concurrently,
-// then returns itself.
+// Lock enables the lock to reload the templates safely and concurrently.
 //
 // Notice: There is no need to enable the lock when no reloading the templates
 // during rendering the templates.
@@ -187,7 +186,7 @@ func (r *HTMLTemplateRender) Lock(lock bool) *HTMLTemplateRender {
 	return r
 }
 
-// Delims resets the left and right delimiter and returns itself.
+// Delims resets the left and right delimiter.
 //
 // The default delimiters are "{{" and "}}".
 //
@@ -198,7 +197,7 @@ func (r *HTMLTemplateRender) Delims(left, right string) *HTMLTemplateRender {
 	return r
 }
 
-// Funcs appends the FuncMap and returns itself.
+// Funcs appends the FuncMap.
 //
 // Notice: it must be set before rendering the html template.
 func (r *HTMLTemplateRender) Funcs(funcs template.FuncMap) *HTMLTemplateRender {
@@ -217,11 +216,6 @@ func (r *HTMLTemplateRender) reload() error {
 		return err
 	}
 
-	if r.lock != nil {
-		r.lock.Lock()
-		defer r.lock.Unlock()
-	}
-
 	tmpl := template.New("__DEFAULT_HTML_TEMPLATE__")
 	tmpl.Delims(r.left, r.right)
 	for _, file := range files {
@@ -233,16 +227,28 @@ func (r *HTMLTemplateRender) reload() error {
 			return err
 		}
 	}
-	r.tmpl = tmpl
+
+	if r.lock == nil {
+		r.tmpl = tmpl
+	} else {
+		r.lock.Lock()
+		r.tmpl = tmpl
+		r.lock.Unlock()
+	}
+
 	return nil
 }
 
 func (r *HTMLTemplateRender) execute(w io.Writer, name string, data interface{}) error {
-	if r.lock != nil {
+	var tmpl *template.Template
+	if r.lock == nil {
+		tmpl = r.tmpl
+	} else {
 		r.lock.RLock()
-		defer r.lock.RUnlock()
+		tmpl = r.tmpl
+		r.lock.RUnlock()
 	}
-	return r.tmpl.ExecuteTemplate(w, name, data)
+	return tmpl.ExecuteTemplate(w, name, data)
 }
 
 // Render implements the interface render.Renderer.

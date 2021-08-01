@@ -23,8 +23,6 @@ import (
 type Handler func(*Context) error
 
 // HTTPHandler converts itself to http.Handler.
-//
-// s may be nil.
 func (h Handler) HTTPHandler(s *Ship) http.Handler {
 	return ToHTTPHandler(s, h)
 }
@@ -88,7 +86,7 @@ func NotFoundHandler() Handler {
 // MethodNotAllowedHandler returns a MethodNotAllowed handler.
 func MethodNotAllowedHandler(allowedMethods []string) Handler {
 	return func(c *Context) error {
-		c.SetHeader(HeaderAllow, strings.Join(allowedMethods, ", "))
+		c.SetRespHeader(HeaderAllow, strings.Join(allowedMethods, ", "))
 		return c.NoContent(http.StatusMethodNotAllowed)
 	}
 }

@@ -23,30 +23,30 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xgfone/ship/v4/router/echo"
+	"github.com/xgfone/ship/v5/router/echo"
 )
 
-func sortRouteInfos(ris []RouteInfo) {
+func sortRouteInfos(ris []Route) {
 	sort.Slice(ris, func(i, j int) bool {
-		return ris[i].CtxData.(int) < ris[j].CtxData.(int)
+		return ris[i].Data.(int) < ris[j].Data.(int)
 	})
 }
 
 func TestRoute(t *testing.T) {
 	s := New()
 	handler := OkHandler()
-	routes := []RouteInfo{
-		{Host: "", Name: "name", Path: "/path", Method: http.MethodGet, Handler: handler},
-		{Host: "host1", Name: "name1", Path: "/path1", Method: http.MethodGet, Handler: handler},
-		{Host: "host1", Name: "name2", Path: "/path2", Method: http.MethodGet, Handler: handler},
-		{Host: "host1", Name: "name3", Path: "/path3", Method: http.MethodGet, Handler: handler},
-		{Host: "host2", Name: "name4", Path: "/path4", Method: http.MethodGet, Handler: handler},
-		{Host: "host2", Name: "name5", Path: "/path5", Method: http.MethodGet, Handler: handler},
-		{Host: "host2", Name: "name6", Path: "/path6", Method: http.MethodGet, Handler: handler},
+	routes := []Route{
+		{Name: "name", Path: "/path", Method: http.MethodGet, Handler: handler},
+		{Name: "name1", Path: "/path1", Method: http.MethodGet, Handler: handler},
+		{Name: "name2", Path: "/path2", Method: http.MethodGet, Handler: handler},
+		{Name: "name3", Path: "/path3", Method: http.MethodGet, Handler: handler},
+		{Name: "name4", Path: "/path4", Method: http.MethodGet, Handler: handler},
+		{Name: "name5", Path: "/path5", Method: http.MethodGet, Handler: handler},
+		{Name: "name6", Path: "/path6", Method: http.MethodGet, Handler: handler},
 	}
 
 	for i, r := range routes {
-		s.Route(r.Path).Name(r.Name).Host(r.Host).CtxData(i).Method(r.Handler, r.Method)
+		s.Route(r.Path).Name(r.Name).Data(i).Method(r.Handler, r.Method)
 	}
 
 	if rs := s.Routes(); len(rs) != 7 {
@@ -54,7 +54,7 @@ func TestRoute(t *testing.T) {
 	} else {
 		sortRouteInfos(rs)
 		for i, r := range rs {
-			if i != r.CtxData.(int) {
+			if i != r.Data.(int) {
 				t.Errorf("%d: %+v", i, r)
 			}
 
@@ -67,8 +67,8 @@ func TestRoute(t *testing.T) {
 			case "name5":
 			case "name6":
 				route := routes[6]
-				if r.Name != route.Name || r.Host != route.Host ||
-					r.Path != route.Path || r.Method != route.Method {
+				if r.Name != route.Name || r.Path != route.Path ||
+					r.Method != route.Method {
 					t.Errorf("expected %v, got %v\n", route, r)
 				}
 			default:
@@ -76,26 +76,7 @@ func TestRoute(t *testing.T) {
 			}
 		}
 	}
-
-	hosts := make([]string, 0, 3)
-	for host := range s.Routers() {
-		hosts = append(hosts, host)
-	}
-	sort.Strings(hosts)
-
-	if len(hosts) != 3 {
-		t.Errorf("the number of routers is not 3: %v", hosts)
-	} else {
-		_hosts := []string{"", "host1", "host2"}
-		for i := range hosts {
-			if hosts[i] != _hosts[i] {
-				t.Errorf("%dth: expected '%s', got '%s'", i, _hosts[i], hosts[i])
-			}
-		}
-	}
 }
-
-//////////////////////////////////////////////////////////////////////////////
 
 var defaultHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
@@ -108,7 +89,7 @@ var defaultHandler = func(ctx *Context) (err error) {
 
 var idHandler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.URLParam("id"))); err != nil {
+	if _, err = resp.Write([]byte(ctx.Param("id"))); err != nil {
 		code := http.StatusInternalServerError
 		err = HTTPServerError{Code: code, Err: err}
 	}
@@ -117,7 +98,7 @@ var idHandler = func(ctx *Context) (err error) {
 
 var params2Handler = func(ctx *Context) (err error) {
 	resp := ctx.Response()
-	_, err = resp.Write([]byte(ctx.URLParam("p1") + "|" + ctx.URLParam("p2")))
+	_, err = resp.Write([]byte(ctx.Param("p1") + "|" + ctx.Param("p2")))
 	if err != nil {
 		code := http.StatusInternalServerError
 		err = HTTPServerError{Code: code, Err: err}
@@ -423,12 +404,11 @@ func TestNotFound(t *testing.T) {
 
 func TestMethodNotAllowed(t *testing.T) {
 	r := New()
-	r.SetNewRouter(func() Router {
-		return echo.NewRouter(&echo.Config{
-			MethodNotAllowedHandler: func(allowedMethods []string) interface{} {
-				return MethodNotAllowedHandler(allowedMethods)
-			}})
-	})
+	r.Router = echo.NewRouter(&echo.Config{
+		MethodNotAllowedHandler: func(allowedMethods []string) interface{} {
+			return MethodNotAllowedHandler(allowedMethods)
+		}},
+	)
 	r.Route("/path").GET(defaultHandler).POST(defaultHandler)
 
 	req, _ := http.NewRequest(http.MethodPut, "/path", nil)
@@ -728,69 +708,6 @@ func (t TestType) Get(ctx *Context) error    { return nil }
 func (t TestType) Has(ctx *Context) error    { return nil }
 func (t TestType) NotHandler()               {}
 
-func TestShipHost(t *testing.T) {
-	s := New()
-	s.Route("/router").GET(func(c *Context) error { return c.Text(200, "default") })
-	s.Route("/router").Host("*.host1.example.com").
-		GET(func(c *Context) error { return c.Text(200, "vhost1") })
-	s.Route("/router").Host(`[a-zA-z0-9]+\.example\.com`).
-		GET(func(c *Context) error { return c.Text(200, "vhost2") })
-
-	req := httptest.NewRequest(http.MethodGet, "/router", nil)
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-	if s := rec.Body.String(); s != "default" {
-		t.Errorf("Body: expect '%s', got '%s'", "default", s)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, "/router", nil)
-	req.Host = "www.host1.example.com"
-	rec = httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-	if s := rec.Body.String(); s != "vhost1" {
-		t.Errorf("Body: expect '%s', got '%s'", "vhost1", s)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, "/router", nil)
-	req.Host = "host2.example.com"
-	rec = httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-	if s := rec.Body.String(); s != "vhost2" {
-		t.Errorf("Body: expect '%s', got '%s'", "vhost2", s)
-	}
-}
-
-func TestRouteHasHeader(t *testing.T) {
-	s := New()
-	s.Route("/path").HasHeader("Content-Type", "application/json").GET(
-		func(ctx *Context) error { return ctx.Text(200, "OK") })
-
-	req := httptest.NewRequest(http.MethodGet, "/path", nil)
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, "/path", nil)
-	req.Header.Set("Content-Type", "application/xml")
-	rec = httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusBadRequest, rec.Code)
-	}
-}
-
 func TestContextBindQuery(t *testing.T) {
 	type V struct {
 		A string `query:"a" default:"xyz"`
@@ -837,7 +754,7 @@ func TestContextAccept(t *testing.T) {
 
 func TestSetRouteFilter(t *testing.T) {
 	app := New()
-	app.RouteFilter = func(ri RouteInfo) bool {
+	app.RouteFilter = func(ri Route) bool {
 		if ri.Name == "" {
 			return true
 		} else if !strings.HasPrefix(ri.Path, "/group/") {
@@ -863,7 +780,7 @@ func TestSetRouteFilter(t *testing.T) {
 
 func TestSetRouteModifier(t *testing.T) {
 	app := New()
-	app.RouteModifier = func(ri RouteInfo) RouteInfo {
+	app.RouteModifier = func(ri Route) Route {
 		if !strings.HasPrefix(ri.Path, "/prefix/") {
 			ri.Path = "/prefix" + ri.Path
 		}

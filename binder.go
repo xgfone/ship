@@ -20,46 +20,57 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v4/binder"
+	"github.com/xgfone/ship/v5/binder"
 )
 
-// Binder is the interface to bind the value to v from ctx.
+// Binder is the interface to bind the value dst to req.
 type Binder interface {
-	// Bind parses the data from http.Request to v.
+	// Bind parses the data from http.Request to dst.
 	//
-	// Notice: v must be a non-nil pointer.
-	Bind(req *http.Request, v interface{}) error
+	// Notice: dst must be a non-nil pointer.
+	Bind(dst interface{}, req *http.Request) error
 }
 
-type binderFunc func(*http.Request, interface{}) error
+// BinderFunc is a function type implementing the interface Binder.
+type BinderFunc func(dst interface{}, req *http.Request) error
 
-func (f binderFunc) Bind(r *http.Request, v interface{}) error { return f(r, v) }
+// Bind implements the interface Binder.
+func (f BinderFunc) Bind(dst interface{}, req *http.Request) error {
+	return f(dst, req)
+}
 
-// BinderFunc converts a function to Binder.
-func BinderFunc(f func(*http.Request, interface{}) error) Binder { return binderFunc(f) }
-
-// MuxBinder is a multiplexer for kinds of Binders based on the Content-Type.
+// MuxBinder is a multiplexer for kinds of Binders based on the request header
+// "Content-Type".
 type MuxBinder struct {
 	binders map[string]Binder
 }
 
 // NewMuxBinder returns a new MuxBinder.
-func NewMuxBinder() *MuxBinder { return &MuxBinder{binders: make(map[string]Binder, 8)} }
+func NewMuxBinder() *MuxBinder {
+	return &MuxBinder{binders: make(map[string]Binder, 8)}
+}
 
-// Add adds a binder to bind the content for the header Content-Type.
-func (mb *MuxBinder) Add(contentType string, binder Binder) { mb.binders[contentType] = binder }
+// Add adds a binder to bind the content for the header "Content-Type".
+func (mb *MuxBinder) Add(contentType string, binder Binder) {
+	mb.binders[contentType] = binder
+}
 
-// Get returns the corresponding binder by the header Content-Type.
+// Get returns the corresponding binder by the header "Content-Type".
 //
 // Return nil if not found.
-func (mb *MuxBinder) Get(contentType string) Binder { return mb.binders[contentType] }
+func (mb *MuxBinder) Get(contentType string) Binder {
+	return mb.binders[contentType]
+}
 
-// Del removes the corresponding binder by the header Content-Type.
-func (mb *MuxBinder) Del(contentType string) { delete(mb.binders, contentType) }
+// Del removes the corresponding binder by the header "Content-Type".
+func (mb *MuxBinder) Del(contentType string) {
+	delete(mb.binders, contentType)
+}
 
-// Bind implements the interface Binder, which will call the registered binder
-// to bind the request to v by the request header Content-Type.
-func (mb *MuxBinder) Bind(req *http.Request, v interface{}) error {
+// Bind implements the interface Binder, which looks up the registered binder
+// by the request header "Content-Type" and calls it to bind the value dst
+// to req.
+func (mb *MuxBinder) Bind(dst interface{}, req *http.Request) error {
 	ct := req.Header.Get("Content-Type")
 	if index := strings.IndexAny(ct, ";"); index > 0 {
 		ct = strings.TrimSpace(ct[:index])
@@ -68,15 +79,17 @@ func (mb *MuxBinder) Bind(req *http.Request, v interface{}) error {
 	if ct == "" {
 		return ErrMissingContentType
 	}
+
 	if binder := mb.Get(ct); binder != nil {
-		return binder.Bind(req, v)
+		return binder.Bind(dst, req)
 	}
+
 	return ErrUnsupportedMediaType.Newf("not support Content-Type '%s'", ct)
 }
 
-// JSONBinder returns a JSON binder to bind the JSON request.
+// JSONBinder returns a binder to bind the data to the request body as JSON.
 func JSONBinder() Binder {
-	return BinderFunc(func(r *http.Request, v interface{}) (err error) {
+	return BinderFunc(func(v interface{}, r *http.Request) (err error) {
 		if r.ContentLength > 0 {
 			err = json.NewDecoder(r.Body).Decode(v)
 		}
@@ -84,9 +97,9 @@ func JSONBinder() Binder {
 	})
 }
 
-// XMLBinder returns a XML binder to bind the XML request.
+// XMLBinder returns a binder to bind the data to the request body as XML.
 func XMLBinder() Binder {
-	return BinderFunc(func(r *http.Request, v interface{}) (err error) {
+	return BinderFunc(func(v interface{}, r *http.Request) (err error) {
 		if r.ContentLength > 0 {
 			err = xml.NewDecoder(r.Body).Decode(v)
 		}
@@ -94,7 +107,7 @@ func XMLBinder() Binder {
 	})
 }
 
-// FormBinder returns a Form binder to bind the Form request.
+// FormBinder returns a binder to bind the data to the request body as Form.
 //
 // Notice: The bound value must be a pointer to a struct with the tag
 // named tag, which is "form" by default.
@@ -104,8 +117,10 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 		_tag = tag[0]
 	}
 
-	return BinderFunc(func(r *http.Request, v interface{}) (err error) {
-		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+	return BinderFunc(func(v interface{}, r *http.Request) (err error) {
+		ct := r.Header.Get("Content-Type")
+
+		if strings.HasPrefix(ct, MIMEMultipartForm) {
 			if err = r.ParseMultipartForm(maxMemory); err != nil {
 				return
 			}
@@ -114,20 +129,5 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 		}
 
 		return binder.BindURLValues(v, r.Form, _tag)
-	})
-}
-
-// QueryBinder returns a query binder to bind the query parameters..
-//
-// Notice: The bound value must be a pointer to a struct with the tag
-// named tag, which is "query" by default.
-func QueryBinder(tag ...string) Binder {
-	_tag := "query"
-	if len(tag) > 0 && tag[0] != "" {
-		_tag = tag[0]
-	}
-
-	return BinderFunc(func(r *http.Request, v interface{}) error {
-		return binder.BindURLValues(v, r.URL.Query(), _tag)
 	})
 }

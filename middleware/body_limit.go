@@ -18,7 +18,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 // BodyLenLimit is used to limit the maximum body of the request.
@@ -32,8 +32,7 @@ func BodyLenLimit(maxBodySize int64) Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
 			req := ctx.Request()
-
-			if ctx.ContentLength() > maxBodySize {
+			if req.ContentLength > maxBodySize {
 				return ship.ErrStatusRequestEntityTooLarge
 			}
 

@@ -24,8 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/xgfone/ship/v4/router"
 )
 
 // PROPFIND Method can be used on collection and property resources.
@@ -70,50 +68,55 @@ type methodHandler struct {
 
 func newMethodHandler() *methodHandler { return &methodHandler{} }
 
-func (mh *methodHandler) Routes() []router.Route {
-	routes := make([]router.Route, 0, 11)
+func (mh *methodHandler) Range(f func(string, interface{})) {
 	if mh.get != nil {
-		routes = append(routes, router.Route{Handler: mh.get, Method: http.MethodGet})
+		f(http.MethodGet, mh.get)
 	}
+
 	if mh.put != nil {
-		routes = append(routes, router.Route{Handler: mh.put, Method: http.MethodPut})
+		f(http.MethodPut, mh.put)
 	}
+
 	if mh.post != nil {
-		routes = append(routes, router.Route{Handler: mh.post, Method: http.MethodPost})
+		f(http.MethodPost, mh.post)
 	}
+
 	if mh.head != nil {
-		routes = append(routes, router.Route{Handler: mh.head, Method: http.MethodHead})
+		f(http.MethodHead, mh.head)
 	}
+
 	if mh.patch != nil {
-		routes = append(routes, router.Route{Handler: mh.patch, Method: http.MethodPatch})
+		f(http.MethodPatch, mh.patch)
 	}
+
 	if mh.trace != nil {
-		routes = append(routes, router.Route{Handler: mh.trace, Method: http.MethodTrace})
+		f(http.MethodTrace, mh.trace)
 	}
+
 	if mh.delete != nil {
-		routes = append(routes, router.Route{Handler: mh.delete, Method: http.MethodDelete})
+		f(http.MethodDelete, mh.delete)
 	}
+
 	if mh.options != nil {
-		routes = append(routes, router.Route{Handler: mh.options, Method: http.MethodOptions})
+		f(http.MethodOptions, mh.options)
 	}
+
 	if mh.connect != nil {
-		routes = append(routes, router.Route{Handler: mh.connect, Method: http.MethodConnect})
+		f(http.MethodConnect, mh.connect)
 	}
+
 	if mh.propfind != nil {
-		routes = append(routes, router.Route{Handler: mh.propfind, Method: PROPFIND})
+		f(PROPFIND, mh.propfind)
 	}
+
 	if mh.report != nil {
-		routes = append(routes, router.Route{Handler: mh.report, Method: REPORT})
+		f(REPORT, mh.report)
 	}
-	return routes
 }
 
 func (mh *methodHandler) Methods() []string {
-	routes := mh.Routes()
-	ms := make([]string, len(routes))
-	for i, r := range routes {
-		ms[i] = r.Method
-	}
+	ms := make([]string, 0, 11)
+	mh.Range(func(method string, _ interface{}) { ms = append(ms, method) })
 	return ms
 }
 
@@ -321,16 +324,18 @@ func (n *node) FindChildByKind(t kind) *node {
 func (n *node) CheckMethodNotAllowed(r *Router) interface{} {
 	if r.conf.MethodNotAllowedHandler == nil || !n.handlers.HasHandler() {
 		return r.conf.NotFoundHandler
-	} else if f, ok := r.conf.MethodNotAllowedHandler.(func([]string) interface{}); ok {
+	}
+
+	if f, ok := r.conf.MethodNotAllowedHandler.(func([]string) interface{}); ok {
 		return f(n.handlers.Methods())
 	}
+
 	return r.conf.MethodNotAllowedHandler
 }
 
 /// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 var errInconsistentRouteName = fmt.Errorf("inconsistent route name")
-var _ router.Router = &Router{}
 
 // Config is used to configure the router.
 type Config struct {
@@ -448,32 +453,21 @@ func (r *Router) Path(name string, params ...interface{}) (url string) {
 	return
 }
 
-// Routes returns the list of the routes, which are filtered by the filter
-// if it returns true.
-func (r *Router) Routes(filter func(name, path, method string) bool) []router.Route {
-	routes := make([]router.Route, 0, 32)
-	return r.getRoutes(r.tree, routes, filter)
+// Range traverses all the registered routes.
+func (r *Router) Range(f func(name, path, method string, handler interface{})) {
+	r.rangef(r.tree, f)
 }
 
-func (r *Router) getRoutes(n *node, routes []router.Route,
-	filter func(string, string, string) bool) []router.Route {
+func (r *Router) rangef(n *node, f func(string, string, string, interface{})) {
 	if n.ppath != "" {
-		for _, route := range n.handlers.Routes() {
-			if filter == nil || filter(n.name, n.ppath, route.Method) {
-				routes = append(routes, router.Route{
-					Name:    n.name,
-					Path:    n.ppath,
-					Method:  route.Method,
-					Handler: route.Handler,
-				})
-			}
-		}
+		n.handlers.Range(func(method string, handler interface{}) {
+			f(n.name, n.ppath, method, handler)
+		})
 	}
 
-	for _, cn := range n.children {
-		routes = r.getRoutes(cn, routes, filter)
+	for i, _len := 0, len(n.children); i < _len; i++ {
+		r.rangef(n.children[i], f)
 	}
-	return routes
 }
 
 /// ----------------------------------------------------------------------- ///
@@ -564,7 +558,8 @@ func (r *Router) Add(name, path, method string, h interface{}) (n int, err error
 	return r.maxnum, nil
 }
 
-func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{}, pnames []string) {
+func (r *Router) insert(name, method, ppath, prefix string,
+	t kind, h interface{}, pnames []string) {
 	// Adjust max param
 	l := len(pnames)
 	if r.maxnum < l {
@@ -600,11 +595,12 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 				cn.handlers.AddHandler(method, h)
 			}
 
-		} else if l < pl { // The inserted path is the full LCP of the current node.
+		} else if l < pl {
+			// The inserted path is the full LCP of the current node.
 
 			// Split node
-			n := newNode(cn.kind, cn.name, cn.prefix[l:], cn.ppath, cn, cn.children,
-				cn.handlers, cn.pnames)
+			n := newNode(cn.kind, cn.name, cn.prefix[l:], cn.ppath, cn,
+				cn.children, cn.handlers, cn.pnames)
 
 			// Reset parent node
 			cn.name = ""
@@ -626,12 +622,14 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 			} else {
 				// Create child node, that's, the path of the new parent node
 				// is the full LCP of the inserted path.
-				n = newNode(t, name, search[l:], ppath, cn, nil, newMethodHandler(), pnames)
+				n = newNode(t, name, search[l:], ppath, cn, nil,
+					newMethodHandler(), pnames)
 				n.handlers.AddHandler(method, h)
 				cn.AddChild(n)
 			}
 
-		} else if l < sl { // The path of the current node is the full LCP of the inserted path.
+		} else if l < sl {
+			// The path of the current node is the full LCP of the inserted path.
 
 			search = search[l:]
 			c := cn.FindChildByLabel(search[0])
@@ -642,7 +640,8 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 			}
 
 			// Create child node
-			n := newNode(t, name, search, ppath, cn, nil, newMethodHandler(), pnames)
+			n := newNode(t, name, search, ppath, cn, nil,
+				newMethodHandler(), pnames)
 			n.handlers.AddHandler(method, h)
 			cn.AddChild(n)
 
@@ -669,7 +668,8 @@ func (r *Router) insert(name, method, ppath, prefix string, t kind, h interface{
 
 // Match lookups a handler registered for method and path,
 // which also parses the path for the parameters.
-func (r *Router) Match(path, method string, pnames, pvalues []string) (h interface{}, pn int) {
+func (r *Router) Match(path, method string, pnames, pvalues []string) (
+	h interface{}, pn int) {
 	if r.conf.RemoveTrailingSlash {
 		// path = strings.TrimRight(path, "/")
 		path = removeTrailingSlash(path)
@@ -1070,8 +1070,10 @@ func (r *Router) PrintTree(w io.Writer) {
 
 func (n *node) printTree(w io.Writer, pfx string, first, tail bool) {
 	prefix := getPrefix(first, tail, pfx, "└── ", "├── ")
-	w.Write([]byte(fmt.Sprintf("%s%s @%p, parent=%p, type=%s, name=%s, path=%s, pnames=%v, methods=%v\n",
-		prefix, n.prefix, n, n.parent, n.kind, n.name, n.ppath, n.pnames, n.handlers.Methods())))
+	w.Write([]byte(fmt.Sprintf(
+		"%s%s @%p, parent=%p, type=%s, name=%s, path=%s, pnames=%v, methods=%v\n",
+		prefix, n.prefix, n, n.parent, n.kind, n.name, n.ppath, n.pnames,
+		n.handlers.Methods())))
 
 	_len := len(n.children)
 	prefix = getPrefix(first, tail, pfx, "    ", "│   ")

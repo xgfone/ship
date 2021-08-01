@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 // CORSConfig is used to configure the CORS middleware.
@@ -87,7 +87,7 @@ func CORS(config *CORSConfig) Middleware {
 		return func(ctx *ship.Context) error {
 			// Check whether the origin is allowed or not.
 			var allowOrigin string
-			origin := ctx.GetHeader(ship.HeaderOrigin)
+			origin := ctx.GetReqHeader(ship.HeaderOrigin)
 			for _, o := range conf.AllowOrigins {
 				if o == "*" {
 					if conf.AllowCredentials {
@@ -108,36 +108,36 @@ func CORS(config *CORSConfig) Middleware {
 
 			// Simple request
 			if ctx.Method() != http.MethodOptions {
-				ctx.AddHeader(ship.HeaderVary, ship.HeaderOrigin)
-				ctx.SetHeader(ship.HeaderAccessControlAllowOrigin, allowOrigin)
+				ctx.AddRespHeader(ship.HeaderVary, ship.HeaderOrigin)
+				ctx.SetRespHeader(ship.HeaderAccessControlAllowOrigin, allowOrigin)
 				if conf.AllowCredentials {
-					ctx.SetHeader(ship.HeaderAccessControlAllowCredentials, "true")
+					ctx.SetRespHeader(ship.HeaderAccessControlAllowCredentials, "true")
 				}
 				if exposeHeaders != "" {
-					ctx.SetHeader(ship.HeaderAccessControlExposeHeaders, exposeHeaders)
+					ctx.SetRespHeader(ship.HeaderAccessControlExposeHeaders, exposeHeaders)
 				}
 				return next(ctx)
 			}
 
 			// Preflight request
-			ctx.AddHeader(ship.HeaderVary, ship.HeaderOrigin)
-			ctx.AddHeader(ship.HeaderVary, ship.HeaderAccessControlRequestMethod)
-			ctx.AddHeader(ship.HeaderVary, ship.HeaderAccessControlRequestHeaders)
-			ctx.SetHeader(ship.HeaderAccessControlAllowOrigin, allowOrigin)
-			ctx.SetHeader(ship.HeaderAccessControlAllowMethods, allowMethods)
+			ctx.AddRespHeader(ship.HeaderVary, ship.HeaderOrigin)
+			ctx.AddRespHeader(ship.HeaderVary, ship.HeaderAccessControlRequestMethod)
+			ctx.AddRespHeader(ship.HeaderVary, ship.HeaderAccessControlRequestHeaders)
+			ctx.SetRespHeader(ship.HeaderAccessControlAllowOrigin, allowOrigin)
+			ctx.SetRespHeader(ship.HeaderAccessControlAllowMethods, allowMethods)
 
 			if conf.AllowCredentials {
-				ctx.SetHeader(ship.HeaderAccessControlAllowCredentials, "true")
+				ctx.SetRespHeader(ship.HeaderAccessControlAllowCredentials, "true")
 			}
 
 			if allowHeaders != "" {
-				ctx.SetHeader(ship.HeaderAccessControlAllowHeaders, allowHeaders)
-			} else if h := ctx.GetHeader(ship.HeaderAccessControlRequestHeaders); h != "" {
-				ctx.SetHeader(ship.HeaderAccessControlAllowHeaders, h)
+				ctx.SetRespHeader(ship.HeaderAccessControlAllowHeaders, allowHeaders)
+			} else if h := ctx.GetReqHeader(ship.HeaderAccessControlRequestHeaders); h != "" {
+				ctx.SetRespHeader(ship.HeaderAccessControlAllowHeaders, h)
 			}
 
 			if conf.MaxAge > 0 {
-				ctx.SetHeader(ship.HeaderAccessControlMaxAge, maxAge)
+				ctx.SetRespHeader(ship.HeaderAccessControlMaxAge, maxAge)
 			}
 
 			return ctx.NoContent(http.StatusNoContent)

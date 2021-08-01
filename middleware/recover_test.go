@@ -20,12 +20,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 func TestRecover(t *testing.T) {
 	bs := bytes.NewBuffer(nil)
-	router := ship.New().Use(Recover())
+	router := ship.New()
+	router.Use(Recover())
 	router.HandleError = func(ctx *ship.Context, err error) {
 		bs.WriteString(err.Error())
 	}

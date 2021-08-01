@@ -15,99 +15,45 @@
 package middleware
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 	"time"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
-// LoggerConfig is used to configure the logger middleware.
-type LoggerConfig struct {
-	// If true, log the request body.
-	//
-	// Default: false
-	LogReqBody bool
-
-	// Log is used to log the request.
-	//
-	// If LogReqBody is false, hasReqBody is false and reqBody is empty.
-	// Or, hasReqBody is true and reqBody is the body of the request.
-	//
-	// Default: use Context.Logger() to log the request.
-	Log func(req *http.Request, hasReqBody bool, reqBody string,
-		statusCode int, startTime time.Time, cost time.Duration, err error)
-}
+const logfmt = "addr=%s, method=%s, path=%s, code=%d, starttime=%d, cost=%s, err=%v"
 
 // Logger returns a new logger middleware that will log the request.
-func Logger(config *LoggerConfig) Middleware {
-	var conf LoggerConfig
-	if config != nil {
-		conf = *config
-	}
-
+func Logger() Middleware {
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) (err error) {
-			var bodyFmt string
-			var bodyCnt string
-			if conf.LogReqBody {
-				buf := ctx.AcquireBuffer()
-				defer ctx.ReleaseBuffer(buf)
-				body := bufferBody{Closer: ctx.Body(), Buffer: buf}
-				_, err = ship.CopyNBuffer(body.Buffer, ctx.Body(), ctx.ContentLength(), nil)
-				if err != nil {
-					return ship.ErrBadRequest.New(err)
-				}
-
-				bodyFmt = ", reqbody="
-				bodyCnt = body.Buffer.String()
-				ctx.Request().Body = body
-			}
-
 			start := time.Now()
 			err = next(ctx)
 			cost := time.Since(start)
 
-			req := ctx.Request()
 			code := ctx.StatusCode()
-
-			var lerr error
-			switch e := err.(type) {
-			case nil:
-			case ship.HTTPServerError:
-				if !ctx.IsResponded() {
-					code = e.Code
-				}
-				if e.Code >= 400 {
-					lerr = err
-				}
-			default:
-				lerr = err
-				if !ctx.IsResponded() {
+			if err != nil && !ctx.IsResponded() {
+				if hse, ok := err.(ship.HTTPServerError); ok {
+					code = hse.Code
+				} else {
 					code = http.StatusInternalServerError
 				}
 			}
 
-			if conf.Log != nil {
-				conf.Log(req, conf.LogReqBody, bodyCnt, code, start, cost, lerr)
-			} else if code < 400 {
-				ctx.Logger().Infof("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
-					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
+			var logf func(string, ...interface{})
+			if code < 400 {
+				logf = ctx.Logger().Infof
 			} else if code < 500 {
-				ctx.Logger().Warnf("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
-					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
+				logf = ctx.Logger().Warnf
 			} else {
-				ctx.Logger().Errorf("addr=%s, method=%s, path=%s%s%s, code=%d, starttime=%d, cost=%s, err=%v",
-					req.RemoteAddr, req.Method, req.URL.RequestURI(), bodyFmt, bodyCnt, code, start.Unix(), cost, lerr)
+				logf = ctx.Logger().Errorf
 			}
+
+			req := ctx.Request()
+			logf(logfmt, req.RemoteAddr, req.Method, req.URL.RequestURI(),
+				code, start.Unix(), cost, err)
 
 			return
 		}
 	}
-}
-
-type bufferBody struct {
-	io.Closer
-	*bytes.Buffer
 }

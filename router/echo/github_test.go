@@ -29,7 +29,7 @@ func TestGithubAPI(t *testing.T) {
 		}
 	}
 
-	if _len := len(router.Routes(nil)); _len != 203 {
+	if _len := len(getRoutes(router)); _len != 203 {
 		t.Errorf("expected 203 routes, but got '%d'", _len)
 	}
 
@@ -47,7 +47,7 @@ func TestGithubAPI(t *testing.T) {
 	for _, r := range githubAPI {
 		router.Del(r.Path, r.Method)
 	}
-	if _len := len(router.Routes(nil)); _len != 0 {
+	if _len := len(getRoutes(router)); _len != 0 {
 		t.Errorf("expected no route, but got '%d'", _len)
 	}
 	if len(router.routes) > 0 {

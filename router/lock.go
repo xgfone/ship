@@ -29,11 +29,10 @@ type lockRouter struct {
 	router Router
 }
 
-func (r *lockRouter) Routes(filter func(string, string, string) bool) []Route {
+func (r *lockRouter) Range(f func(string, string, string, interface{})) {
 	r.lock.RLock()
-	routes := r.router.Routes(filter)
+	r.router.Range(f)
 	r.lock.RUnlock()
-	return routes
 }
 
 func (r *lockRouter) Path(name string, params ...interface{}) string {
@@ -43,7 +42,8 @@ func (r *lockRouter) Path(name string, params ...interface{}) string {
 	return url
 }
 
-func (r *lockRouter) Add(name, path, method string, handler interface{}) (int, error) {
+func (r *lockRouter) Add(name, path, method string, handler interface{}) (
+	int, error) {
 	r.lock.Lock()
 	num, err := r.router.Add(name, path, method, handler)
 	r.lock.Unlock()
@@ -57,7 +57,8 @@ func (r *lockRouter) Del(path, method string) (err error) {
 	return
 }
 
-func (r *lockRouter) Match(path, method string, ns, vs []string) (interface{}, int) {
+func (r *lockRouter) Match(path, method string, ns, vs []string) (
+	interface{}, int) {
 	r.lock.RLock()
 	h, n := r.router.Match(path, method, ns, vs)
 	r.lock.RUnlock()

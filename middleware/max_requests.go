@@ -17,7 +17,7 @@ package middleware
 import (
 	"sync/atomic"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 // MaxRequests returns a Middleware to allow the maximum number of the requests
@@ -31,10 +31,10 @@ func MaxRequests(max uint32) Middleware {
 
 	return func(next ship.Handler) ship.Handler {
 		return func(ctx *ship.Context) error {
-			atomic.AddInt32(&current, 1)
+			num := atomic.AddInt32(&current, 1)
 			defer atomic.AddInt32(&current, -1)
 
-			if atomic.LoadInt32(&current) > maxNum {
+			if num > maxNum {
 				return ship.ErrTooManyRequests
 			}
 			return next(ctx)

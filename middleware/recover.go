@@ -17,7 +17,7 @@ package middleware
 import (
 	"fmt"
 
-	"github.com/xgfone/ship/v4"
+	"github.com/xgfone/ship/v5"
 )
 
 // Recover returns a middleware to wrap the panic.

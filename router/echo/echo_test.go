@@ -15,9 +15,19 @@
 package echo
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
+
+func getRoutes(r *Router) (routes []string) {
+	routes = make([]string, 0, 8)
+	r.Range(func(name, path, method string, _ interface{}) {
+		routes = append(routes, fmt.Sprintf("%s:%s:%s", name, method, path))
+	})
+	return
+}
 
 func TestRemoveTrailingSlash(t *testing.T) {
 	if path := removeTrailingSlash(""); path != "" {
@@ -42,7 +52,7 @@ func TestRemoveTrailingSlash(t *testing.T) {
 	r := NewRouter(&Config{RemoveTrailingSlash: true})
 	if _, err := r.Add("", "/v1/path/", http.MethodGet, true); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(nil); len(rs) != 1 {
+	} else if rs := getRoutes(r); len(rs) != 1 {
 		t.Error(rs)
 	}
 
@@ -55,14 +65,14 @@ func TestRemoveTrailingSlash(t *testing.T) {
 
 	if err := r.Del("/v1/path/", http.MethodGet); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(nil); len(rs) != 0 {
+	} else if rs := getRoutes(r); len(rs) != 0 {
 		t.Error(rs)
 	}
 
 	r.Add("", "/v1/path/", http.MethodGet, true)
 	if err := r.Del("/v1/path", http.MethodGet); err != nil {
 		t.Error(err)
-	} else if rs := r.Routes(nil); len(rs) != 0 {
+	} else if rs := getRoutes(r); len(rs) != 0 {
 		t.Error(rs)
 	}
 }
@@ -127,14 +137,19 @@ func TestRouter(t *testing.T) {
 		t.Error("not found the handler")
 	}
 
-	routes := router.Routes(func(n, _, _ string) bool { return n == "param" })
+	var routes []string
+	router.Range(func(name, path, method string, _ interface{}) {
+		if name == "param" {
+			routes = append(routes, fmt.Sprintf("%s:%s", method, path))
+		}
+	})
+
 	if len(routes) != 1 {
 		t.Error(routes)
-	} else if r := routes[0]; r.Method != "POST" || r.Path != "/test/:name" {
-		t.Errorf("expect method='%s', path='%s', but got method='%s', path='%s'",
-			"POST", "/test/:name", r.Method, r.Path)
+	} else if routes[0] != "POST:/test/:name" {
+		t.Errorf("expect '%s', but got '%s'",
+			"POST:/test/:name", routes[0])
 	}
-
 }
 
 func TestRouterAnyMethod(t *testing.T) {
@@ -149,24 +164,23 @@ func TestRouterAnyMethod(t *testing.T) {
 	router.Add("", "/path2", "POST", handler3)
 	router.Add("", "/path2", "", handler4)
 
-	if rs := router.Routes(nil); len(rs) != 12 {
+	if rs := getRoutes(router); len(rs) != 12 {
 		t.Error(rs)
 	}
 
 	router.Del("/path2", "POST")
-	if rs := router.Routes(nil); len(rs) != 11 {
+	if rs := getRoutes(router); len(rs) != 11 {
 		t.Error(rs)
 	} else {
 		for _, r := range rs {
-			switch r.Method {
-			case "POST":
+			if strings.HasPrefix(r, "POST:") {
 				t.Error(r)
 			}
 		}
 	}
 
 	router.Del("/path2", "")
-	if rs := router.Routes(nil); len(rs) != 1 || rs[0].Path != "/path1" {
+	if rs := getRoutes(router); len(rs) != 1 || rs[0] != ":GET:/path1" {
 		t.Error(rs)
 	}
 }

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package middleware is the collection of the middlewares.
 package middleware
 
-import "github.com/xgfone/ship/v4"
+import "github.com/xgfone/ship/v5"
 
 // Middleware is the alias of ship.Middleware.
-//
-// We add it in order to show the middlewares in together by the godoc.
 type Middleware = ship.Middleware

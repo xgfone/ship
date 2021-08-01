@@ -35,7 +35,7 @@ func GetResponseFromPool(w http.ResponseWriter) *Response {
 // PutResponseIntoPool puts a Response into the pool.
 func PutResponseIntoPool(r *Response) { r.Reset(nil); responsePool.Put(r) }
 
-// Response implements http.ResponseWriter.
+// Response implements the interface http.ResponseWriter.
 type Response struct {
 	http.ResponseWriter
 
@@ -82,7 +82,7 @@ func (r *Response) WriteString(s string) (n int, err error) {
 	return
 }
 
-// Reset resets the response to the initialized and returns itself.
+// Reset resets the response to the initialized status.
 func (r *Response) Reset(w http.ResponseWriter) {
 	*r = Response{ResponseWriter: w, Status: http.StatusOK}
 }

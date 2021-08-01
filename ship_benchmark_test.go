@@ -24,8 +24,9 @@ var noHandler = NothingHandler()
 
 func BenchmarkShipWithoutVHost(b *testing.B) {
 	router := New()
-	router.AddRoute(RouteInfo{Host: "", Path: "/path1", Method: http.MethodGet, Handler: noHandler})
-	router.AddRoute(RouteInfo{Host: "", Path: "/path2", Method: http.MethodGet, Handler: noHandler})
+	router.Route("/path1").GET(noHandler)
+	router.Route("/path2").GET(noHandler)
+
 	req, err := http.NewRequest(http.MethodGet, "http://www.example.com/path2", nil)
 	rec := httptest.NewRecorder()
 	if err != nil {
@@ -40,12 +41,14 @@ func BenchmarkShipWithoutVHost(b *testing.B) {
 }
 
 func BenchmarkShipWithExactVHost(b *testing.B) {
-	router := New()
-	router.AddHost("www1.example.com", nil)
-	router.AddHost("www2.example.com", nil)
+	vhost := New()
+	vhost.Route("/path1").GET(noHandler)
+	vhost.Route("/path2").GET(noHandler)
 
-	router.AddRoute(RouteInfo{Host: "www1.example.com", Path: "/path1", Method: http.MethodGet, Handler: noHandler})
-	router.AddRoute(RouteInfo{Host: "www1.example.com", Path: "/path2", Method: http.MethodGet, Handler: noHandler})
+	vhosts := NewHostManagerHandler(nil)
+	vhosts.AddHost("www1.example.com", vhost)
+	vhosts.AddHost("www2.example.com", New())
+
 	req, err := http.NewRequest(http.MethodGet, "http://www1.example.com/path2", nil)
 	rec := httptest.NewRecorder()
 	if err != nil {
@@ -55,15 +58,18 @@ func BenchmarkShipWithExactVHost(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		router.ServeHTTP(rec, req)
+		vhosts.ServeHTTP(rec, req)
 	}
 }
 
 func BenchmarkShipWithPrefixVHost(b *testing.B) {
-	router := New()
-	router.AddHost("*.example.com", nil)
-	router.AddRoute(RouteInfo{Host: "*.example.com", Path: "/path1", Method: http.MethodGet, Handler: noHandler})
-	router.AddRoute(RouteInfo{Host: "*.example.com", Path: "/path2", Method: http.MethodGet, Handler: noHandler})
+	vhost := New()
+	vhost.Route("/path1").GET(noHandler)
+	vhost.Route("/path2").GET(noHandler)
+
+	vhosts := NewHostManagerHandler(nil)
+	vhosts.AddHost("*.example.com", vhost)
+
 	req, err := http.NewRequest(http.MethodGet, "http://www.example.com/path2", nil)
 	rec := httptest.NewRecorder()
 	if err != nil {
@@ -73,17 +79,18 @@ func BenchmarkShipWithPrefixVHost(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		router.ServeHTTP(rec, req)
+		vhosts.ServeHTTP(rec, req)
 	}
 }
 
 func BenchmarkShipWithRegexpVHost(b *testing.B) {
-	host := `[a-zA-z0-9]+\.example\.com`
+	vhost := New()
+	vhost.Route("/path1").GET(noHandler)
+	vhost.Route("/path2").GET(noHandler)
 
-	router := New()
-	router.AddHost(host, nil)
-	router.AddRoute(RouteInfo{Host: host, Path: "/path1", Method: http.MethodGet, Handler: noHandler})
-	router.AddRoute(RouteInfo{Host: host, Path: "/path2", Method: http.MethodGet, Handler: noHandler})
+	vhosts := NewHostManagerHandler(nil)
+	vhosts.AddHost(`[a-zA-z0-9]+\.example\.com`, vhost)
+
 	req, err := http.NewRequest(http.MethodGet, "http://www.example.com/path2", nil)
 	rec := httptest.NewRecorder()
 	if err != nil {
@@ -93,6 +100,6 @@ func BenchmarkShipWithRegexpVHost(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		router.ServeHTTP(rec, req)
+		vhosts.ServeHTTP(rec, req)
 	}
 }
