@@ -310,8 +310,13 @@ func (s *Ship) handleRequest(c *Context) error {
 	return c.Route.Handler(c)
 }
 
+// HandleRequest is the same as ServeHTTP, but handles the request
+// with the Context.
+func (s *Ship) HandleRequest(c *Context) error { return s.handler(c) }
+
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	// Optimize for s.AcquireContext(req, resp)
 	ctx := s.cpool.Get().(*Context)
 	ctx.req, ctx.res.ResponseWriter = req, resp
 
@@ -321,6 +326,7 @@ func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		s.HandleError(ctx, err)
 	}
 
+	// Optimize for s.ReleaseContext(ctx)
 	ctx.Reset()
 	s.cpool.Put(ctx)
 }
