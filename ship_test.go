@@ -16,404 +16,53 @@ package ship
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strings"
 	"testing"
 
 	"github.com/xgfone/ship/v5/router/echo"
 )
 
-func sortRouteInfos(ris []Route) {
-	sort.Slice(ris, func(i, j int) bool {
-		return ris[i].Data.(int) < ris[j].Data.(int)
-	})
-}
-
-func TestRoute(t *testing.T) {
-	s := New()
-	handler := OkHandler()
-	routes := []Route{
-		{Name: "name", Path: "/path", Method: http.MethodGet, Handler: handler},
-		{Name: "name1", Path: "/path1", Method: http.MethodGet, Handler: handler},
-		{Name: "name2", Path: "/path2", Method: http.MethodGet, Handler: handler},
-		{Name: "name3", Path: "/path3", Method: http.MethodGet, Handler: handler},
-		{Name: "name4", Path: "/path4", Method: http.MethodGet, Handler: handler},
-		{Name: "name5", Path: "/path5", Method: http.MethodGet, Handler: handler},
-		{Name: "name6", Path: "/path6", Method: http.MethodGet, Handler: handler},
-	}
-
-	for i, r := range routes {
-		s.Route(r.Path).Name(r.Name).Data(i).Method(r.Handler, r.Method)
-	}
-
-	if rs := s.Routes(); len(rs) != 7 {
-		t.Errorf("the number of the registered routes is %d, not 7\n", len(rs))
-	} else {
-		sortRouteInfos(rs)
-		for i, r := range rs {
-			if i != r.Data.(int) {
-				t.Errorf("%d: %+v", i, r)
-			}
-
-			switch r.Name {
-			case "name":
-			case "name1":
-			case "name2":
-			case "name3":
-			case "name4":
-			case "name5":
-			case "name6":
-				route := routes[6]
-				if r.Name != route.Name || r.Path != route.Path ||
-					r.Method != route.Method {
-					t.Errorf("expected %v, got %v\n", route, r)
-				}
-			default:
-				t.Errorf("unknown route: %v", r)
-			}
-		}
-	}
-}
-
-var defaultHandler = func(ctx *Context) (err error) {
-	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.Request().Method)); err != nil {
-		code := http.StatusInternalServerError
-		err = HTTPServerError{Code: code, Err: err}
-	}
-	return
-}
-
-var idHandler = func(ctx *Context) (err error) {
-	resp := ctx.Response()
-	if _, err = resp.Write([]byte(ctx.Param("id"))); err != nil {
-		code := http.StatusInternalServerError
-		err = HTTPServerError{Code: code, Err: err}
-	}
-	return
-}
-
-var params2Handler = func(ctx *Context) (err error) {
-	resp := ctx.Response()
-	_, err = resp.Write([]byte(ctx.Param("p1") + "|" + ctx.Param("p2")))
-	if err != nil {
-		code := http.StatusInternalServerError
-		err = HTTPServerError{Code: code, Err: err}
-	}
-	return
-}
-
-type closeNotifyingRecorder struct {
-	*httptest.ResponseRecorder
-	closed chan bool
-}
-
-func (c *closeNotifyingRecorder) Close()                   { close(c.closed) }
-func (c *closeNotifyingRecorder) CloseNotify() <-chan bool { return c.closed }
-
-func sendTestRequest(method, path string, s *Ship) (int, string) {
-	r, _ := http.NewRequest(method, path, nil)
-	w := &closeNotifyingRecorder{
-		httptest.NewRecorder(),
-		make(chan bool, 1),
-	}
-
-	s.ServeHTTP(w, r)
-	return w.Code, w.Body.String()
-}
-
-func TestRouteMap(t *testing.T) {
-	m2h := map[string]Handler{"GET": defaultHandler, "POST": defaultHandler}
-
-	s := New()
-	s.Route("/path/to").Map(m2h)
-
-	req := httptest.NewRequest(http.MethodGet, "/path/to", nil)
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-
-	req = httptest.NewRequest(http.MethodPost, "/path/to", nil)
-	rec = httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-}
-
-func TestAllMethods(t *testing.T) {
-	p := New()
-	p.Use(func(next Handler) Handler {
-		return func(c *Context) error {
-			return next(c)
-		}
-	})
-
-	tests := []struct {
-		method  string
-		path    string
-		url     string
-		handler Handler
-		code    int
-		body    string
-		// panicExpected bool
-		// panicMsg      string
-	}{
-		{
-			method:  http.MethodGet,
-			path:    "/get",
-			url:     "/get",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodGet,
-		},
-		{
-			method:  http.MethodPost,
-			path:    "/post",
-			url:     "/post",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodPost,
-		},
-		{
-			method:  http.MethodHead,
-			path:    "/head",
-			url:     "/head",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodHead,
-		},
-		{
-			method:  http.MethodPut,
-			path:    "/put",
-			url:     "/put",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodPut,
-		},
-		{
-			method:  http.MethodDelete,
-			path:    "/delete",
-			url:     "/delete",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodDelete,
-		},
-		{
-			method:  http.MethodConnect,
-			path:    "/connect",
-			url:     "/connect",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodConnect,
-		},
-		{
-			method:  http.MethodOptions,
-			path:    "/options",
-			url:     "/options",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodOptions,
-		},
-		{
-			method:  http.MethodPatch,
-			path:    "/patch",
-			url:     "/patch",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodPatch,
-		},
-		{
-			method:  http.MethodTrace,
-			path:    "/trace",
-			url:     "/trace",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    http.MethodTrace,
-		},
-		{
-			method:  "PROPFIND",
-			path:    "/propfind",
-			url:     "/propfind",
-			handler: defaultHandler,
-			code:    http.StatusOK,
-			body:    "PROPFIND",
-		},
-		{
-			method:  http.MethodGet,
-			path:    "/users/:id",
-			url:     "/users/13",
-			handler: idHandler,
-			code:    http.StatusOK,
-			body:    "13",
-		},
-		{
-			method:  http.MethodGet,
-			path:    "/2params/:p1",
-			url:     "/2params/10",
-			handler: params2Handler,
-			code:    http.StatusOK,
-			body:    "10|",
-		},
-		{
-			method:  http.MethodGet,
-			path:    "/2params/:p1/params/:p2",
-			url:     "/2params/13/params/12",
-			handler: params2Handler,
-			code:    http.StatusOK,
-			body:    "13|12",
-		},
-	}
-
-	for _, tt := range tests {
-		switch tt.method {
-		case http.MethodGet:
-			p.Route(tt.path).GET(tt.handler)
-		case http.MethodPost:
-			p.Route(tt.path).POST(tt.handler)
-		case http.MethodHead:
-			p.Route(tt.path).HEAD(tt.handler)
-		case http.MethodPut:
-			p.Route(tt.path).PUT(tt.handler)
-		case http.MethodDelete:
-			p.Route(tt.path).DELETE(tt.handler)
-		case http.MethodConnect:
-			p.Route(tt.path).CONNECT(tt.handler)
-		case http.MethodOptions:
-			p.Route(tt.path).OPTIONS(tt.handler)
-		case http.MethodPatch:
-			p.Route(tt.path).PATCH(tt.handler)
-		case http.MethodTrace:
-			p.Route(tt.path).TRACE(tt.handler)
-		default:
-			p.Route(tt.path).Method(tt.handler, tt.method)
-		}
-	}
-
-	for _, tt := range tests {
-		req, err := http.NewRequest(tt.method, tt.url, nil)
-		if err != nil {
-			t.Error(err)
-		}
-
-		res := httptest.NewRecorder()
-		p.ServeHTTP(res, req)
-
-		if tt.code != res.Code {
-			t.Errorf("StatusCode: expect %d, got %d", tt.code, res.Code)
-		}
-
-		if len(tt.body) > 0 {
-			if b, err := ioutil.ReadAll(res.Body); err != nil {
-				t.Error(err)
-			} else if s := string(b); s != tt.body {
-				t.Errorf("Body: expect '%s', got '%s'", tt.body, s)
-			}
-		}
-	}
-
-	// test any
-
-	p2 := New()
-	p2.Route("/test").Any(defaultHandler)
-
-	test2 := []struct{ method string }{
-		{method: http.MethodConnect},
-		{method: http.MethodDelete},
-		{method: http.MethodGet},
-		{method: http.MethodHead},
-		{method: http.MethodOptions},
-		{method: http.MethodPatch},
-		{method: http.MethodPost},
-		{method: http.MethodPut},
-		{method: http.MethodTrace},
-	}
-
-	for _, tt := range test2 {
-		req, err := http.NewRequest(tt.method, "/test", nil)
-		if err != nil {
-			t.Error(err)
-		}
-
-		res := httptest.NewRecorder()
-		p2.ServeHTTP(res, req)
-
-		if http.StatusOK != res.Code {
-			t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, res.Code)
-		}
-
-		if b, err := ioutil.ReadAll(res.Body); err != nil {
-			t.Error(err)
-		} else if s := string(b); s != tt.method {
-			t.Errorf("Body: expect '%s', got '%s'", tt.method, s)
-		}
-	}
-}
-
-func TestRouterAPI(t *testing.T) {
-	p := New()
-
-	for _, route := range githubAPI {
-		p.Route(route.path).Method(func(ctx *Context) error {
-			if _, err := ctx.Response().Write([]byte(ctx.Request().URL.Path)); err != nil {
-				panic(err)
-			}
-			return nil
-		}, route.method)
-	}
-
-	for _, route := range githubAPI {
-		code, body := sendTestRequest(route.method, route.path, p)
-		if body != route.path {
-			t.Errorf("Body: expect '%s', got '%s'", route.path, body)
-		}
-		if code != http.StatusOK {
-			t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, code)
-		}
-	}
-}
-
 func TestNotFound(t *testing.T) {
-	notFound := func(ctx *Context) error {
-		http.Error(ctx.Response(), http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return nil
+	notFound := func(c *Context) error {
+		return c.Text(http.StatusNotFound, http.StatusText(http.StatusNotFound))
 	}
 
-	p := New()
-	p.NotFound = notFound
-	p.Route("/home/").GET(defaultHandler)
-	p.Route("/home/").POST(defaultHandler)
-	p.Route("/users/:id").GET(defaultHandler)
-	p.Route("/users/:id/:id2/:id3").GET(defaultHandler)
+	router := New()
+	router.NotFound = notFound
+	router.Route("/home/").GET(OkHandler())
+	router.Route("/home/").POST(OkHandler())
+	router.Route("/users/:id").GET(OkHandler())
+	router.Route("/users/:id/:id2/:id3").GET(OkHandler())
 
-	code, _ := sendTestRequest("BAD_METHOD", "/home/", p)
-	if code != http.StatusNotFound {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, code)
+	req, _ := http.NewRequest(http.MethodOptions, "/home/", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, rec.Code)
 	}
 
-	code, _ = sendTestRequest(http.MethodGet, "/users/14/more", p)
-	if code != http.StatusNotFound {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, code)
+	req, _ = http.NewRequest(http.MethodGet, "/users/14/more", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("StatusCode: expect %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	r := New()
-	r.Router = echo.NewRouter(&echo.Config{
+	router := New()
+	router.Router = echo.NewRouter(&echo.Config{
 		MethodNotAllowedHandler: func(allowedMethods []string) interface{} {
 			return MethodNotAllowedHandler(allowedMethods)
 		}},
 	)
-	r.Route("/path").GET(defaultHandler).POST(defaultHandler)
+	router.Route("/path").GET(OkHandler()).POST(OkHandler())
 
 	req, _ := http.NewRequest(http.MethodPut, "/path", nil)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, req)
 	if rec.Code != 405 {
 		t.Errorf("expect status code '%d', but got '%d'", 405, rec.Code)
 	} else if methods := rec.Header().Get(HeaderAllow); methods != "GET, POST" {
@@ -421,340 +70,9 @@ func TestMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestBasePath(t *testing.T) {
-	p := New()
-	p.Route("/").GET(defaultHandler)
-
-	code, _ := sendTestRequest(http.MethodGet, "/", p)
-	if code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, code)
-	}
-}
-
-type route struct {
-	method string
-	path   string
-}
-
-var githubAPI = []route{
-	// OAuth Authorizations
-	{"GET", "/authorizations"},
-	{"GET", "/authorizations/:id"},
-	{"POST", "/authorizations"},
-	//{"PUT", "/authorizations/clients/:client_id"},
-	//{"PATCH", "/authorizations/:id"},
-	{"DELETE", "/authorizations/:id"},
-	{"GET", "/applications/:client_id/tokens/:access_token"},
-	{"DELETE", "/applications/:client_id/tokens"},
-	{"DELETE", "/applications/:client_id/tokens/:access_token"},
-
-	// Activity
-	{"GET", "/events"},
-	{"GET", "/repos/:owner/:repo/events"},
-	{"GET", "/networks/:owner/:repo/events"},
-	{"GET", "/orgs/:org/events"},
-	{"GET", "/users/:user/received_events"},
-	{"GET", "/users/:user/received_events/public"},
-	{"GET", "/users/:user/events"},
-	{"GET", "/users/:user/events/public"},
-	{"GET", "/users/:user/events/orgs/:org"},
-	{"GET", "/feeds"},
-	{"GET", "/notifications"},
-	{"GET", "/repos/:owner/:repo/notifications"},
-	{"PUT", "/notifications"},
-	{"PUT", "/repos/:owner/:repo/notifications"},
-	{"GET", "/notifications/threads/:id"},
-	//{"PATCH", "/notifications/threads/:id"},
-	{"GET", "/notifications/threads/:id/subscription"},
-	{"PUT", "/notifications/threads/:id/subscription"},
-	{"DELETE", "/notifications/threads/:id/subscription"},
-	{"GET", "/repos/:owner/:repo/stargazers"},
-	{"GET", "/users/:user/starred"},
-	{"GET", "/user/starred"},
-	{"GET", "/user/starred/:owner/:repo"},
-	{"PUT", "/user/starred/:owner/:repo"},
-	{"DELETE", "/user/starred/:owner/:repo"},
-	{"GET", "/repos/:owner/:repo/subscribers"},
-	{"GET", "/users/:user/subscriptions"},
-	{"GET", "/user/subscriptions"},
-	{"GET", "/repos/:owner/:repo/subscription"},
-	{"PUT", "/repos/:owner/:repo/subscription"},
-	{"DELETE", "/repos/:owner/:repo/subscription"},
-	{"GET", "/user/subscriptions/:owner/:repo"},
-	{"PUT", "/user/subscriptions/:owner/:repo"},
-	{"DELETE", "/user/subscriptions/:owner/:repo"},
-
-	// Gists
-	{"GET", "/users/:user/gists"},
-	{"GET", "/gists"},
-	//{"GET", "/gists/public"},
-	//{"GET", "/gists/starred"},
-	{"GET", "/gists/:id"},
-	{"POST", "/gists"},
-	//{"PATCH", "/gists/:id"},
-	{"PUT", "/gists/:id/star"},
-	{"DELETE", "/gists/:id/star"},
-	{"GET", "/gists/:id/star"},
-	{"POST", "/gists/:id/forks"},
-	{"DELETE", "/gists/:id"},
-
-	// Git Data
-	{"GET", "/repos/:owner/:repo/git/blobs/:sha"},
-	{"POST", "/repos/:owner/:repo/git/blobs"},
-	{"GET", "/repos/:owner/:repo/git/commits/:sha"},
-	{"POST", "/repos/:owner/:repo/git/commits"},
-	//{"GET", "/repos/:owner/:repo/git/refs/*ref"},
-	{"GET", "/repos/:owner/:repo/git/refs"},
-	{"POST", "/repos/:owner/:repo/git/refs"},
-	//{"PATCH", "/repos/:owner/:repo/git/refs/*ref"},
-	//{"DELETE", "/repos/:owner/:repo/git/refs/*ref"},
-	{"GET", "/repos/:owner/:repo/git/tags/:sha"},
-	{"POST", "/repos/:owner/:repo/git/tags"},
-	{"GET", "/repos/:owner/:repo/git/trees/:sha"},
-	{"POST", "/repos/:owner/:repo/git/trees"},
-
-	// Issues
-	{"GET", "/issues"},
-	{"GET", "/user/issues"},
-	{"GET", "/orgs/:org/issues"},
-	{"GET", "/repos/:owner/:repo/issues"},
-	{"GET", "/repos/:owner/:repo/issues/:number"},
-	{"POST", "/repos/:owner/:repo/issues"},
-	//{"PATCH", "/repos/:owner/:repo/issues/:number"},
-	{"GET", "/repos/:owner/:repo/assignees"},
-	{"GET", "/repos/:owner/:repo/assignees/:assignee"},
-	{"GET", "/repos/:owner/:repo/issues/:number/comments"},
-	//{"GET", "/repos/:owner/:repo/issues/comments"},
-	//{"GET", "/repos/:owner/:repo/issues/comments/:id"},
-	{"POST", "/repos/:owner/:repo/issues/:number/comments"},
-	//{"PATCH", "/repos/:owner/:repo/issues/comments/:id"},
-	//{"DELETE", "/repos/:owner/:repo/issues/comments/:id"},
-	{"GET", "/repos/:owner/:repo/issues/:number/events"},
-	//{"GET", "/repos/:owner/:repo/issues/events"},
-	//{"GET", "/repos/:owner/:repo/issues/events/:id"},
-	{"GET", "/repos/:owner/:repo/labels"},
-	{"GET", "/repos/:owner/:repo/labels/:name"},
-	{"POST", "/repos/:owner/:repo/labels"},
-	//{"PATCH", "/repos/:owner/:repo/labels/:name"},
-	{"DELETE", "/repos/:owner/:repo/labels/:name"},
-	{"GET", "/repos/:owner/:repo/issues/:number/labels"},
-	{"POST", "/repos/:owner/:repo/issues/:number/labels"},
-	{"DELETE", "/repos/:owner/:repo/issues/:number/labels/:name"},
-	{"PUT", "/repos/:owner/:repo/issues/:number/labels"},
-	{"DELETE", "/repos/:owner/:repo/issues/:number/labels"},
-	{"GET", "/repos/:owner/:repo/milestones/:number/labels"},
-	{"GET", "/repos/:owner/:repo/milestones"},
-	{"GET", "/repos/:owner/:repo/milestones/:number"},
-	{"POST", "/repos/:owner/:repo/milestones"},
-	//{"PATCH", "/repos/:owner/:repo/milestones/:number"},
-	{"DELETE", "/repos/:owner/:repo/milestones/:number"},
-
-	// Miscellaneous
-	{"GET", "/emojis"},
-	{"GET", "/gitignore/templates"},
-	{"GET", "/gitignore/templates/:name"},
-	{"POST", "/markdown"},
-	{"POST", "/markdown/raw"},
-	{"GET", "/meta"},
-	{"GET", "/rate_limit"},
-
-	// Organizations
-	{"GET", "/users/:user/orgs"},
-	{"GET", "/user/orgs"},
-	{"GET", "/orgs/:org"},
-	//{"PATCH", "/orgs/:org"},
-	{"GET", "/orgs/:org/members"},
-	{"GET", "/orgs/:org/members/:user"},
-	{"DELETE", "/orgs/:org/members/:user"},
-	{"GET", "/orgs/:org/public_members"},
-	{"GET", "/orgs/:org/public_members/:user"},
-	{"PUT", "/orgs/:org/public_members/:user"},
-	{"DELETE", "/orgs/:org/public_members/:user"},
-	{"GET", "/orgs/:org/teams"},
-	{"GET", "/teams/:id"},
-	{"POST", "/orgs/:org/teams"},
-	//{"PATCH", "/teams/:id"},
-	{"DELETE", "/teams/:id"},
-	{"GET", "/teams/:id/members"},
-	{"GET", "/teams/:id/members/:user"},
-	{"PUT", "/teams/:id/members/:user"},
-	{"DELETE", "/teams/:id/members/:user"},
-	{"GET", "/teams/:id/repos"},
-	{"GET", "/teams/:id/repos/:owner/:repo"},
-	{"PUT", "/teams/:id/repos/:owner/:repo"},
-	{"DELETE", "/teams/:id/repos/:owner/:repo"},
-	{"GET", "/user/teams"},
-
-	// Pull Requests
-	{"GET", "/repos/:owner/:repo/pulls"},
-	{"GET", "/repos/:owner/:repo/pulls/:number"},
-	{"POST", "/repos/:owner/:repo/pulls"},
-	//{"PATCH", "/repos/:owner/:repo/pulls/:number"},
-	{"GET", "/repos/:owner/:repo/pulls/:number/commits"},
-	{"GET", "/repos/:owner/:repo/pulls/:number/files"},
-	{"GET", "/repos/:owner/:repo/pulls/:number/merge"},
-	{"PUT", "/repos/:owner/:repo/pulls/:number/merge"},
-	{"GET", "/repos/:owner/:repo/pulls/:number/comments"},
-	//{"GET", "/repos/:owner/:repo/pulls/comments"},
-	//{"GET", "/repos/:owner/:repo/pulls/comments/:number"},
-	{"PUT", "/repos/:owner/:repo/pulls/:number/comments"},
-	//{"PATCH", "/repos/:owner/:repo/pulls/comments/:number"},
-	//{"DELETE", "/repos/:owner/:repo/pulls/comments/:number"},
-
-	// Repositories
-	{"GET", "/user/repos"},
-	{"GET", "/users/:user/repos"},
-	{"GET", "/orgs/:org/repos"},
-	{"GET", "/repositories"},
-	{"POST", "/user/repos"},
-	{"POST", "/orgs/:org/repos"},
-	{"GET", "/repos/:owner/:repo"},
-	//{"PATCH", "/repos/:owner/:repo"},
-	{"GET", "/repos/:owner/:repo/contributors"},
-	{"GET", "/repos/:owner/:repo/languages"},
-	{"GET", "/repos/:owner/:repo/teams"},
-	{"GET", "/repos/:owner/:repo/tags"},
-	{"GET", "/repos/:owner/:repo/branches"},
-	{"GET", "/repos/:owner/:repo/branches/:branch"},
-	{"DELETE", "/repos/:owner/:repo"},
-	{"GET", "/repos/:owner/:repo/collaborators"},
-	{"GET", "/repos/:owner/:repo/collaborators/:user"},
-	{"PUT", "/repos/:owner/:repo/collaborators/:user"},
-	{"DELETE", "/repos/:owner/:repo/collaborators/:user"},
-	{"GET", "/repos/:owner/:repo/comments"},
-	{"GET", "/repos/:owner/:repo/commits/:sha/comments"},
-	{"POST", "/repos/:owner/:repo/commits/:sha/comments"},
-	{"GET", "/repos/:owner/:repo/comments/:id"},
-	//{"PATCH", "/repos/:owner/:repo/comments/:id"},
-	{"DELETE", "/repos/:owner/:repo/comments/:id"},
-	{"GET", "/repos/:owner/:repo/commits"},
-	{"GET", "/repos/:owner/:repo/commits/:sha"},
-	{"GET", "/repos/:owner/:repo/readme"},
-	//{"GET", "/repos/:owner/:repo/contents/*path"},
-	//{"PUT", "/repos/:owner/:repo/contents/*path"},
-	//{"DELETE", "/repos/:owner/:repo/contents/*path"},
-	//{"GET", "/repos/:owner/:repo/:archive_format/:ref"},
-	{"GET", "/repos/:owner/:repo/keys"},
-	{"GET", "/repos/:owner/:repo/keys/:id"},
-	{"POST", "/repos/:owner/:repo/keys"},
-	//{"PATCH", "/repos/:owner/:repo/keys/:id"},
-	{"DELETE", "/repos/:owner/:repo/keys/:id"},
-	{"GET", "/repos/:owner/:repo/downloads"},
-	{"GET", "/repos/:owner/:repo/downloads/:id"},
-	{"DELETE", "/repos/:owner/:repo/downloads/:id"},
-	{"GET", "/repos/:owner/:repo/forks"},
-	{"POST", "/repos/:owner/:repo/forks"},
-	{"GET", "/repos/:owner/:repo/hooks"},
-	{"GET", "/repos/:owner/:repo/hooks/:id"},
-	{"POST", "/repos/:owner/:repo/hooks"},
-	//{"PATCH", "/repos/:owner/:repo/hooks/:id"},
-	{"POST", "/repos/:owner/:repo/hooks/:id/tests"},
-	{"DELETE", "/repos/:owner/:repo/hooks/:id"},
-	{"POST", "/repos/:owner/:repo/merges"},
-	{"GET", "/repos/:owner/:repo/releases"},
-	{"GET", "/repos/:owner/:repo/releases/:id"},
-	{"POST", "/repos/:owner/:repo/releases"},
-	//{"PATCH", "/repos/:owner/:repo/releases/:id"},
-	{"DELETE", "/repos/:owner/:repo/releases/:id"},
-	{"GET", "/repos/:owner/:repo/releases/:id/assets"},
-	{"GET", "/repos/:owner/:repo/stats/contributors"},
-	{"GET", "/repos/:owner/:repo/stats/commit_activity"},
-	{"GET", "/repos/:owner/:repo/stats/code_frequency"},
-	{"GET", "/repos/:owner/:repo/stats/participation"},
-	{"GET", "/repos/:owner/:repo/stats/punch_card"},
-	{"GET", "/repos/:owner/:repo/statuses/:ref"},
-	{"POST", "/repos/:owner/:repo/statuses/:ref"},
-
-	// Search
-	{"GET", "/search/repositories"},
-	{"GET", "/search/code"},
-	{"GET", "/search/issues"},
-	{"GET", "/search/users"},
-	{"GET", "/legacy/issues/search/:owner/:repository/:state/:keyword"},
-	{"GET", "/legacy/repos/search/:keyword"},
-	{"GET", "/legacy/user/search/:keyword"},
-	{"GET", "/legacy/user/email/:email"},
-
-	// Users
-	{"GET", "/users/:user"},
-	{"GET", "/user"},
-	//{"PATCH", "/user"},
-	{"GET", "/users"},
-	{"GET", "/user/emails"},
-	{"POST", "/user/emails"},
-	{"DELETE", "/user/emails"},
-	{"GET", "/users/:user/followers"},
-	{"GET", "/user/followers"},
-	{"GET", "/users/:user/following"},
-	{"GET", "/user/following"},
-	{"GET", "/user/following/:user"},
-	{"GET", "/users/:user/following/:target_user"},
-	{"PUT", "/user/following/:user"},
-	{"DELETE", "/user/following/:user"},
-	{"GET", "/users/:user/keys"},
-	{"GET", "/user/keys"},
-	{"GET", "/user/keys/:id"},
-	{"POST", "/user/keys"},
-	//{"PATCH", "/user/keys/:id"},
-	{"DELETE", "/user/keys/:id"},
-}
-
-type TestType struct{}
-
-func (t TestType) Create(ctx *Context) error { return nil }
-func (t TestType) Delete(ctx *Context) error { return nil }
-func (t TestType) Update(ctx *Context) error { return nil }
-func (t TestType) Get(ctx *Context) error    { return nil }
-func (t TestType) Has(ctx *Context) error    { return nil }
-func (t TestType) NotHandler()               {}
-
-func TestContextBindQuery(t *testing.T) {
-	type V struct {
-		A string `query:"a" default:"xyz"`
-		B int    `query:"b"`
-	}
-	vs := V{}
-
-	s := Default()
-	s.Route("/path").GET(func(ctx *Context) error { return ctx.BindQuery(&vs) })
-	req := httptest.NewRequest(http.MethodGet, "/path?b=2", nil)
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	} else if vs.A != "xyz" {
-		t.Errorf("expect '%s', got '%s'", "xyz", vs.A)
-	} else if vs.B != 2 {
-		t.Errorf("expect %d, got %d", 2, vs.B)
-	}
-}
-
-func TestContextAccept(t *testing.T) {
-	expected := []string{"text/html", "application/xhtml+xml", "image/webp", "application/", ""}
-	var accepts []string
-	s := New()
-	s.Route("/path").GET(func(ctx *Context) error {
-		accepts = ctx.Accept()
-		return nil
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/path", nil)
-	req.Header.Set(HeaderAccept, "text/html, application/xhtml+xml, application/*;q=0.9, image/webp, */*;q=0.8")
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("StatusCode: expect %d, got %d", http.StatusOK, rec.Code)
-	}
-	for i := range expected {
-		if expected[i] != accepts[i] {
-			t.Errorf("expect '%s', got '%s'", expected[i], accepts[i])
-		}
-	}
-}
-
-func TestSetRouteFilter(t *testing.T) {
-	app := New()
-	app.RouteFilter = func(ri Route) bool {
+func TestRouteFilter(t *testing.T) {
+	router := New()
+	router.RouteFilter = func(ri Route) bool {
 		if ri.Name == "" {
 			return true
 		} else if !strings.HasPrefix(ri.Path, "/group/") {
@@ -764,23 +82,24 @@ func TestSetRouteFilter(t *testing.T) {
 	}
 
 	handler := func(ctx *Context) error { return nil }
-	app.Group("/group").Route("/name").Name("test").GET(handler)
-	app.Route("/noname").GET(handler)
+	router.Group("/group").Route("/name").Name("test").GET(handler)
+	router.Route("/noname").GET(handler)
 
-	routes := app.Routes()
-	if len(routes) == 0 {
+	switch routes := router.Routes(); len(routes) {
+	case 0:
 		t.Error("no routes")
-	}
-	for _, ri := range routes {
-		if ri.Name != "test" {
-			t.Error(ri)
+	case 1:
+		if name := routes[0].Name; name != "test" {
+			t.Errorf("expect route name '%s', but got '%s'", "test", name)
 		}
+	default:
+		t.Errorf("too many routes: %v", routes)
 	}
 }
 
-func TestSetRouteModifier(t *testing.T) {
-	app := New()
-	app.RouteModifier = func(ri Route) Route {
+func TestRouteModifier(t *testing.T) {
+	router := New()
+	router.RouteModifier = func(ri Route) Route {
 		if !strings.HasPrefix(ri.Path, "/prefix/") {
 			ri.Path = "/prefix" + ri.Path
 		}
@@ -788,18 +107,17 @@ func TestSetRouteModifier(t *testing.T) {
 	}
 
 	handler := func(ctx *Context) error { return nil }
-	app.Route("/path").GET(handler)
+	router.Route("/path").GET(handler)
 
-	noRoute := true
-	for _, ri := range app.Routes() {
-		noRoute = false
-		if ri.Path != "/prefix/path" {
-			t.Error(ri.Path)
+	switch routes := router.Routes(); len(routes) {
+	case 0:
+		t.Error("no routes")
+	case 1:
+		if path := routes[0].Path; path != "/prefix/path" {
+			t.Errorf("expect path '%s', but got '%s'", "/prefix/path", path)
 		}
-	}
-
-	if noRoute {
-		t.Fail()
+	default:
+		t.Errorf("too many routes: %v", routes)
 	}
 }
 
@@ -824,8 +142,8 @@ pre m1 end
 
 func TestMiddleware(t *testing.T) {
 	bs := bytes.NewBufferString("\n")
-	s := New()
-	s.Pre(func(next Handler) Handler {
+	router := New()
+	router.Pre(func(next Handler) Handler {
 		return func(ctx *Context) error {
 			bs.WriteString("pre m1 start\n")
 			err := next(ctx)
@@ -841,7 +159,7 @@ func TestMiddleware(t *testing.T) {
 		}
 	})
 
-	s.Use(func(next Handler) Handler {
+	router.Use(func(next Handler) Handler {
 		return func(ctx *Context) error {
 			bs.WriteString("use m1 start\n")
 			err := next(ctx)
@@ -857,7 +175,7 @@ func TestMiddleware(t *testing.T) {
 		}
 	})
 
-	group := s.Group("/v1")
+	group := router.Group("/v1")
 	group.Use(func(next Handler) Handler {
 		return func(ctx *Context) error {
 			bs.WriteString("group m1 start\n")
@@ -892,24 +210,10 @@ func TestMiddleware(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/route", nil)
 	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, req)
+	router.ServeHTTP(rec, req)
 
 	if bs.String() != middlewareoutput {
 		t.Error(bs.String())
 		t.Fail()
-	}
-}
-
-func TestRoute_RemoveAny(t *testing.T) {
-	h := OkHandler()
-	app := New()
-	app.Route("/path1").GET(h).POST(h).DELETE(h)
-	if routes := app.Routes(); len(routes) != 3 {
-		t.Error(routes)
-	}
-
-	app.Route("/path1").RemoveAny()
-	if routes := app.Routes(); len(routes) != 0 {
-		t.Error(routes)
 	}
 }

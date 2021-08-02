@@ -14,7 +14,32 @@
 
 package ship
 
-import "fmt"
+import (
+	"fmt"
+	"testing"
+)
+
+func TestIsInteger(t *testing.T) {
+	if !IsInteger("1234567890") {
+		t.Errorf("expect true, but got false")
+	}
+
+	if IsInteger("123abc456") {
+		t.Errorf("expect false but got true")
+	}
+}
+
+func TestInStrings(t *testing.T) {
+	ss := []string{"a", "b", "c"}
+
+	if !InStrings("b", ss) {
+		t.Errorf("expect true, but got false")
+	}
+
+	if InStrings("d", ss) {
+		t.Errorf("expect false but got true")
+	}
+}
 
 func ExampleSplitHostPort() {
 	var host, port string
