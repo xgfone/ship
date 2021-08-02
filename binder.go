@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/xgfone/ship/v5/binder"
@@ -130,4 +131,8 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 
 		return binder.BindURLValues(v, r.Form, _tag)
 	})
+}
+
+func bindQuery(dst interface{}, src url.Values) error {
+	return binder.BindURLValues(dst, src, "query")
 }

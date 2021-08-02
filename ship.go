@@ -22,7 +22,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/xgfone/ship/v5/binder"
 	"github.com/xgfone/ship/v5/router"
 	"github.com/xgfone/ship/v5/router/echo"
 )
@@ -64,7 +63,7 @@ type Ship struct {
 
 	// Router is the route manager to manage all the routes.
 	//
-	// Default: echo.NewRouter(nil)
+	// Default: echo.NewRouter(&echo.Config{RemoveTrailingSlash: true})
 	Router Router
 
 	// The default handler when not finding the route.
@@ -101,30 +100,30 @@ type Ship struct {
 	mws     []Middleware
 	pmws    []Middleware
 	handler Handler
-	bpool   sync.Pool
 	cpool   sync.Pool
+	bpool   sync.Pool
+	bsize   int
 }
 
 // New returns a new Ship.
 func New() *Ship {
 	s := &Ship{
-		Router: echo.NewRouter(&echo.Config{RemoveTrailingSlash: true}),
+		Router:      echo.NewRouter(&echo.Config{RemoveTrailingSlash: true}),
+		Logger:      NewLoggerFromWriter(os.Stderr, ""),
+		Session:     NewMemorySession(),
+		NotFound:    NotFoundHandler(),
+		HandleError: handleErrorDefault,
+		SetDefault:  SetStructFieldToDefault,
+		BindQuery:   bindQuery,
+
+		URLParamMaxNum:   4,
+		MiddlewareMaxNum: 256,
 	}
 
 	s.handler = s.handleRequest
 	s.cpool.New = func() interface{} { return s.NewContext() }
-
-	s.URLParamMaxNum = 4
-	s.MiddlewareMaxNum = 256
-
-	s.Logger = NewLoggerFromWriter(os.Stderr, "")
-	s.Session = NewMemorySession()
-	s.NotFound = NotFoundHandler()
-	s.HandleError = s.handleErrorDefault
-	s.SetDefault = SetStructFieldToDefault
-	s.Validator = noop
-	s.BindQuery = func(v interface{}, vs url.Values) error {
-		return binder.BindURLValues(v, vs, "query")
+	s.bpool.New = func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, s.bsize))
 	}
 
 	s.SetBufferSize(2048)
@@ -148,46 +147,58 @@ func Default() *Ship {
 	return s
 }
 
-// Clone clones itself to a new one without routes and middlewares.
-// Meanwhile, it will reset the signals of the new Ship to nil.
-func (s *Ship) Clone() *Ship {
+// Clone clones itself to a new one with the new name and the new router.
+//
+// If router is nil, create a new default one automatically.
+func (s *Ship) Clone(name string, router Router) *Ship {
+	if router == nil {
+		router = echo.NewRouter(&echo.Config{RemoveTrailingSlash: true})
+	}
+
 	newShip := &Ship{
-		Router: echo.NewRouter(&echo.Config{RemoveTrailingSlash: true}),
+		Name:   name,
+		Router: router,
+
+		// Public
+		Prefix:           s.Prefix,
+		NotFound:         s.NotFound,
+		HandleError:      s.HandleError,
+		RouteFilter:      s.RouteFilter,
+		RouteModifier:    s.RouteModifier,
+		CtxDataInitCap:   s.CtxDataInitCap,
+		URLParamMaxNum:   s.URLParamMaxNum,
+		MiddlewareMaxNum: s.MiddlewareMaxNum,
+
+		// Context
+		Binder:     s.Binder,
+		Logger:     s.Logger,
+		Session:    s.Session,
+		Renderer:   s.Renderer,
+		BindQuery:  s.BindQuery,
+		Validator:  s.Validator,
+		Responder:  s.Responder,
+		SetDefault: s.SetDefault,
 	}
 
 	// Private
-	newShip.cpool.New = func() interface{} { return newShip.NewContext() }
 	newShip.handler = newShip.handleRequest
+	newShip.cpool.New = func() interface{} { return newShip.NewContext() }
+	newShip.bpool.New = func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, newShip.bsize))
+	}
 
-	// Public
-	newShip.Logger = s.Logger
-	newShip.Prefix = s.Prefix
-	newShip.NotFound = s.NotFound
-	newShip.HandleError = s.HandleError
-	newShip.RouteFilter = s.RouteFilter
-	newShip.RouteModifier = s.RouteModifier
-	newShip.CtxDataInitCap = s.CtxDataInitCap
-	newShip.URLParamMaxNum = s.URLParamMaxNum
-	newShip.MiddlewareMaxNum = s.MiddlewareMaxNum
-
-	// Context
-	newShip.Binder = s.Binder
-	newShip.Session = s.Session
-	newShip.Renderer = s.Renderer
-	newShip.BindQuery = s.BindQuery
-	newShip.Validator = s.Validator
-	newShip.Responder = s.Responder
-	newShip.SetDefault = s.SetDefault
-
+	newShip.Use(s.mws...)
+	newShip.Pre(s.pmws...)
 	newShip.SetBufferSize(2048)
 	return newShip
 }
 
 // SetBufferSize resets the size of the buffer. The default is 2048.
 func (s *Ship) SetBufferSize(size int) {
-	s.bpool.New = func() interface{} {
-		return bytes.NewBuffer(make([]byte, 0, size))
+	if size < 0 {
+		panic("the buffer size must not be a negative")
 	}
+	s.bsize = size
 }
 
 //----------------------------------------------------------------------------
@@ -279,7 +290,7 @@ func (s *Ship) Use(middlewares ...Middleware) {
 // Handle Request
 //----------------------------------------------------------------------------
 
-func (s *Ship) handleErrorDefault(ctx *Context, err error) {
+func handleErrorDefault(ctx *Context, err error) {
 	if !ctx.res.Wrote {
 		if se, ok := err.(HTTPServerError); !ok {
 			ctx.NoContent(http.StatusInternalServerError)
