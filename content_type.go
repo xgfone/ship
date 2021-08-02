@@ -45,13 +45,15 @@ var contenttypes = map[string][]string{}
 // to contentTypeSlice, which is used by SetContentType to set the header
 // "Content-Type" to contentTypeSlice by contentType to avoid allocating
 // the memory.
+//
+// If contentTypeSlice is empty, it is []string{contentType} by default.
 func AddContentTypeMapping(contentType string, contentTypeSlice []string) {
 	if contentType == "" {
 		panic(fmt.Errorf("the Content-Type is empty"))
 	}
 
 	if len(contentTypeSlice) == 0 {
-		panic(fmt.Errorf("the Content-Type slice is empty"))
+		contentTypeSlice = []string{contentType}
 	}
 
 	contenttypes[contentType] = contentTypeSlice
