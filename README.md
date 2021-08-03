@@ -541,50 +541,42 @@ func main() {
 
 ## Benchmark
 
-### Test 1
 ```
-Dell Vostro 3470
-Intel Core i5-7400 3.0GHz
-8GB DDR4 2666MHz
-Windows 10
-Go 1.13.4
-```
-
-|           Function          |  ops   | ns/op | bytes/opt | allocs/op
-|-----------------------------|--------|-------|-----------|-----------
-|Benchmark**Gin**Static-4         |  23368 | 49788 |    8278   |   157
-|Benchmark**Gin**GitHubAPI-4      |  15684 | 75104 |   10849   |   203
-|Benchmark**Gin**GplusAPI-4       | 276224 |  4184 |     686   |    13
-|Benchmark**Gin**ParseAPI-4       | 157810 |  7537 |    1357   |    26
-|Benchmark**Echo**Static-4        |  29432 | 39989 |    2432   |   157
-|Benchmark**Echo**GitHubAPI-4     |  20527 | 56857 |    2468   |   203
-|Benchmark**Echo**GplusAPI-4      | 387421 |  3179 |     193   |    13
-|Benchmark**Echo**ParseAPI-4      | 220273 |  5575 |     365   |    26
-|Benchmark**ShipEcho**Static-4    |  34054 | 35548 |    1016   | **0**
-|Benchmark**ShipEcho**GitHubAPI-4 |  21842 | 54962 |    1585   | **0**
-|Benchmark**ShipEcho**GplusAPI-4  | 402898 |  2996 |      85   | **0**
-|Benchmark**ShipEcho**ParseAPI-4  | 223581 |  5478 |     154   | **0**
-
-### Test 2
-```
-MacBook Pro(Retina, 13-inch, Mid 2014)
-Intel Core i5 2.6GHz
-8GB DDR3 1600MHz
-macOS Mojave
-Go 1.13.4
+HP Laptop 14s-dr2014TU
+go:     1.16.4
+goos:   windows
+goarch: amd64
+memory: 16GB DDR4-3200
+cpu:    11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
 ```
 
-|           Function          |  ops   | ns/op | bytes/opt | allocs/op
-|-----------------------------|--------|-------|-----------|-----------
-|Benchmark**Gin**Static-4         |  18085 | 62380 |    8494   |   157
-|Benchmark**Gin**GitHubAPI-4      |  12646 | 93052 |   11115   |   203
-|Benchmark**Gin**GplusAPI-4       | 224404 |  5222 |     701   |    13
-|Benchmark**Gin**ParseAPI-4       | 124138 |  9442 |    1387   |    26
-|Benchmark**Echo**Static-4        |  22624 | 47401 |    2021   |   157
-|Benchmark**Echo**GitHubAPI-4     |  16822 | 69059 |    2654   |   203
-|Benchmark**Echo**GplusAPI-4      | 326142 |  3759 |     157   |    13
-|Benchmark**Echo**ParseAPI-4      | 178182 |  6713 |     402   |    26
-|Benchmark**ShipEcho**Static-4    |  27048 | 43713 |     640   | **0**
-|Benchmark**ShipEcho**GitHubAPI-4 |  17545 | 66953 |     987   | **0**
-|Benchmark**ShipEcho**GplusAPI-4  | 318595 |  3698 |      54   | **0**
-|Benchmark**ShipEcho**ParseAPI-4  | 175984 |  6807 |     196   | **0**
+
+|            Framework          | Version
+|-------------------------------|---------
+| `github.com/gin-gonic/gin`    | v1.7.2
+| `github.com/labstack/echo/v4` | v4.4.0
+| `github.com/xgfone/ship/v5`   | v5.0.0
+
+
+|           Function           |  ops   | ns/op | B/opt | allocs/op
+|------------------------------|--------|-------|-------|-----------
+| Benchmark**Echo**Static-8        |  43269 | 27676 |  2056 | 157
+| Benchmark**Echo**GitHubAPI-8     |  29738 | 40773 |  2788 | 203
+| Benchmark**Echo**GplusAPI-8      | 668731 |  1967 |   207 |  13
+| Benchmark**Echo**ParseAPI-8      | 362774 |  3369 |   398 |  26
+| Benchmark**Gin**Static-8         |  47384 | 24037 |  8267 | 157
+| Benchmark**Gin**GitHubAPI-8      |  33747 | 34648 | 10771 | 203
+| Benchmark**Gin**GplusAPI-8       | 598628 |  1830 |   681 |  13
+| Benchmark**Gin**ParseAPI-8       | 356298 |  3314 |  1442 |  26
+| Benchmark**ShipEcho**Static-8    |  51788 | 23219 |   668 | **0**
+| Benchmark**ShipEcho**GitHubAPI-8 |  32854 | 35759 |  1054 | **0**
+| Benchmark**ShipEcho**GplusAPI-8  | 746049 |  1809 |    92 | **0**
+| Benchmark**ShipEcho**ParseAPI-8  | 396067 |  3310 |   174 | **0**
+
+
+|             Function           |    ops   | ns/op | B/opt | allocs/op
+|--------------------------------|----------|-------|-------|-----------
+| BenchmarkShipWithoutVHost-8    | 19691887 | 54.53 |   0   |    0
+| BenchmarkShipWithExactVHost-8  | 17158249 | 64.19 |   0   |    0
+| BenchmarkShipWithPrefixVHost-8 | 13445091 | 90.81 |   0   |    0
+| BenchmarkShipWithRegexpVHost-8 |  4668913 | 248.0 |   0   |    0

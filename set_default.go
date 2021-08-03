@@ -27,6 +27,23 @@ var (
 	errNotPointerToStruct = errors.New("the argument must be a pointer to struct")
 )
 
+// Defaulter is used to set the default value if the data or the field of data
+// is ZERO.
+type Defaulter interface {
+	SetDefault(data interface{}) error
+}
+
+// DefaulterFunc is the function type implementing the interface Defaulter.
+type DefaulterFunc func(interface{}) error
+
+// SetDefault implements the interface Defaulter.
+func (d DefaulterFunc) SetDefault(data interface{}) error { return d(data) }
+
+// NothingDefaulter returns a Defaulter that does nothing.
+func NothingDefaulter() Defaulter { return DefaulterFunc(nothingDefaulter) }
+
+func nothingDefaulter(interface{}) error { return nil }
+
 // SetStructFieldToDefault sets the default value of the fields of the pointer
 // to struct v to the value of the tag "default" of the fields when the field
 // value is ZERO.

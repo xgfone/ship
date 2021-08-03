@@ -42,11 +42,11 @@ func Logger() Middleware {
 
 			var logf func(string, ...interface{})
 			if code < 400 {
-				logf = ctx.Logger().Infof
+				logf = ctx.Infof
 			} else if code < 500 {
-				logf = ctx.Logger().Warnf
+				logf = ctx.Warnf
 			} else {
-				logf = ctx.Logger().Errorf
+				logf = ctx.Errorf
 			}
 
 			req := ctx.Request()

@@ -16,7 +16,6 @@ package ship
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -88,14 +87,14 @@ type Ship struct {
 	HandleError func(c *Context, err error)
 
 	// Context Settings.
-	Session    Session                                     // Default: NewMemorySession()
-	Logger     Logger                                      // Default: NewLoggerFromWriter(os.Stderr, "")
-	Binder     Binder                                      // Default: nil
-	Renderer   Renderer                                    // Default: nil
-	Responder  func(c *Context, args ...interface{}) error // Default: nil
-	BindQuery  func(dst interface{}, src url.Values) error // Default: BindURLValues(dst, src, "query")
-	SetDefault func(v interface{}) error                   // Default: SetStructFieldToDefault
-	Validator  func(v interface{}) error                   // Default: nil
+	Session   Session                                     // Default: NewMemorySession()
+	Logger    Logger                                      // Default: NewLoggerFromWriter(os.Stderr, "")
+	Binder    Binder                                      // Default: nil
+	Renderer  Renderer                                    // Default: nil
+	Validator Validator                                   // Default: nil
+	Defaulter Defaulter                                   // Default: SetStructFieldToDefault
+	BindQuery func(dst interface{}, src url.Values) error // Default: BindURLValues(dst, src, "query")
+	Responder func(c *Context, args ...interface{}) error // Default: nil
 
 	mws     []Middleware
 	pmws    []Middleware
@@ -113,7 +112,7 @@ func New() *Ship {
 		Session:     NewMemorySession(),
 		NotFound:    NotFoundHandler(),
 		HandleError: handleErrorDefault,
-		SetDefault:  SetStructFieldToDefault,
+		Defaulter:   DefaulterFunc(SetStructFieldToDefault),
 		BindQuery:   bindQuery,
 
 		URLParamMaxNum:   4,
@@ -170,14 +169,14 @@ func (s *Ship) Clone(name string, router Router) *Ship {
 		MiddlewareMaxNum: s.MiddlewareMaxNum,
 
 		// Context
-		Binder:     s.Binder,
-		Logger:     s.Logger,
-		Session:    s.Session,
-		Renderer:   s.Renderer,
-		BindQuery:  s.BindQuery,
-		Validator:  s.Validator,
-		Responder:  s.Responder,
-		SetDefault: s.SetDefault,
+		Binder:    s.Binder,
+		Logger:    s.Logger,
+		Session:   s.Session,
+		Renderer:  s.Renderer,
+		BindQuery: s.BindQuery,
+		Validator: s.Validator,
+		Responder: s.Responder,
+		Defaulter: s.Defaulter,
 	}
 
 	// Private
@@ -207,27 +206,27 @@ func (s *Ship) SetBufferSize(size int) {
 
 // NewContext news a Context.
 func (s *Ship) NewContext() *Context {
-	c := newContext(s.URLParamMaxNum, s.CtxDataInitCap)
-	c.buffer = s
-	c.logger = s.Logger
-	c.router = s.Router
-	c.session = s.Session
-	c.notFound = s.NotFound
-	c.binder = s.Binder
-	c.qbinder = s.BindQuery
-	c.renderer = s.Renderer
-	c.responder = s.Responder
+	c := NewContext(s.URLParamMaxNum, s.CtxDataInitCap)
+	c.BufferAllocator = s
+	c.Logger = s.Logger
+	c.Router = s.Router
+	c.Session = s.Session
+	c.NotFound = s.NotFound
+	c.Binder = s.Binder
+	c.Renderer = s.Renderer
+	c.Responder = s.Responder
+	c.QueryBinder = s.BindQuery
 
-	if s.SetDefault == nil {
-		c.defaulter = noop
+	if s.Defaulter == nil {
+		c.Defaulter = NothingDefaulter()
 	} else {
-		c.defaulter = s.SetDefault
+		c.Defaulter = s.Defaulter
 	}
 
 	if s.Validator == nil {
-		c.validate = noop
+		c.Validator = NothingValidator()
 	} else {
-		c.validate = s.Validator
+		c.Validator = s.Validator
 	}
 
 	return c
@@ -302,42 +301,18 @@ func handleErrorDefault(ctx *Context, err error) {
 	}
 }
 
-func (s *Ship) handleRequest(c *Context) error {
-	h, n := c.router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
-	if h == nil {
-		return c.notFound(c)
-	}
-
-	c.plen = n
-	switch r := h.(type) {
-	case Route:
-		c.Route = r
-	case Handler:
-		c.Route.Handler = r
-	default:
-		panic(fmt.Errorf("unknown handler type '%T'", h))
-	}
-
-	return c.Route.Handler(c)
-}
-
 // HandleRequest is the same as ServeHTTP, but handles the request
 // with the Context.
 func (s *Ship) HandleRequest(c *Context) error { return s.handler(c) }
+func (s *Ship) handleRequest(c *Context) error { return c.Execute() }
 
 // ServeHTTP implements the interface http.Handler.
 func (s *Ship) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	// Optimize for s.AcquireContext(req, resp)
-	ctx := s.cpool.Get().(*Context)
-	ctx.req, ctx.res.ResponseWriter = req, resp
-
-	switch err := s.handler(ctx); err {
+	c := s.AcquireContext(req, resp)
+	switch err := s.handler(c); err {
 	case nil, ErrSkip:
 	default:
-		s.HandleError(ctx, err)
+		s.HandleError(c, err)
 	}
-
-	// Optimize for s.ReleaseContext(ctx)
-	ctx.Reset()
-	s.cpool.Put(ctx)
+	s.ReleaseContext(c)
 }

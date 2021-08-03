@@ -33,7 +33,7 @@ func TestLogger(t *testing.T) {
 	router.Use(Logger())
 
 	router.Route("/test").GET(func(ctx *ship.Context) error {
-		ctx.Logger().Infof("handler")
+		ctx.Infof("handler")
 		return nil
 	})
 

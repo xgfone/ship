@@ -35,6 +35,12 @@ import (
 // MaxMemoryLimit is the maximum memory.
 var MaxMemoryLimit int64 = 32 << 20 // 32MB
 
+// BufferAllocator is used to acquire and release a buffer.
+type BufferAllocator interface {
+	AcquireBuffer() *bytes.Buffer
+	ReleaseBuffer(*bytes.Buffer)
+}
+
 // Context represetns a request and response context.
 type Context struct {
 	// Route is the route information associated with the route.
@@ -50,6 +56,19 @@ type Context struct {
 	// Notice: when the new request is coming, they will be cleaned out.
 	Data map[string]interface{}
 
+	// Public Configuration
+	BufferAllocator
+	Logger
+	Router      Router
+	Session     Session
+	NotFound    Handler
+	Binder      Binder
+	Renderer    Renderer
+	Defaulter   Defaulter
+	Validator   Validator
+	Responder   func(*Context, ...interface{}) error
+	QueryBinder func(interface{}, url.Values) error
+
 	res *Response
 	req *http.Request
 
@@ -58,22 +77,10 @@ type Context struct {
 	pvalues []string
 	cookies []*http.Cookie
 	query   url.Values
-
-	logger    Logger
-	buffer    BufferAllocator
-	router    Router
-	binder    Binder
-	session   Session
-	renderer  Renderer
-	defaulter func(interface{}) error
-	validate  func(interface{}) error
-	qbinder   func(interface{}, url.Values) error
-	responder func(*Context, ...interface{}) error
-	notFound  Handler
 }
 
 // NewContext returns a new Context.
-func newContext(urlParamMaxNum, dataInitCap int) *Context {
+func NewContext(urlParamMaxNum, dataInitCap int) *Context {
 	var pnames, pvalues []string
 	if urlParamMaxNum > 0 {
 		pnames = make([]string, urlParamMaxNum)
@@ -105,17 +112,81 @@ func (c *Context) Reset() {
 	c.plen = 0
 }
 
-// Logger returns the logger.
-func (c *Context) Logger() Logger { return c.logger }
-
-// Router returns the router.
-func (c *Context) Router() Router { return c.router }
-
 // URL generates a url path by the route path name and provided parameters.
 //
 // Return "" if there is not the route named name.
 func (c *Context) URL(name string, params ...interface{}) string {
-	return c.router.Path(name, params...)
+	return c.Router.Path(name, params...)
+}
+
+// FindRoute finds the route by the request method and path and put it
+// into the field Route of Context.
+//
+// For the handler registered into the underlying Router, it supports
+// three kinds of types as follow:
+//
+//   - Route
+//   - Handler
+//   - http.Handler
+//   - http.HandlerFunc
+//
+func (c *Context) FindRoute() (ok bool) {
+	h, n := c.Router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
+	if h == nil {
+		return false
+	}
+
+	c.plen = n
+	switch r := h.(type) {
+	case Route:
+		c.Route = r
+	case Handler:
+		c.Route.Handler = r
+	case http.Handler:
+		c.Route.Handler = FromHTTPHandler(r)
+	case http.HandlerFunc:
+		c.Route.Handler = FromHTTPHandlerFunc(r)
+	default:
+		panic(fmt.Errorf("unknown handler type '%T'", h))
+	}
+
+	return true
+}
+
+// ExecuteRoute executes the handler of the found route.
+//
+// Notice: You should call FindRoute before calling this method.
+func (c *Context) ExecuteRoute() error {
+	if c.Route.Handler != nil {
+		return c.Route.Handler(c)
+	}
+	return c.NotFound(c)
+}
+
+// Execute finds the route by the request method and path, then executes
+// the handler of the found route, which is equal to the union of FindRoute
+// and ExecuteRoute.
+func (c *Context) Execute() error {
+	h, n := c.Router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
+	if h == nil {
+		return c.NotFound(c)
+	}
+
+	c.plen = n
+	switch r := h.(type) {
+	case Route:
+		c.Route = r
+	case Handler:
+		c.Route.Handler = r
+	case http.Handler:
+		c.Route.Handler = FromHTTPHandler(r)
+	case http.HandlerFunc:
+		c.Route.Handler = FromHTTPHandlerFunc(r)
+	default:
+		panic(fmt.Errorf("unknown handler type '%T'", h))
+	}
+
+	return c.Route.Handler(c)
 }
 
 //----------------------------------------------------------------------------
@@ -154,7 +225,7 @@ func (c *Context) IsResponded() bool { return c.res.Wrote }
 
 // Respond responds the result to the peer by using Ship.Responder.
 func (c *Context) Respond(args ...interface{}) error {
-	return c.responder(c, args...)
+	return c.Responder(c, args...)
 }
 
 //----------------------------------------------------------------------------
@@ -333,27 +404,6 @@ func (c *Context) ContentType() (ct string) {
 }
 
 //----------------------------------------------------------------------------
-// Buffer
-//----------------------------------------------------------------------------
-
-// BufferAllocator is used to acquire and release a buffer.
-type BufferAllocator interface {
-	AcquireBuffer() *bytes.Buffer
-	ReleaseBuffer(*bytes.Buffer)
-}
-
-// AcquireBuffer acquires a buffer from the pool, which should be released
-// by calling ReleaseBuffer().
-func (c *Context) AcquireBuffer() *bytes.Buffer {
-	return c.buffer.AcquireBuffer()
-}
-
-// ReleaseBuffer releases a buffer into the pool.
-func (c *Context) ReleaseBuffer(buf *bytes.Buffer) {
-	c.buffer.ReleaseBuffer(buf)
-}
-
-//----------------------------------------------------------------------------
 // URL Params
 //----------------------------------------------------------------------------
 
@@ -386,15 +436,15 @@ func (c *Context) ParamValues() []string { return c.pvalues[:c.plen] }
 // Header
 //----------------------------------------------------------------------------
 
+// Header implements the interface http.ResponseWriter,
+// which is the alias of RespHeader.
+func (c *Context) Header() http.Header { return c.res.Header() }
+
 // ReqHeader returns the header of the request.
 func (c *Context) ReqHeader() http.Header { return c.req.Header }
 
 // RespHeader returns the header of the response.
 func (c *Context) RespHeader() http.Header { return c.res.Header() }
-
-// Header implements the interface http.ResponseWriter,
-// which is the alias of RespHeader.
-func (c *Context) Header() http.Header { return c.res.Header() }
 
 // GetReqHeader returns the first value of the request header named name.
 //
@@ -548,7 +598,7 @@ func (c *Context) MultipartReader() (*multipart.Reader, error) {
 func (c *Context) GetSession(id string) (v interface{}, err error) {
 	if id == "" {
 		err = ErrInvalidSession
-	} else if v, err = c.session.GetSession(id); err == nil && v == nil {
+	} else if v, err = c.Session.GetSession(id); err == nil && v == nil {
 		err = ErrSessionNotExist
 	}
 
@@ -560,7 +610,7 @@ func (c *Context) SetSession(id string, value interface{}) (err error) {
 	if id == "" || value == nil {
 		return ErrInvalidSession
 	}
-	return c.session.SetSession(id, value)
+	return c.Session.SetSession(id, value)
 }
 
 // DelSession deletes the session from the backend store.
@@ -568,25 +618,19 @@ func (c *Context) DelSession(id string) (err error) {
 	if id == "" {
 		return ErrInvalidSession
 	}
-	return c.session.DelSession(id)
+	return c.Session.DelSession(id)
 }
 
 //----------------------------------------------------------------------------
 // Bind & SetDefault & Validator
 //----------------------------------------------------------------------------
 
-// Validate validates whether v is valid or not.
-func (c *Context) Validate(v interface{}) error { return c.validate(v) }
-
-// SetDefault calls the default setter to set the default value of v.
-func (c *Context) SetDefault(v interface{}) error { return c.defaulter(v) }
-
 // Bind extracts the data information from the request and assigns it to v,
 // then validates whether it is valid or not.
 func (c *Context) Bind(v interface{}) (err error) {
-	if err = c.binder.Bind(v, c.req); err == nil {
-		if err = c.defaulter(v); err == nil {
-			err = c.validate(v)
+	if err = c.Binder.Bind(v, c.req); err == nil {
+		if err = c.Defaulter.SetDefault(v); err == nil {
+			err = c.Validator.Validate(v)
 		}
 	}
 	return
@@ -595,9 +639,9 @@ func (c *Context) Bind(v interface{}) (err error) {
 // BindQuery extracts the data from the request url query and assigns it to v,
 // then validates whether it is valid or not.
 func (c *Context) BindQuery(v interface{}) (err error) {
-	if err = c.qbinder(v, c.Queries()); err == nil {
-		if err = c.defaulter(v); err == nil {
-			err = c.validate(v)
+	if err = c.QueryBinder(v, c.Queries()); err == nil {
+		if err = c.Defaulter.SetDefault(v); err == nil {
+			err = c.Validator.Validate(v)
 		}
 	}
 	return
@@ -610,7 +654,7 @@ func (c *Context) BindQuery(v interface{}) (err error) {
 // Render renders a template named name with data and sends it as the response
 // with status code.
 func (c *Context) Render(name string, code int, data interface{}) error {
-	return c.renderer.Render(c, name, code, data)
+	return c.Renderer.Render(c, name, code, data)
 }
 
 // RenderOk is short for c.Render(name, http.StatusOK, data).
