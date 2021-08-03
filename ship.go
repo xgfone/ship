@@ -261,18 +261,22 @@ func (s *Ship) ReleaseBuffer(buf *bytes.Buffer) {
 //----------------------------------------------------------------------------
 
 // ResetMiddlewares resets the global middlewares to mdws.
-func (s *Ship) ResetMiddlewares(mdws ...Middleware) {
-	s.mws = append([]Middleware{}, mdws...)
+func (s *Ship) ResetMiddlewares(middlewares ...Middleware) {
+	s.mws = append([]Middleware{}, middlewares...)
 }
 
 // ResetPreMiddlewares resets the global pre-middlewares to mdws.
-func (s *Ship) ResetPreMiddlewares(mdws ...Middleware) {
-	s.pmws = append([]Middleware{}, mdws...)
+func (s *Ship) ResetPreMiddlewares(middlewares ...Middleware) {
+	s.updatePreMiddlewares(append([]Middleware{}, middlewares...)...)
 }
 
 // Pre registers the pre-middlewares, which are executed before finding the route.
 func (s *Ship) Pre(middlewares ...Middleware) {
-	s.pmws = append(s.pmws, middlewares...)
+	s.updatePreMiddlewares(append(s.pmws, middlewares...)...)
+}
+
+func (s *Ship) updatePreMiddlewares(middlewares ...Middleware) {
+	s.pmws = middlewares
 	s.handler = s.handleRequest
 	for i := len(s.pmws) - 1; i >= 0; i-- {
 		s.handler = s.pmws[i](s.handler)
