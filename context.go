@@ -56,7 +56,7 @@ type Context struct {
 	// Notice: when the new request is coming, they will be cleaned out.
 	Data map[string]interface{}
 
-	// Public Configuration
+	// Public Configuration, which are not reset when calling Reset().
 	BufferAllocator
 	Logger
 	Router      Router

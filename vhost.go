@@ -22,6 +22,16 @@ import (
 	"sync"
 )
 
+// IsDomainName is used to check whether the domain name is valid or not.
+// And you can reset it to a customized one.
+//
+// The default implementation has these limits as follow:
+//   - The maximum length of the full qualified domain name is equal to 253.
+//   - The maximum length of the sub-domain name is equal to 63.
+//   - The valid characters only contain "a-zA-z0-9_-.".
+//
+var IsDomainName func(domainName string) bool = isDomainName
+
 // HostManager is used to manage the domain hosts.
 type HostManager interface {
 	// Len returns the number of the hosts.
@@ -114,12 +124,16 @@ type hostManager struct {
 }
 
 // NewHostManager returns a new HostManager implementation,
-// which supports three kinds of hosts:
+// which uses IsDomainName to check whether a host name is the valid domain
+// and supports three kinds of hosts:
 //
 //   - Exact: a valid domain, such as "www.example.com".
 //   - Prefix: a valid domain with the suffix ".*", such as "www.example.*".
 //   - Suffix: a valid domain with the prefix "*.", such as "*.example.com".
 //   - Regexp: a valid regular expression defined by regexpHostManager.
+//
+// Notice: if the host name is not any of the exact, prefix and suffix formats,
+// it will be regarded as the regexp host name.
 //
 // If regexpHostManager is nil, it is NewRegexpHostManager() by default.
 func NewHostManager(regexpHostManager HostManager) HostManager {
@@ -165,7 +179,7 @@ func (h *hostManager) AddHost(host string, handler http.Handler) (http.Handler, 
 	if host == "" {
 		return nil, errors.New("host must not be empty")
 	} else if strings.HasPrefix(host, "*.") { // Suffix Matching
-		if !isDomainName(host[2:]) {
+		if !IsDomainName(host[2:]) {
 			return nil, fmt.Errorf("invalid domain '%s'", host)
 		} else if addedHandler, ok := h.suffixs[host]; ok {
 			handler = addedHandler
@@ -173,14 +187,14 @@ func (h *hostManager) AddHost(host string, handler http.Handler) (http.Handler, 
 			h.suffixs[host] = handler
 		}
 	} else if strings.HasSuffix(host, ".*") { // Prefix Matching
-		if !isDomainName(host[:len(host)-2]) {
+		if !IsDomainName(host[:len(host)-2]) {
 			return nil, fmt.Errorf("invalid domain '%s'", host)
 		} else if addedHandler, ok := h.prefixs[host]; ok {
 			handler = addedHandler
 		} else {
 			h.prefixs[host] = handler
 		}
-	} else if isDomainName(host) { // Exact Matching
+	} else if IsDomainName(host) { // Exact Matching
 		if addedHandler, ok := h.exacts[host]; ok {
 			handler = addedHandler
 		} else {
@@ -206,7 +220,7 @@ func (h *hostManager) DelHost(host string) (handler http.Handler) {
 		if handler, ok = h.prefixs[host]; ok {
 			delete(h.prefixs, host)
 		}
-	} else if isDomainName(host) {
+	} else if IsDomainName(host) {
 		if handler, ok = h.exacts[host]; ok {
 			delete(h.exacts, host)
 		}
