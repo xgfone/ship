@@ -89,14 +89,14 @@ func (h *lockHostManager) Range(f func(host string, handler http.Handler)) {
 func (h *lockHostManager) AddHost(host string, handler http.Handler) (
 	http.Handler, error) {
 	h.lock.Lock()
-	handler, err := h.AddHost(host, handler)
+	handler, err := h.hosts.AddHost(host, handler)
 	h.lock.Unlock()
 	return handler, err
 }
 
 func (h *lockHostManager) DelHost(host string) http.Handler {
 	h.lock.Lock()
-	handler := h.DelHost(host)
+	handler := h.hosts.DelHost(host)
 	h.lock.Unlock()
 	return handler
 }
@@ -110,7 +110,7 @@ func (h *lockHostManager) GetHost(host string) http.Handler {
 
 func (h *lockHostManager) MatchHost(host string) (string, http.Handler) {
 	h.lock.RLock()
-	host, handler := h.MatchHost(host)
+	host, handler := h.hosts.MatchHost(host)
 	h.lock.RUnlock()
 	return host, handler
 }
