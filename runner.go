@@ -78,14 +78,20 @@ func StartServerTLS(addr string, handler http.Handler, certFile, keyFile string)
 
 // NewRunner returns a new Runner.
 //
-// If the handler is a ship, it will set the name and the logger of runner
-// to those of ship.
+// If the handler has implemented the interface { GetName() string },
+// it will set the name to handler.GetName().
+//
+// If the handler has implemented the interface { GetLogger() Logger },
+// it will set the logger to handler.GetLogger().
 func NewRunner(handler http.Handler) *Runner {
 	var name string
+	if h, ok := handler.(interface{ GetName() string }); ok {
+		name = h.GetName()
+	}
+
 	var logger Logger
-	if s, ok := handler.(*Ship); ok {
-		name = s.Name
-		logger = s.Logger
+	if h, ok := handler.(interface{ GetLogger() Logger }); ok {
+		logger = h.GetLogger()
 	}
 
 	r := &Runner{
@@ -105,6 +111,18 @@ func NewRunner(handler http.Handler) *Runner {
 func (r *Runner) Link(other *Runner) {
 	other.RegisterOnShutdown(r.Stop)
 	r.RegisterOnShutdown(other.Stop)
+}
+
+// SetName sets the name to name and returns itself.
+func (r *Runner) SetName(name string) *Runner {
+	r.Name = name
+	return r
+}
+
+// SetLogger sets the logger to logger and returns itself.
+func (r *Runner) SetLogger(logger Logger) *Runner {
+	r.Logger = logger
+	return r
 }
 
 // RegisterOnShutdown registers some shutdown functions to run

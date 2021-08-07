@@ -146,6 +146,12 @@ func Default() *Ship {
 	return s
 }
 
+// GetName returns the name of the ship router.
+func (s *Ship) GetName() string { return s.Name }
+
+// GetLogger returns the logger of the ship router.
+func (s *Ship) GetLogger() Logger { return s.Logger }
+
 // Clone clones itself to a new one with the new name and the new router.
 //
 // If router is nil, create a new default one automatically.
