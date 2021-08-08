@@ -58,6 +58,7 @@ type Runner struct {
 	Signals   []os.Signal
 	ConnState func(net.Conn, http.ConnState)
 
+	err    error
 	done   chan struct{}
 	shut   *OnceRunner
 	stop   *OnceRunner
@@ -145,6 +146,7 @@ func (r *Runner) Stop()        { r.shut.Run() }
 func (r *Runner) runShutdown() { r.Shutdown(context.Background()) }
 func (r *Runner) runStopfs() {
 	defer close(r.done)
+	r.logShutdown()
 	for i := len(r.stopfs) - 1; i >= 0; i-- {
 		r.stopfs[i].Run()
 	}
@@ -176,11 +178,10 @@ func (r *Runner) startServer(certFile, keyFile string) {
 		panic("Runner: Server.Handler is nil")
 	}
 
-	name, server := r.Name, r.Server
-	if name == "" {
-		r.infof("The HTTP Server is running on %s", server.Addr)
+	if r.Name == "" {
+		r.infof("The HTTP Server is running on %s", r.Server.Addr)
 	} else {
-		r.infof("The HTTP Server [%s] is running on %s", name, server.Addr)
+		r.infof("The HTTP Server [%s] is running on %s", r.Name, r.Server.Addr)
 	}
 
 	go r.handleSignals(r.done)
@@ -188,36 +189,38 @@ func (r *Runner) startServer(certFile, keyFile string) {
 	var isTLS bool
 	if certFile != "" && keyFile != "" {
 		isTLS = true
-	} else if server.TLSConfig != nil &&
-		(len(server.TLSConfig.Certificates) > 0 ||
-			server.TLSConfig.GetCertificate != nil) {
+	} else if r.Server.TLSConfig != nil &&
+		(len(r.Server.TLSConfig.Certificates) > 0 ||
+			r.Server.TLSConfig.GetCertificate != nil) {
 		isTLS = true
 	}
 
-	var err error
 	if isTLS {
-		err = server.ListenAndServeTLS(certFile, keyFile)
+		r.err = r.Server.ListenAndServeTLS(certFile, keyFile)
 	} else {
-		err = server.ListenAndServe()
+		r.err = r.Server.ListenAndServe()
 	}
 
 	r.Stop()
 	<-r.done
+}
 
-	if err == nil || err == http.ErrServerClosed {
-		if name == "" {
-			r.infof("The HTTP Server listening on %s is shutdown", server.Addr)
+func (r *Runner) logShutdown() {
+	if r.err == nil || r.err == http.ErrServerClosed {
+		if r.Name == "" {
+			r.infof("The HTTP Server listening on %s is shutdown",
+				r.Server.Addr)
 		} else {
 			r.infof("The HTTP Server [%s] listening on %s is shutdown",
-				name, server.Addr)
+				r.Name, r.Server.Addr)
 		}
 	} else {
-		if name == "" {
+		if r.Name == "" {
 			r.errorf("The HTTP Server listening on %s is shutdown: %s",
-				server.Addr, err)
+				r.Server.Addr, r.err)
 		} else {
 			r.errorf("The HTTP Server [%s] listening on %s is shutdown: %s",
-				name, server.Addr, err)
+				r.Name, r.Server.Addr, r.err)
 		}
 	}
 }
