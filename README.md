@@ -1,4 +1,4 @@
-# ship [![Build Status](https://api.travis-ci.com/xgfone/ship.svg?branch=master)](https://travis-ci.com/github/xgfone/ship) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/ship/v5)](https://pkg.go.dev/github.com/xgfone/ship/v5) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
+# ship [![Build Status](https://github.com/xgfone/ship/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/ship/actions/workflows/go.yml) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/ship/v5)](https://pkg.go.dev/github.com/xgfone/ship/v5) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/ship/master/LICENSE)
 
 `ship` is a flexible, powerful, high performance and minimalist Go Web HTTP router framework supporting Go `1.11+`. It is inspired by [echo](https://github.com/labstack/echo) and [httprouter](https://github.com/julienschmidt/httprouter). Thanks for those contributors.
 
