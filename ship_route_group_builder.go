@@ -15,7 +15,6 @@
 package ship
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ func newRouteGroup(s *Ship, pprefix, prefix string,
 	if prefix = strings.TrimSuffix(prefix, "/"); len(prefix) == 0 {
 		prefix = "/"
 	} else if prefix[0] != '/' {
-		panic(fmt.Errorf("prefix '%s' must start with '/'", prefix))
+		prefix = "/" + prefix
 	}
 
 	return &RouteGroupBuilder{
@@ -43,6 +42,8 @@ func newRouteGroup(s *Ship, pprefix, prefix string,
 }
 
 // Group returns a new route sub-group with the group prefix.
+//
+// If the prefix does not start with "/", it will add "/" as the prefix.
 func (s *Ship) Group(prefix string) *RouteGroupBuilder {
 	return newRouteGroup(s, s.Prefix, prefix, s.mws...)
 }
@@ -67,6 +68,8 @@ func (g *RouteGroupBuilder) Use(middlewares ...Middleware) *RouteGroupBuilder {
 }
 
 // Group returns a new route sub-group.
+//
+// If the prefix does not start with "/", it will add "/" as the prefix.
 func (g *RouteGroupBuilder) Group(prefix string, middlewares ...Middleware) *RouteGroupBuilder {
 	mws := make([]Middleware, 0, len(g.mdwares)+len(middlewares))
 	mws = append(mws, g.mdwares...)
