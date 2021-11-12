@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // BindUnmarshaler is the interface used to wrap the UnmarshalParam method.
@@ -40,6 +41,27 @@ type BindUnmarshaler interface {
 //
 // Notice: tag is the name of the struct tag. such as "form", "query", etc.
 // If the tag value is equal to "-", ignore this field.
+//
+// Support the types of the struct fields as follow:
+//   - bool
+//   - int
+//   - int8
+//   - int16
+//   - int32
+//   - int64
+//   - uint
+//   - uint8
+//   - uint16
+//   - uint32
+//   - uint64
+//   - string
+//   - float32
+//   - float64
+//   - time.Time     // use time.Time.UnmarshalText(), so only support RFC3339 format
+//   - time.Duration // use time.ParseDuration()
+//   - interface { UnmarshalBind(param string) error }
+// And any pointer to the type above.
+//
 func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 	typ := reflect.TypeOf(ptr).Elem()
 	val := reflect.ValueOf(ptr).Elem()
@@ -135,6 +157,13 @@ func setWithProperType(valueKind reflect.Kind, val string, structField reflect.V
 	case reflect.Int32:
 		return setIntField(val, 32, structField)
 	case reflect.Int64:
+		if _, ok := structField.Interface().(time.Duration); ok {
+			v, err := time.ParseDuration(val)
+			if err == nil {
+				structField.SetInt(int64(v))
+			}
+			return err
+		}
 		return setIntField(val, 64, structField)
 	case reflect.Uint:
 		return setUintField(val, 0, structField)
@@ -155,6 +184,12 @@ func setWithProperType(valueKind reflect.Kind, val string, structField reflect.V
 	case reflect.String:
 		structField.SetString(val)
 	default:
+		if _, ok := structField.Interface().(time.Time); ok {
+			if val == "" {
+				return nil
+			}
+			return structField.Addr().Interface().(*time.Time).UnmarshalText([]byte(val))
+		}
 		return errors.New("unknown type")
 	}
 	return nil
@@ -200,8 +235,9 @@ func unmarshalFieldPtr(value string, field reflect.Value) (bool, error) {
 
 func setIntField(value string, bitSize int, field reflect.Value) error {
 	if value == "" {
-		value = "0"
+		return nil
 	}
+
 	intVal, err := strconv.ParseInt(value, 10, bitSize)
 	if err == nil {
 		field.SetInt(intVal)
@@ -211,8 +247,9 @@ func setIntField(value string, bitSize int, field reflect.Value) error {
 
 func setUintField(value string, bitSize int, field reflect.Value) error {
 	if value == "" {
-		value = "0"
+		return nil
 	}
+
 	uintVal, err := strconv.ParseUint(value, 10, bitSize)
 	if err == nil {
 		field.SetUint(uintVal)
@@ -222,8 +259,9 @@ func setUintField(value string, bitSize int, field reflect.Value) error {
 
 func setBoolField(value string, field reflect.Value) error {
 	if value == "" {
-		value = "false"
+		return nil
 	}
+
 	boolVal, err := strconv.ParseBool(value)
 	if err == nil {
 		field.SetBool(boolVal)
@@ -233,8 +271,9 @@ func setBoolField(value string, field reflect.Value) error {
 
 func setFloatField(value string, bitSize int, field reflect.Value) error {
 	if value == "" {
-		value = "0.0"
+		return nil
 	}
+
 	floatVal, err := strconv.ParseFloat(value, bitSize)
 	if err == nil {
 		field.SetFloat(floatVal)
