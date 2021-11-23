@@ -24,6 +24,7 @@ package binder
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -63,22 +64,35 @@ type BindUnmarshaler interface {
 // And any pointer to the type above.
 //
 func BindURLValues(ptr interface{}, data url.Values, tag string) error {
-	typ := reflect.TypeOf(ptr).Elem()
-	val := reflect.ValueOf(ptr).Elem()
+	value := reflect.ValueOf(ptr)
+	if value.Kind() != reflect.Ptr {
+		return fmt.Errorf("%T is not a pointer", ptr)
+	}
+	return bindURLValues(value.Elem(), data, tag)
+}
 
+func bindURLValues(val reflect.Value, data url.Values, tag string) (err error) {
+	typ := val.Type()
 	if typ.Kind() != reflect.Struct {
 		return errors.New("binding element must be a struct")
 	}
 
 	for i := 0; i < typ.NumField(); i++ {
 		typeField := typ.Field(i)
-		structField := val.Field(i)
-		if !structField.CanSet() {
-			continue
-		}
-		structFieldKind := structField.Kind()
 		inputFieldName := typeField.Tag.Get(tag)
 		if inputFieldName = strings.TrimSpace(inputFieldName); inputFieldName == "-" {
+			continue
+		}
+
+		structField := val.Field(i)
+		structFieldKind := structField.Kind()
+		if !structField.CanSet() {
+			if typeField.Anonymous && structFieldKind == reflect.Struct {
+				err := bindURLValues(structField, data, tag)
+				if err != nil {
+					return err
+				}
+			}
 			continue
 		}
 
@@ -86,7 +100,7 @@ func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 			inputFieldName = typeField.Name
 			// If tag is nil, we inspect if the field is a struct.
 			if _, ok := bindUnmarshaler(structField); !ok && structFieldKind == reflect.Struct {
-				if err := BindURLValues(structField.Addr().Interface(), data, tag); err != nil {
+				if err := bindURLValues(structField, data, tag); err != nil {
 					return err
 				}
 				continue
@@ -95,10 +109,9 @@ func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 
 		inputValue, exists := data[inputFieldName]
 		if !exists {
-			// Go json.Unmarshal supports case insensitive binding.  However the
-			// url params are bound case sensitive which is inconsistent.  To
-			// fix this we must check all of the map values in a
-			// case-insensitive search.
+			// Go json.Unmarshal supports case insensitive binding.
+			// However the url params are bound case sensitive which is inconsistent.
+			// To fix this we must check all of the map values in a case-insensitive search.
 			inputFieldName = strings.ToLower(inputFieldName)
 			for k, v := range data {
 				if strings.ToLower(k) == inputFieldName {
@@ -136,7 +149,7 @@ func BindURLValues(ptr interface{}, data url.Values, tag string) error {
 		}
 	}
 
-	return nil
+	return
 }
 
 func setWithProperType(valueKind reflect.Kind, val string, structField reflect.Value) error {
