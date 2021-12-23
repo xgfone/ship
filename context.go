@@ -16,6 +16,7 @@ package ship
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -31,6 +32,19 @@ import (
 	"strconv"
 	"strings"
 )
+
+type reqctx uint8
+
+// GetContext returns the http reqeust context from the context.
+func GetContext(ctx context.Context) *Context {
+	c, _ := ctx.Value(reqctx(255)).(*Context)
+	return c
+}
+
+// SetContext sets the http request context into the context.
+func SetContext(ctx context.Context, c *Context) (newctx context.Context) {
+	return context.WithValue(ctx, reqctx(255), c)
+}
 
 // MaxMemoryLimit is the maximum memory.
 var MaxMemoryLimit int64 = 32 << 20 // 32MB

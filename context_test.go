@@ -15,10 +15,29 @@
 package ship
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func BenchmarkContext(b *testing.B) {
+	c := NewContext(0, 0)
+	b.ResetTimer()
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			GetContext(SetContext(context.Background(), c))
+		}
+	})
+}
+
+func TestContext(t *testing.T) {
+	c := NewContext(0, 0)
+	nc := GetContext(SetContext(context.Background(), c))
+	if nc != c {
+		t.Errorf("unexpect the context")
+	}
+}
 
 func TestContextBindQuery(t *testing.T) {
 	type V struct {
