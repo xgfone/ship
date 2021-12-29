@@ -772,18 +772,26 @@ func (c *Context) BlobXML(code int, b []byte) (err error) {
 }
 
 // XML sends an XML response with the status code.
-func (c *Context) XML(code int, v interface{}) error {
-	c.setContentTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
-	if _, err := c.res.WriteString(xml.Header); err != nil {
-		return err
+func (c *Context) XML(code int, v interface{}) (err error) {
+	buf := c.AcquireBuffer()
+	buf.WriteString(xml.Header)
+	if err = xml.NewEncoder(buf).Encode(v); err == nil {
+		c.setContentTypeAndCode(code, MIMEApplicationXMLCharsetUTF8)
+		_, err = c.res.Write(buf.Bytes())
 	}
-	return xml.NewEncoder(c.res).Encode(v)
+	c.ReleaseBuffer(buf)
+	return
 }
 
 // JSON sends a JSON response with the status code.
-func (c *Context) JSON(code int, v interface{}) error {
-	c.setContentTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
-	return json.NewEncoder(c.res).Encode(v)
+func (c *Context) JSON(code int, v interface{}) (err error) {
+	buf := c.AcquireBuffer()
+	if err = json.NewEncoder(buf).Encode(v); err == nil {
+		c.setContentTypeAndCode(code, MIMEApplicationJSONCharsetUTF8)
+		_, err = c.res.Write(buf.Bytes())
+	}
+	c.ReleaseBuffer(buf)
+	return
 }
 
 // HTML sends an HTML response with the status code.
