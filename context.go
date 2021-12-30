@@ -848,7 +848,8 @@ func (c *Context) contentDisposition(file, name, dispositionType string) error {
 		name = filepath.Base(file)
 	}
 
-	disposition := fmt.Sprintf("%s; filename=%q", dispositionType, name)
+	name = url.QueryEscape(name)
+	disposition := fmt.Sprintf("%s; filename*=utf-8''%s", dispositionType, name)
 	c.res.Header().Set(HeaderContentDisposition, disposition)
 	return c.File(file)
 }
