@@ -27,9 +27,6 @@ func (h Handler) HTTPHandler(s *Ship) http.Handler {
 	return ToHTTPHandler(s, h)
 }
 
-// Middleware represents a middleware.
-type Middleware func(Handler) Handler
-
 type httpHandlerBridge struct {
 	ship *Ship
 	Handler
