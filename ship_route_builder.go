@@ -237,10 +237,12 @@ func (r *RouteBuilder) StaticFS(fs http.FileSystem) *RouteBuilder {
 	}
 
 	fileServer := http.StripPrefix(r.path, http.FileServer(fs))
-	r.addRoute("", path.Join(r.path, "/*"), func(c *Context) error {
+	handler := func(c *Context) error {
 		fileServer.ServeHTTP(c.res, c.req)
 		return nil
-	}, http.MethodHead, http.MethodGet)
+	}
+	r.addRoute("", path.Join(r.path, "/"), handler, http.MethodHead, http.MethodGet)
+	r.addRoute("", path.Join(r.path, "/*"), handler, http.MethodHead, http.MethodGet)
 
 	return r
 }
