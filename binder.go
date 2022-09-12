@@ -129,7 +129,7 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 			return err
 		}
 
-		return binder.BindURLValues(v, r.Form, _tag)
+		return binder.BindURLValuesAndFiles(v, r.Form, r.MultipartForm.File, _tag)
 	})
 }
 
