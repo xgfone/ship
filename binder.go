@@ -17,6 +17,7 @@ package ship
 import (
 	"encoding/json"
 	"encoding/xml"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -129,7 +130,12 @@ func FormBinder(maxMemory int64, tag ...string) Binder {
 			return err
 		}
 
-		return binder.BindURLValuesAndFiles(v, r.Form, r.MultipartForm.File, _tag)
+		var fhs map[string][]*multipart.FileHeader
+		if r.MultipartForm != nil {
+			fhs = r.MultipartForm.File
+		}
+
+		return binder.BindURLValuesAndFiles(v, r.Form, fhs, _tag)
 	})
 }
 
