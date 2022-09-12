@@ -1,30 +1,23 @@
-// The MIT License (MIT)
+// Copyright 2022 xgfone
 //
-// Copyright (c) 2017 LabStack
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package binder
 
 import (
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -32,13 +25,14 @@ import (
 	"time"
 )
 
-// BindUnmarshaler is the interface used to wrap the UnmarshalParam method.
+// BindUnmarshaler is the interface used to wrap the UnmarshalParam method
+// to unmarshal itself from the string parameter.
 type BindUnmarshaler interface {
 	// Unmarshal decodes the argument param and assigns to itself.
 	UnmarshalBind(param string) error
 }
 
-// BindURLValues parses the data and assign to the pointer ptr to a struct.
+// BindURLValuesAndFiles parses the data and assign to the pointer ptr to a struct.
 //
 // Notice: tag is the name of the struct tag. such as "form", "query", etc.
 // If the tag value is equal to "-", ignore this field.
@@ -60,190 +54,166 @@ type BindUnmarshaler interface {
 //   - float64
 //   - time.Time     // use time.Time.UnmarshalText(), so only support RFC3339 format
 //   - time.Duration // use time.ParseDuration()
+// And any pointer to the type above, and
+//   - *multipart.FileHeader
+//   - []*multipart.FileHeader
 //   - interface { UnmarshalBind(param string) error }
-// And any pointer to the type above.
 //
-func BindURLValues(ptr interface{}, data url.Values, tag string) error {
+func BindURLValuesAndFiles(ptr interface{}, data url.Values,
+	files map[string][]*multipart.FileHeader, tag string) error {
 	value := reflect.ValueOf(ptr)
 	if value.Kind() != reflect.Ptr {
 		return fmt.Errorf("%T is not a pointer", ptr)
 	}
-	return bindURLValues(value.Elem(), data, tag)
+	return bindURLValues(value.Elem(), files, data, tag)
 }
 
-func bindURLValues(val reflect.Value, data url.Values, tag string) (err error) {
-	typ := val.Type()
-	if typ.Kind() != reflect.Struct {
+// BindURLValues is equal to BindURLValuesAndFiles(ptr, data, nil, tag).
+func BindURLValues(ptr interface{}, data url.Values, tag string) error {
+	return BindURLValuesAndFiles(ptr, data, nil, tag)
+}
+
+func bindURLValues(val reflect.Value, files map[string][]*multipart.FileHeader,
+	data url.Values, tag string) (err error) {
+	valType := val.Type()
+	if valType.Kind() != reflect.Struct {
 		return errors.New("binding element must be a struct")
 	}
 
-	for i := 0; i < typ.NumField(); i++ {
-		typeField := typ.Field(i)
-		inputFieldName := typeField.Tag.Get(tag)
-		if inputFieldName = strings.TrimSpace(inputFieldName); inputFieldName == "-" {
+	for i, num := 0, valType.NumField(); i < num; i++ {
+		field := valType.Field(i)
+		fieldName := field.Tag.Get(tag)
+		switch fieldName = strings.TrimSpace(fieldName); fieldName {
+		case "":
+			fieldName = field.Name
+		case "-":
 			continue
 		}
 
-		structField := val.Field(i)
-		structFieldKind := structField.Kind()
-		if !structField.CanSet() {
-			if typeField.Anonymous && structFieldKind == reflect.Struct {
-				err := bindURLValues(structField, data, tag)
+		fieldValue := val.Field(i)
+		fieldKind := fieldValue.Kind()
+		if !fieldValue.CanSet() {
+			if field.Anonymous && fieldKind == reflect.Struct {
+				if err = bindURLValues(fieldValue, files, data, tag); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		inputValue, exists := data[fieldName]
+		if !exists {
+			if fhs := files[fieldName]; len(fhs) > 0 {
+				switch fieldValue.Interface().(type) {
+				case *multipart.FileHeader:
+					fieldValue.Set(reflect.ValueOf(fhs[0]))
+				case []*multipart.FileHeader:
+					fieldValue.Set(reflect.ValueOf(fhs))
+				}
+			}
+			continue
+		} else if len(inputValue) == 0 {
+			continue
+		}
+
+		if fieldKind == reflect.Slice {
+			num := len(inputValue)
+			kind := field.Type.Elem().Kind()
+			slice := reflect.MakeSlice(field.Type, num, num)
+			for j := 0; j < num; j++ {
+				err = setWithProperType(kind, slice.Index(j), inputValue[j])
 				if err != nil {
-					return err
+					return
 				}
 			}
-			continue
-		}
-
-		if inputFieldName == "" {
-			inputFieldName = typeField.Name
-			// If tag is nil, we inspect if the field is a struct.
-			if _, ok := bindUnmarshaler(structField); !ok && structFieldKind == reflect.Struct {
-				if err := bindURLValues(structField, data, tag); err != nil {
-					return err
-				}
-				continue
-			}
-		}
-
-		inputValue, exists := data[inputFieldName]
-		if !exists {
-			// Go json.Unmarshal supports case insensitive binding.
-			// However the url params are bound case sensitive which is inconsistent.
-			// To fix this we must check all of the map values in a case-insensitive search.
-			inputFieldName = strings.ToLower(inputFieldName)
-			for k, v := range data {
-				if strings.ToLower(k) == inputFieldName {
-					inputValue = v
-					exists = true
-					break
-				}
-			}
-		}
-
-		if !exists {
-			continue
-		}
-
-		// Call this first, in case we're dealing with an alias to an array type
-		if ok, err := unmarshalField(typeField.Type.Kind(), inputValue[0], structField); ok {
+			fieldValue.Set(slice)
+		} else {
+			err = setWithProperType(fieldKind, fieldValue, inputValue[0])
 			if err != nil {
-				return err
+				return
 			}
-			continue
-		}
-
-		numElems := len(inputValue)
-		if structFieldKind == reflect.Slice && numElems > 0 {
-			sliceOf := structField.Type().Elem().Kind()
-			slice := reflect.MakeSlice(structField.Type(), numElems, numElems)
-			for j := 0; j < numElems; j++ {
-				if err := setWithProperType(sliceOf, inputValue[j], slice.Index(j)); err != nil {
-					return err
-				}
-			}
-			val.Field(i).Set(slice)
-		} else if err := setWithProperType(typeField.Type.Kind(), inputValue[0], structField); err != nil {
-			return err
 		}
 	}
 
 	return
 }
 
-func setWithProperType(valueKind reflect.Kind, val string, structField reflect.Value) error {
-	// But also call it here, in case we're dealing with an array of BindUnmarshalers
-	if ok, err := unmarshalField(valueKind, val, structField); ok {
-		return err
+var binderType = reflect.TypeOf((*BindUnmarshaler)(nil)).Elem()
+
+func bindUnmarshaler(kind reflect.Kind, val reflect.Value, value string) (ok bool, err error) {
+	if kind != reflect.Ptr && kind != reflect.Interface {
+		val = val.Addr()
 	}
 
-	switch valueKind {
-	case reflect.Ptr:
-		return setWithProperType(structField.Elem().Kind(), val, structField.Elem())
-	case reflect.Int:
-		return setIntField(val, 0, structField)
-	case reflect.Int8:
-		return setIntField(val, 8, structField)
-	case reflect.Int16:
-		return setIntField(val, 16, structField)
-	case reflect.Int32:
-		return setIntField(val, 32, structField)
-	case reflect.Int64:
-		if _, ok := structField.Interface().(time.Duration); ok {
-			v, err := time.ParseDuration(val)
-			if err == nil {
-				structField.SetInt(int64(v))
-			}
-			return err
-		}
-		return setIntField(val, 64, structField)
-	case reflect.Uint:
-		return setUintField(val, 0, structField)
-	case reflect.Uint8:
-		return setUintField(val, 8, structField)
-	case reflect.Uint16:
-		return setUintField(val, 16, structField)
-	case reflect.Uint32:
-		return setUintField(val, 32, structField)
-	case reflect.Uint64:
-		return setUintField(val, 64, structField)
-	case reflect.Bool:
-		return setBoolField(val, structField)
-	case reflect.Float32:
-		return setFloatField(val, 32, structField)
-	case reflect.Float64:
-		return setFloatField(val, 64, structField)
-	case reflect.String:
-		structField.SetString(val)
-	default:
-		if _, ok := structField.Interface().(time.Time); ok {
-			if val == "" {
-				return nil
-			}
-			return structField.Addr().Interface().(*time.Time).UnmarshalText([]byte(val))
-		}
-		return errors.New("unknown type")
-	}
-	return nil
-}
-
-func unmarshalField(valueKind reflect.Kind, val string, field reflect.Value) (bool, error) {
-	switch valueKind {
-	case reflect.Ptr:
-		return unmarshalFieldPtr(val, field)
-	default:
-		return unmarshalFieldNonPtr(val, field)
-	}
-}
-
-// bindUnmarshaler attempts to unmarshal a reflect.Value into a BindUnmarshaler
-func bindUnmarshaler(field reflect.Value) (BindUnmarshaler, bool) {
-	ptr := reflect.New(field.Type())
-	if ptr.CanInterface() {
-		iface := ptr.Interface()
-		if unmarshaler, ok := iface.(BindUnmarshaler); ok {
-			return unmarshaler, ok
+	if val.Type().Implements(binderType) {
+		if unmarshaler, ok := val.Interface().(BindUnmarshaler); ok {
+			return true, unmarshaler.UnmarshalBind(value)
 		}
 	}
-	return nil, false
-}
 
-func unmarshalFieldNonPtr(value string, field reflect.Value) (bool, error) {
-	if unmarshaler, ok := bindUnmarshaler(field); ok {
-		err := unmarshaler.UnmarshalBind(value)
-		field.Set(reflect.ValueOf(unmarshaler).Elem())
-		return true, err
-	}
 	return false, nil
 }
 
-func unmarshalFieldPtr(value string, field reflect.Value) (bool, error) {
-	if field.IsNil() {
-		// Initialize the pointer to a nil value
-		field.Set(reflect.New(field.Type().Elem()))
+func setWithProperType(kind reflect.Kind, value reflect.Value, input string) error {
+	if kind == reflect.Ptr && value.IsNil() {
+		value.Set(reflect.New(value.Type().Elem()))
+	} else if kind == reflect.Interface && value.IsNil() {
+		panic("the bind struct field interface value must not be nil")
 	}
-	return unmarshalFieldNonPtr(value, field.Elem())
+
+	if ok, err := bindUnmarshaler(kind, value, input); ok {
+		return err
+	}
+
+	switch kind {
+	case reflect.Ptr:
+		value = value.Elem()
+		return setWithProperType(value.Kind(), value, input)
+	case reflect.Int:
+		return setIntField(input, 0, value)
+	case reflect.Int8:
+		return setIntField(input, 8, value)
+	case reflect.Int16:
+		return setIntField(input, 16, value)
+	case reflect.Int32:
+		return setIntField(input, 32, value)
+	case reflect.Int64:
+		if _, ok := value.Interface().(time.Duration); ok {
+			v, err := time.ParseDuration(input)
+			if err == nil {
+				value.SetInt(int64(v))
+			}
+			return err
+		}
+		return setIntField(input, 64, value)
+	case reflect.Uint:
+		return setUintField(input, 0, value)
+	case reflect.Uint8:
+		return setUintField(input, 8, value)
+	case reflect.Uint16:
+		return setUintField(input, 16, value)
+	case reflect.Uint32:
+		return setUintField(input, 32, value)
+	case reflect.Uint64:
+		return setUintField(input, 64, value)
+	case reflect.Bool:
+		return setBoolField(input, value)
+	case reflect.Float32:
+		return setFloatField(input, 32, value)
+	case reflect.Float64:
+		return setFloatField(input, 64, value)
+	case reflect.String:
+		value.SetString(input)
+	default:
+		if _, ok := value.Interface().(time.Time); ok {
+			if input == "" {
+				return nil
+			}
+			return value.Addr().Interface().(*time.Time).UnmarshalText([]byte(input))
+		}
+		return fmt.Errorf("unknown field type '%T'", value.Interface())
+	}
+	return nil
 }
 
 func setIntField(value string, bitSize int, field reflect.Value) error {
