@@ -92,12 +92,12 @@ func bindURLValues(val reflect.Value, files map[string][]*multipart.FileHeader,
 
 		fieldValue := val.Field(i)
 		fieldKind := fieldValue.Kind()
-		if !fieldValue.CanSet() {
-			if field.Anonymous && fieldKind == reflect.Struct {
-				if err = bindURLValues(fieldValue, files, data, tag); err != nil {
-					return err
-				}
+		if field.Anonymous && fieldKind == reflect.Struct {
+			if err = bindURLValues(fieldValue, files, data, tag); err != nil {
+				return err
 			}
+			continue
+		} else if !fieldValue.CanSet() {
 			continue
 		}
 

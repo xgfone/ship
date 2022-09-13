@@ -59,6 +59,11 @@ func (b *paramBinder) UnmarshalBind(param string) error {
 	return err
 }
 
+type AnonymousString string
+type AnonymousStruct struct {
+	Embed string `query:"Embed"`
+}
+
 func TestBindURLValues(t *testing.T) {
 	type T struct {
 		Bool       bool            `query:"bool"`
@@ -82,6 +87,8 @@ func TestBindURLValues(t *testing.T) {
 
 		BindUnmarshaler `query:"anonymous1"`
 		paramBinder     `query:"anonymous2"`
+		AnonymousStruct `query:"anonymous3"`
+		AnonymousString `query:"anonymous4"`
 
 		Ingore int `query:"-"`
 		Ptr    *int
@@ -110,6 +117,8 @@ func TestBindURLValues(t *testing.T) {
 		"interface1": []string{"41"},
 		"interface2": []string{"42"},
 		"anonymous1": []string{"43"},
+		"anonymous4": []string{"44"},
+		"Embed":      []string{"45"},
 
 		"Ptr":    []string{"51"},
 		"Value":  []string{"51"},
@@ -140,6 +149,8 @@ func TestBindURLValues(t *testing.T) {
 		Interface1:      paramBinder{41},
 		Interface2:      &paramBinder{42},
 		BindUnmarshaler: &paramBinder{43},
+		AnonymousString: "44",
+		AnonymousStruct: AnonymousStruct{Embed: "45"},
 
 		paramBinder: paramBinder{int1},
 		Ptr:         &int1,
