@@ -21,6 +21,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -143,7 +144,6 @@ func (c *Context) URL(name string, params ...interface{}) string {
 //   - Handler
 //   - http.Handler
 //   - http.HandlerFunc
-//
 func (c *Context) FindRoute() (ok bool) {
 	h, n := c.Router.Match(c.req.URL.Path, c.req.Method, c.pnames, c.pvalues)
 	if h == nil {
@@ -300,10 +300,9 @@ func (c *Context) ContentLength() int64 { return c.req.ContentLength }
 // If there is no the request header "Accept", return nil.
 //
 // Notice:
-//   1. If the value is "*/*", it will be amended as "".
-//   2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
-//      So it can be used to match the prefix.
-//
+//  1. If the value is "*/*", it will be amended as "".
+//  2. If the value is "<MIME_type>/*", it will be amended as "<MIME_type>/".
+//     So it can be used to match the prefix.
 func (c *Context) Accept() []string {
 	type acceptT struct {
 		ct string
@@ -848,8 +847,8 @@ func (c *Context) contentDisposition(file, name, dispositionType string) error {
 		name = filepath.Base(file)
 	}
 
-	name = url.QueryEscape(name)
-	disposition := fmt.Sprintf("%s; filename*=utf-8''%s", dispositionType, name)
+	params := map[string]string{"filename*": "utf-8''" + name}
+	disposition := mime.FormatMediaType(dispositionType, params)
 	c.res.Header().Set(HeaderContentDisposition, disposition)
 	return c.File(file)
 }
