@@ -847,7 +847,7 @@ func (c *Context) contentDisposition(file, name, dispositionType string) error {
 		name = filepath.Base(file)
 	}
 
-	params := map[string]string{"filename*": "utf-8''" + name}
+	params := map[string]string{"filename": name}
 	disposition := mime.FormatMediaType(dispositionType, params)
 	c.res.Header().Set(HeaderContentDisposition, disposition)
 	return c.File(file)
