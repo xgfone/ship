@@ -157,19 +157,30 @@ func TestRouterAnyMethod(t *testing.T) {
 	handler2 := 2
 	handler3 := 3
 	handler4 := 4
+	handler5 := 5
 
 	router := NewRouter(nil)
 	router.Add("", "/path1", "GET", handler1)
 	router.Add("", "/path2", "PUT", handler2)
 	router.Add("", "/path2", "POST", handler3)
-	router.Add("", "/path2", "", handler4)
 
-	if rs := getRoutes(router); len(rs) != 12 {
+	handler, _ := router.Match("/path2", "nonstandard", nil, nil)
+	if handler != nil {
+		t.Errorf("unexpect to get the handler: %v, %T", handler, handler)
+	}
+	router.Add("", "/path2", "nonstandard", handler5)
+	handler, _ = router.Match("/path2", "nonstandard", nil, nil)
+	if h, ok := handler.(int); !ok || h != 5 {
+		t.Error("got an unexpected handler")
+	}
+
+	router.Add("", "/path2", "", handler4)
+	if rs := getRoutes(router); len(rs) != 14 {
 		t.Error(rs)
 	}
 
 	router.Del("/path2", "POST")
-	if rs := getRoutes(router); len(rs) != 11 {
+	if rs := getRoutes(router); len(rs) != 13 {
 		t.Error(rs)
 	} else {
 		for _, r := range rs {

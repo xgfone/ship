@@ -64,9 +64,11 @@ type methodHandler struct {
 	connect  interface{}
 	propfind interface{}
 	report   interface{}
+	any      interface{}
+	others   map[string]interface{}
 }
 
-func newMethodHandler() *methodHandler { return &methodHandler{} }
+func newMethodHandler() *methodHandler { return &methodHandler{others: make(map[string]interface{})} }
 
 func (mh *methodHandler) Range(f func(string, interface{})) {
 	if mh.get != nil {
@@ -112,6 +114,14 @@ func (mh *methodHandler) Range(f func(string, interface{})) {
 	if mh.report != nil {
 		f(REPORT, mh.report)
 	}
+
+	if mh.any != nil {
+		f("", mh.any)
+	}
+
+	for method, handler := range mh.others {
+		f(method, handler)
+	}
 }
 
 func (mh *methodHandler) Methods() []string {
@@ -124,6 +134,11 @@ func (mh *methodHandler) DelHandler(method string) { mh.AddHandler(method, nil) 
 func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 	switch method {
 	case "": // For Any Method
+		if handler == nil {
+			for method := range mh.others {
+				delete(mh.others, method)
+			}
+		}
 		*mh = methodHandler{
 			get:      handler,
 			put:      handler,
@@ -136,6 +151,8 @@ func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 			connect:  handler,
 			propfind: handler,
 			report:   handler,
+			any:      handler,
+			others:   mh.others,
 		}
 	case http.MethodGet:
 		mh.get = handler
@@ -159,6 +176,12 @@ func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 		mh.propfind = handler
 	case REPORT:
 		mh.report = handler
+	default:
+		if handler == nil {
+			delete(mh.others, method)
+		} else {
+			mh.others[method] = handler
+		}
 	}
 }
 
@@ -187,7 +210,10 @@ func (mh *methodHandler) FindHandler(method string) interface{} {
 	case REPORT:
 		return mh.report
 	default:
-		return nil
+		if h, ok := mh.others[method]; ok {
+			return h
+		}
+		return mh.any
 	}
 }
 
@@ -213,6 +239,10 @@ func (mh *methodHandler) HasHandler() bool {
 	} else if mh.propfind != nil {
 		return true
 	} else if mh.report != nil {
+		return true
+	} else if mh.any != nil {
+		return true
+	} else if len(mh.others) > 0 {
 		return true
 	}
 	return false
@@ -383,7 +413,7 @@ type Config struct {
 //   - OPTIONS
 //   - PROPFIND
 //   - REPORT
-//
+//   - Other non-standard methods
 type Router struct {
 	conf    Config
 	tree    *node
@@ -480,6 +510,8 @@ func (r *Router) Add(name, path, method string, h interface{}) (n int, err error
 	if h == nil {
 		return 0, fmt.Errorf("route handler must not be nil")
 	}
+
+	method = strings.ToUpper(method)
 
 	// Validate path
 	if r.conf.RemoveTrailingSlash {
@@ -689,6 +721,7 @@ func (r *Router) Match(path, method string, pnames, pvalues []string) (
 		ns     string // Next search
 	)
 
+	method = strings.ToUpper(method)
 	// Search order static > param > any
 	for {
 		if search == "" {
@@ -826,7 +859,7 @@ func (r *Router) Match(path, method string, pnames, pvalues []string) (
 // Del deletes the given route.
 func (r *Router) Del(path, method string) (err error) {
 	if path != "" {
-		err = r.delRoute(path, method)
+		err = r.delRoute(path, strings.ToUpper(method))
 	}
 	return
 }
