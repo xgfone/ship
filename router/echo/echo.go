@@ -180,6 +180,9 @@ func (mh *methodHandler) AddHandler(method string, handler interface{}) {
 		if handler == nil {
 			delete(mh.others, method)
 		} else {
+			if mh.others == nil {
+				mh.others = make(map[string]interface{}, 4)
+			}
 			mh.others[method] = handler
 		}
 	}
