@@ -73,17 +73,16 @@ func (mb *MuxBinder) Del(contentType string) {
 // by the request header "Content-Type" and calls it to bind the value dst
 // to req.
 func (mb *MuxBinder) Bind(dst interface{}, req *http.Request) error {
-	ct := req.Header.Get("Content-Type")
-	if index := strings.IndexAny(ct, ";"); index > 0 {
-		ct = strings.TrimSpace(ct[:index])
-	}
+	ct := req.Header.Get(HeaderContentType)
+	ct, _, _ = strings.Cut(ct, ";")
+	ct = strings.TrimSpace(ct)
 
 	if ct == "" {
 		return ErrMissingContentType
 	}
 
-	if binder := mb.Get(ct); binder != nil {
-		return binder.Bind(dst, req)
+	if bind := mb.Get(ct); bind != nil {
+		return bind.Bind(dst, req)
 	}
 
 	return ErrUnsupportedMediaType.Newf("not support Content-Type '%s'", ct)

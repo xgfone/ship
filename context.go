@@ -394,26 +394,16 @@ func (c *Context) ClientIP() string {
 // Return "" if there is no charset.
 func (c *Context) Charset() string {
 	ct := c.req.Header.Get(HeaderContentType)
-	index := strings.IndexByte(ct, ';')
-	for ; index > 0; index = strings.IndexByte(ct, ';') {
-		ct = ct[index+1:]
-		if index = strings.IndexByte(ct, '='); index > 0 {
-			if strings.TrimSpace(ct[:index]) == "charset" {
-				return strings.TrimSpace(ct[index+1:])
-			}
-			ct = ct[index+1:]
-		}
-	}
-	return ""
+	_, after, _ := strings.Cut(ct, ";")
+	_, charset, _ := strings.Cut(after, "=")
+	return strings.TrimSpace(charset)
 }
 
 // ContentType returns the Content-Type of the request without the charset.
-func (c *Context) ContentType() (ct string) {
-	ct = c.req.Header.Get(HeaderContentType)
-	if index := strings.IndexAny(ct, ";"); index > 0 {
-		ct = strings.TrimSpace(ct[:index])
-	}
-	return
+func (c *Context) ContentType() string {
+	hct := c.req.Header.Get(HeaderContentType)
+	ct, _, _ := strings.Cut(hct, ";")
+	return strings.TrimSpace(ct)
 }
 
 //----------------------------------------------------------------------------
