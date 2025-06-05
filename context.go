@@ -254,13 +254,13 @@ func (c *Context) IsTLS() bool { return c.req.TLS != nil }
 
 // IsAjax reports whether the request is ajax or not.
 func (c *Context) IsAjax() bool {
-	return c.req.Header.Get(HeaderXRequestedWith) == "XMLHttpRequest"
+	return strings.ToLower(c.req.Header.Get(HeaderXRequestedWith)) == "xmlhttprequest"
 }
 
 // IsWebSocket reports whether HTTP connection is WebSocket or not.
 func (c *Context) IsWebSocket() bool {
 	if c.req.Method == http.MethodGet &&
-		c.req.Header.Get(HeaderConnection) == "Upgrade" &&
+		strings.ToLower(c.req.Header.Get(HeaderConnection)) == "upgrade" &&
 		c.req.Header.Get(HeaderUpgrade) == "websocket" {
 		return true
 	}
