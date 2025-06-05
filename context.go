@@ -261,7 +261,7 @@ func (c *Context) IsAjax() bool {
 func (c *Context) IsWebSocket() bool {
 	if c.req.Method == http.MethodGet &&
 		strings.ToLower(c.req.Header.Get(HeaderConnection)) == "upgrade" &&
-		c.req.Header.Get(HeaderUpgrade) == "websocket" {
+		strings.ToLower(c.req.Header.Get(HeaderUpgrade)) == "websocket" {
 		return true
 	}
 	return false
